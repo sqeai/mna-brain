@@ -1,3 +1,6 @@
+/**
+ * API Route for getting a signed download URL for a file
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSignedUrl } from "@/lib/s3";
@@ -14,51 +17,56 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
 /**
- * GET - Generate a pre-signed download URL for a specific meeting note
+ * GET - Get a signed URL for downloading/previewing a file
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext
 ) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
 
     if (!id) {
       return NextResponse.json(
-        { error: "Meeting note ID is required" },
+        { error: "File ID is required" },
         { status: 400 }
       );
     }
 
     const supabase = getSupabaseClient();
 
-    // Fetch the meeting note to get the S3 key and original filename
-    const { data, error } = await supabase
-      .from("minutes_of_meeting")
+    // Get the record to find the S3 key
+    const { data: record, error: fetchError } = await supabase
+      .from("files")
       .select("file_link, file_name")
       .eq("id", id)
       .single();
 
-    if (error || !data) {
-      console.error("Database query error:", error);
+    if (fetchError || !record) {
+      console.error("Record not found:", fetchError);
       return NextResponse.json(
-        { error: "Meeting note not found" },
+        { error: "File not found" },
         { status: 404 }
       );
     }
 
-    // Generate a pre-signed URL that forces a browser download with the original filename
-    const downloadUrl = await getSignedUrl(data.file_link, 3600, data.file_name);
+    // Generate signed URL
+    const url = await getSignedUrl(record.file_link);
 
     return NextResponse.json({
       success: true,
-      download_url: downloadUrl,
+      url,
+      fileName: record.file_name,
     });
   } catch (error) {
-    console.error("Generate download URL error:", error);
+    console.error("Get download URL error:", error);
     return NextResponse.json(
-      { error: (error as Error).message || "Failed to generate download URL" },
+      { error: (error as Error).message || "Failed to get download URL" },
       { status: 500 }
     );
   }

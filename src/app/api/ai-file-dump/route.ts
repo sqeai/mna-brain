@@ -1,6 +1,6 @@
 /**
- * API Route for Meeting Notes
- * Handles POST (upload) and GET (list) requests for meeting notes
+ * API Route for AI File Dump
+ * Handles POST (upload) and GET (list) requests for file dumps
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -21,7 +21,7 @@ function getSupabaseClient() {
 }
 
 /**
- * POST - Upload a new meeting note file
+ * POST - Upload a new file
  */
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Initial insert with 'processing' status
     const { data: initialData, error: insertError } = await supabase
-      .from("minutes_of_meeting")
+      .from("files")
       .insert({
         file_name: fileName,
         file_link: s3Key,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (insertError || !initialData) {
       console.error("Database insert error:", insertError);
       return NextResponse.json(
-        { error: "Failed to create meeting note record" },
+        { error: "Failed to create file record" },
         { status: 500 }
       );
     }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       // 3. Update the record with full technical results
       await supabase
-        .from("minutes_of_meeting")
+        .from("files")
         .update({
           raw_notes: rawText,
           structured_notes: structuredResult ? JSON.stringify(structuredResult, null, 2) : null,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     } catch (processError) {
       console.error("Error during file processing:", processError);
       await supabase
-        .from("minutes_of_meeting")
+        .from("files")
         .update({
           processing_status: 'failed',
           raw_notes: rawText || "Extraction failed"
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch the updated record
     const { data: updatedData } = await supabase
-      .from("minutes_of_meeting")
+      .from("files")
       .select("*")
       .eq('id', initialData.id)
       .single();
@@ -120,29 +120,36 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Upload meeting note error:", error);
+    console.error("Upload file error:", error);
     return NextResponse.json(
-      { error: (error as Error).message || "Failed to upload meeting note" },
+      { error: (error as Error).message || "Failed to upload file" },
       { status: 500 }
     );
   }
 }
 
 /**
- * GET - List all meeting notes with signed URLs
+ * GET - List all files with signed URLs
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const fileType = request.nextUrl.searchParams.get("file_type");
+
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from("minutes_of_meeting")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let query = supabase
+      .from("files")
+      .select("*");
+
+    if (fileType) {
+      query = query.eq("file_type", fileType);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) {
       console.error("Database query error:", error);
       return NextResponse.json(
-        { error: "Failed to fetch meeting notes" },
+        { error: "Failed to fetch files" },
         { status: 500 }
       );
     }
@@ -171,16 +178,16 @@ export async function GET() {
       data: notesWithUrls,
     });
   } catch (error) {
-    console.error("Fetch meeting notes error:", error);
+    console.error("Fetch files error:", error);
     return NextResponse.json(
-      { error: (error as Error).message || "Failed to fetch meeting notes" },
+      { error: (error as Error).message || "Failed to fetch files" },
       { status: 500 }
     );
   }
 }
 
 /**
- * PATCH - Update a meeting note
+ * PATCH - Update a file record
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -188,14 +195,14 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { error: "Meeting note ID is required" },
+        { error: "File ID is required" },
         { status: 400 }
       );
     }
 
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from("minutes_of_meeting")
+      .from("files")
       .update(updates)
       .eq("id", id)
       .select()
@@ -204,7 +211,7 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       console.error("Database update error:", error);
       return NextResponse.json(
-        { error: "Failed to update meeting note" },
+        { error: "Failed to update file record" },
         { status: 500 }
       );
     }
@@ -214,9 +221,9 @@ export async function PATCH(request: NextRequest) {
       data,
     });
   } catch (error) {
-    console.error("Update meeting note error:", error);
+    console.error("Update file error:", error);
     return NextResponse.json(
-      { error: (error as Error).message || "Failed to update meeting note" },
+      { error: (error as Error).message || "Failed to update file record" },
       { status: 500 }
     );
   }

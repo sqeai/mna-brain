@@ -142,7 +142,7 @@ export async function processFileContent(rawText: string) {
             // OR simply return this data. 
             // Given the instructions: "structure it... match it... store it". 
             // We will attach the note content to the matched_companies object so the caller (API) can use it if needed,
-            // or just rely on the 'matched_companies' column in minutes_of_meeting.
+            // or just rely on the 'matched_companies' column in files table.
 
             // Let's augment the matched company object with the note
             const recordIndex = finalMatchedCompanies.findIndex(m => m.id === match.id);
