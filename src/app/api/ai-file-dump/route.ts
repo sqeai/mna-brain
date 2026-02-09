@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
       .insert({
         file_name: fileName,
         file_link: s3Key,
-        processing_status: 'processing'
+        processing_status: 'processing',
+        file_type: 'other'
       })
       .select()
       .single();
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
         .from("files")
         .update({
           raw_notes: rawText,
+          file_type: structuredResult?.file_type || 'other',
           structured_notes: structuredResult ? JSON.stringify(structuredResult, null, 2) : null,
           tags: tags,
           matched_companies: matched_companies,
