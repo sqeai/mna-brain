@@ -191,9 +191,9 @@ export default function Pipeline() {
   // Source filter
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
-  // L1 pagination
-  const [l1Page, setL1Page] = useState(0);
-  const L1_PAGE_SIZE = 10;
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
@@ -286,14 +286,14 @@ export default function Pipeline() {
   const handleTabChange = (value: string) => {
     setActiveTab(value as DealStage);
     setSelectedIds(new Set());
-    setL1Page(0);
+    setCurrentPage(1);
     router.push(`/pipeline?stage=${value}`);
   };
 
-  // Reset L1 page when filters change
+  // Reset page when filters change
   useEffect(() => {
-    setL1Page(0);
-  }, [searchQuery, sectorFilter, l1StatusFilter]);
+    setCurrentPage(1);
+  }, [searchQuery, sectorFilter, l1StatusFilter, activeTab]);
 
   // Get unique sectors for filter
   const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))].sort();
@@ -883,10 +883,11 @@ export default function Pipeline() {
                             </TableHeader>
                             <TableBody>
                               {(() => {
-                                const displayCompanies = stage === 'L1'
-                                  ? sortedCompanies.slice(l1Page * L1_PAGE_SIZE, (l1Page + 1) * L1_PAGE_SIZE)
-                                  : sortedCompanies;
-                                return displayCompanies.map((company) => (
+                                const paginatedCompanies = sortedCompanies.slice(
+                                  (currentPage - 1) * itemsPerPage,
+                                  currentPage * itemsPerPage
+                                );
+                                return paginatedCompanies.map((company) => (
                                   <TableRow key={company.id} className="hover:bg-muted/50">
                                     {stage === 'L1' && (
                                       <TableCell>
@@ -970,35 +971,35 @@ export default function Pipeline() {
                         </div>
                       )}
 
-                      {/* L1 Pagination */}
-                      {stage === 'L1' && sortedCompanies.length > L1_PAGE_SIZE && (
-                        <div className="flex items-center justify-between pt-4">
-                          <p className="text-sm text-muted-foreground">
-                            Showing {l1Page * L1_PAGE_SIZE + 1}-{Math.min((l1Page + 1) * L1_PAGE_SIZE, sortedCompanies.length)} of {sortedCompanies.length} companies
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setL1Page((p) => Math.max(0, p - 1))}
-                              disabled={l1Page === 0}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-sm text-muted-foreground">
-                              Page {l1Page + 1} of {Math.ceil(sortedCompanies.length / L1_PAGE_SIZE)}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setL1Page((p) => Math.min(Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1, p + 1))}
-                              disabled={l1Page >= Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
+                      {(() => {
+                        const totalPages = Math.ceil(sortedCompanies.length / itemsPerPage);
+                        if (totalPages <= 1) return null;
+                        return (
+                          <div className="flex items-center justify-between pt-4">
+                            <p className="text-sm text-muted-foreground">
+                              Page {currentPage} of {totalPages} ({sortedCompanies.length} companies)
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                     </>
                   )}
