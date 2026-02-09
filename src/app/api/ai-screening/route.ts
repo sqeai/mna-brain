@@ -110,22 +110,74 @@ export async function POST(request: NextRequest) {
       .replace("{companyContext}", companyContext)
       .replace("{criteriaPrompt}", criteriaPrompt);
 
-    // Invoke the agent
-    const result = await agent.invoke({
-      messages: [new HumanMessage(evaluationPrompt)],
-    });
+    // Invoke the agent with a timeout to prevent hanging
+    // 4 minutes allows for multiple tool-call round trips (each ~10-30s) even under concurrent load
+    console.log(`[AI-Screening] Invoking agent for company=${company.name}, criteria=${criteriaId}`);
+    const AGENT_TIMEOUT_MS = 240_000; // 4 minutes timeout
+    let result;
+    try {
+      result = await Promise.race([
+        agent.invoke({
+          messages: [new HumanMessage(evaluationPrompt)],
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Agent invocation timed out")), AGENT_TIMEOUT_MS)
+        ),
+      ]);
+    } catch (agentError) {
+      const errorMsg = (agentError as Error).message;
+      console.error(`[AI-Screening] Agent error for company=${company.name}: ${errorMsg}`);
 
-    // Extract the response
-    const msg = result.messages[0];
+      // Detect rate limit errors from the Anthropic SDK and surface them with 429 status
+      const isRateLimit = errorMsg.includes('rate_limit') || errorMsg.includes('429') || errorMsg.includes('Rate limit');
+      if (isRateLimit) {
+        return NextResponse.json(
+          {
+            companyId,
+            criteriaId,
+            result: "error",
+            remarks: "Rate limit exceeded. Request will be retried automatically.",
+          },
+          { status: 429 }
+        );
+      }
+
+      // Return 504 Gateway Timeout for timeout errors so the frontend can detect and retry
+      const isTimeout = errorMsg.includes('timed out');
+      if (isTimeout) {
+        return NextResponse.json(
+          {
+            companyId,
+            criteriaId,
+            result: "error",
+            remarks: "Screening timed out. Will be retried automatically.",
+          },
+          { status: 504 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          companyId,
+          criteriaId,
+          result: "error",
+          remarks: `Agent error: ${errorMsg}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Extract the last message (AI's final response)
+    const messages = result.messages;
+    const msg = messages[messages.length - 1];
     const content = msg ? (typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)) : "";
 
     let screeningResult: ScreeningResult;
     try {
-      // Try to parse as JSON
       const parsed = JSON.parse(content);
       screeningResult = ScreeningResultSchema.parse(parsed);
     } catch {
-      // If parsing fails, try to extract JSON from the response
+      // If direct parse fails, try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
@@ -145,6 +197,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log(`[AI-Screening] Result for company=${company.name}, criteria=${criteriaId}: ${screeningResult.result}`);
+
     return NextResponse.json({
       companyId,
       criteriaId,
@@ -152,9 +206,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("AI Screening error:", error);
+
+    // Detect rate limit errors thrown by the Anthropic SDK
+    const errorMsg = (error as Error).message || "";
+    const isRateLimit = errorMsg.includes('rate_limit') || errorMsg.includes('429') || errorMsg.includes('Rate limit');
+    if (isRateLimit) {
+      return NextResponse.json(
+        {
+          result: "error",
+          remarks: "Rate limit exceeded. Request will be retried automatically.",
+        },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json(
       {
-        error: (error as Error).message || "Internal server error",
+        error: errorMsg || "Internal server error",
         result: "error",
         remarks: "An error occurred during screening",
       },

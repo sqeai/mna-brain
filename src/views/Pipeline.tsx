@@ -36,6 +36,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Search,
+  ChevronLeft,
   ChevronRight,
   Building2,
   TrendingUp,
@@ -80,6 +81,7 @@ interface PipelineCompany {
   ev_2024: number | null;
   pipeline_stage: DealStage;
   l1_screening_result: string | null;
+  pic: string | null;
   remarks: string | null;
   created_at: string;
   updated_at: string;
@@ -189,6 +191,10 @@ export default function Pipeline() {
   // Source filter
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
+  // L1 pagination
+  const [l1Page, setL1Page] = useState(0);
+  const L1_PAGE_SIZE = 10;
+
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotingCompany, setPromotingCompany] = useState<PipelineCompany | null>(null);
@@ -239,7 +245,8 @@ export default function Pipeline() {
         ev_2024: company.ev_2024,
         pipeline_stage: (company.pipeline_stage || 'L0') as DealStage,
         l1_screening_result: company.l1_screening_result,
-        remarks: company.remarks,
+        pic: company.pic || null,
+        remarks: company.remarks || null,
         created_at: company.created_at,
         updated_at: company.updated_at,
       })) || [];
@@ -278,8 +285,15 @@ export default function Pipeline() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as DealStage);
+    setSelectedIds(new Set());
+    setL1Page(0);
     router.push(`/pipeline?stage=${value}`);
   };
+
+  // Reset L1 page when filters change
+  useEffect(() => {
+    setL1Page(0);
+  }, [searchQuery, sectorFilter, l1StatusFilter]);
 
   // Get unique sectors for filter
   const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))].sort();
@@ -434,17 +448,17 @@ export default function Pipeline() {
   };
 
   const toggleSelectAll = () => {
-    const l0Companies = filteredCompanies.filter(c => c.pipeline_stage === 'L0');
-    if (selectedIds.size === l0Companies.length && l0Companies.length > 0) {
+    const stageCompanies = filteredCompanies.filter(c => c.pipeline_stage === activeTab);
+    if (selectedIds.size === stageCompanies.length && stageCompanies.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(l0Companies.map(c => c.id)));
+      setSelectedIds(new Set(stageCompanies.map(c => c.id)));
     }
   };
 
   const isAllSelected = () => {
-    const l0Companies = filteredCompanies.filter(c => c.pipeline_stage === 'L0');
-    return l0Companies.length > 0 && selectedIds.size === l0Companies.length;
+    const stageCompanies = filteredCompanies.filter(c => c.pipeline_stage === activeTab);
+    return stageCompanies.length > 0 && selectedIds.size === stageCompanies.length;
   };
 
   return (
@@ -552,8 +566,8 @@ export default function Pipeline() {
                             </div>
                           </CardHeader>
                           <CardContent>
-                            {/* Header with Select All and AI Screening */}
-                            <div className="flex items-center justify-between mb-4">
+                            {/* Header with Select All */}
+                            <div className="flex items-center mb-4">
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   checked={isAllSelected()}
@@ -564,13 +578,6 @@ export default function Pipeline() {
                                   Select All
                                 </label>
                               </div>
-                              <Button
-                                onClick={openAIScreening}
-                                className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
-                              >
-                                <Sparkles className="mr-2 h-4 w-4" />
-                                AI Screening ({selectedIds.size} selected)
-                              </Button>
                             </div>
 
                             {/* Filters */}
@@ -746,24 +753,32 @@ export default function Pipeline() {
                         </Card>
                       </CollapsibleSection>
 
-                      {/* AI Screening Progress Panel */}
-                      <CollapsibleSection title="Screening Progress">
-                        <ScreeningProgressPanel
-                          refreshTrigger={screeningProgressRefresh}
-                          onScreeningComplete={() => {
-                            fetchCompanies();
-                          }}
-                          onCompanyClick={(companyId) => {
-                            const company = companies.find((c) => c.id === companyId);
-                            if (company) {
-                              setSelectedCompany(company);
-                            }
-                          }}
-                        />
-                      </CollapsibleSection>
                     </div>
                   ) : (
                     <>
+                      {/* Header with Select All and AI Screening for L1 */}
+                      {stage === 'L1' && (
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={isAllSelected()}
+                              onCheckedChange={toggleSelectAll}
+                              id="select-all-l1"
+                            />
+                            <label htmlFor="select-all-l1" className="text-sm font-medium cursor-pointer">
+                              Select All
+                            </label>
+                          </div>
+                          <Button
+                            onClick={openAIScreening}
+                            className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
+                          >
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            AI Screening ({selectedIds.size} selected)
+                          </Button>
+                        </div>
+                      )}
+
                       {/* Filters for L1-L5 stages */}
                       <div className="flex items-center gap-4 mb-4 flex-wrap">
                         <div className="relative flex-1 max-w-sm">
@@ -818,6 +833,7 @@ export default function Pipeline() {
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                {stage === 'L1' && <TableHead className="w-[50px]">Select</TableHead>}
                                 <TableHead>
                                   <button
                                     onClick={() => toggleSort('name')}
@@ -836,7 +852,7 @@ export default function Pipeline() {
                                     <SortIcon field="sector" />
                                   </button>
                                 </TableHead>
-                                {stage === 'L1' && <TableHead>Status</TableHead>}
+                                {stage === 'L1' && <TableHead>PIC</TableHead>}
                                 <TableHead className="text-right">Rev 2023</TableHead>
                                 <TableHead className="text-right">Rev 2024</TableHead>
                                 <TableHead className="text-right">Rev 2025</TableHead>
@@ -866,9 +882,20 @@ export default function Pipeline() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {sortedCompanies.map((company) => {
-                                return (
-                                  <TableRow key={company.id}>
+                              {(() => {
+                                const displayCompanies = stage === 'L1'
+                                  ? sortedCompanies.slice(l1Page * L1_PAGE_SIZE, (l1Page + 1) * L1_PAGE_SIZE)
+                                  : sortedCompanies;
+                                return displayCompanies.map((company) => (
+                                  <TableRow key={company.id} className="hover:bg-muted/50">
+                                    {stage === 'L1' && (
+                                      <TableCell>
+                                        <Checkbox
+                                          checked={selectedIds.has(company.id)}
+                                          onCheckedChange={() => toggleSelect(company.id)}
+                                        />
+                                      </TableCell>
+                                    )}
                                     <TableCell>
                                       <button
                                         onClick={() => setSelectedCompany(company)}
@@ -882,7 +909,9 @@ export default function Pipeline() {
                                     </TableCell>
                                     {stage === 'L1' && (
                                       <TableCell>
-                                        <L1StatusBadge status={company.l1_screening_result as L1Status | null} />
+                                        <span className="text-sm text-muted-foreground">
+                                          {company.pic || '-'}
+                                        </span>
                                       </TableCell>
                                     )}
                                     <TableCell className="text-right font-mono">
@@ -934,16 +963,65 @@ export default function Pipeline() {
                                       )}
                                     </TableCell>
                                   </TableRow>
-                                );
-                              })}
+                                ));
+                              })()}
                             </TableBody>
                           </Table>
                         </div>
                       )}
+
+                      {/* L1 Pagination */}
+                      {stage === 'L1' && sortedCompanies.length > L1_PAGE_SIZE && (
+                        <div className="flex items-center justify-between pt-4">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {l1Page * L1_PAGE_SIZE + 1}-{Math.min((l1Page + 1) * L1_PAGE_SIZE, sortedCompanies.length)} of {sortedCompanies.length} companies
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setL1Page((p) => Math.max(0, p - 1))}
+                              disabled={l1Page === 0}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
+                              Page {l1Page + 1} of {Math.ceil(sortedCompanies.length / L1_PAGE_SIZE)}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setL1Page((p) => Math.min(Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1, p + 1))}
+                              disabled={l1Page >= Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
                     </>
                   )}
                 </CardContent>
               </Card>
+
+              {/* AI Screening Progress Panel for L1 */}
+              {stage === 'L1' && (
+                <CollapsibleSection title="Screening Progress">
+                  <ScreeningProgressPanel
+                    refreshTrigger={screeningProgressRefresh}
+                    onScreeningComplete={() => {
+                      fetchCompanies();
+                    }}
+                    onCompanyClick={(companyId) => {
+                      const company = companies.find((c) => c.id === companyId);
+                      if (company) {
+                        setSelectedCompany(company);
+                      }
+                    }}
+                  />
+                </CollapsibleSection>
+              )}
             </TabsContent>
           ))}
         </Tabs>
