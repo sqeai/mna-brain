@@ -33,7 +33,14 @@ import {
   DollarSign,
   BarChart3,
   Expand,
+  Sparkles,
+  Lightbulb,
+  AlertTriangle,
+  Search,
+  Briefcase,
+  Globe,
 } from 'lucide-react';
+import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
 import { DealStage, L1Status } from '@/lib/types';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
@@ -114,6 +121,28 @@ interface Screening {
   };
 }
 
+interface CompanyAnalysis {
+  id?: string;
+  company_id: string;
+  status: string;
+  business_overview: string | null;
+  business_model_summary: string | null;
+  key_takeaways: string | null;
+  investment_highlights: string | null;
+  investment_risks: string | null;
+  diligence_priorities: string | null;
+  sources: AnalysisSource[] | null;
+  error_message: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+interface AnalysisSource {
+  type: string;
+  url?: string;
+  title?: string;
+}
+
 interface CompanyDetailDialogProps {
   company: CompanyData;
   open: boolean;
@@ -151,6 +180,10 @@ export default function CompanyDetailDialog({
   const [screenings, setScreenings] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Analysis states
+  const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
+  const [analysisGenerating, setAnalysisGenerating] = useState(false);
+
   // Form states
   const [newNote, setNewNote] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -160,6 +193,7 @@ export default function CompanyDetailDialog({
   useEffect(() => {
     if (open) {
       fetchDetails();
+      fetchAnalysis();
     }
   }, [open, company.id]);
 
@@ -211,6 +245,83 @@ export default function CompanyDetailDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAnalysis = async () => {
+    try {
+      const res = await fetch(`/api/company-analysis?companyId=${company.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysis(data);
+        if (data.status === 'generating') {
+          setAnalysisGenerating(true);
+          pollAnalysis();
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching analysis:', error);
+    }
+  };
+
+  const pollAnalysis = () => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/company-analysis?companyId=${company.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAnalysis(data);
+          if (data.status !== 'generating') {
+            setAnalysisGenerating(false);
+            clearInterval(interval);
+          }
+        }
+      } catch {
+        clearInterval(interval);
+        setAnalysisGenerating(false);
+      }
+    }, 5000);
+    setTimeout(() => {
+      clearInterval(interval);
+      setAnalysisGenerating(false);
+    }, 300000);
+  };
+
+  const generateAnalysis = async () => {
+    setAnalysisGenerating(true);
+    try {
+      const res = await fetch('/api/company-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: company.id }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate analysis');
+      }
+
+      const data = await res.json();
+      setAnalysis(data);
+      toast.success('AI Company Card generated successfully');
+    } catch (error) {
+      console.error('Error generating analysis:', error);
+      toast.error((error as Error).message || 'Failed to generate AI Company Card');
+      fetchAnalysis();
+    } finally {
+      setAnalysisGenerating(false);
+    }
+  };
+
+  const regenerateAnalysis = async () => {
+    try {
+      await fetch(`/api/company-analysis?companyId=${company.id}`, {
+        method: 'DELETE',
+      });
+      setAnalysis(null);
+    } catch {
+      // Continue even if delete fails
+    }
+    await generateAnalysis();
   };
 
   const addNote = async () => {
@@ -371,13 +482,33 @@ export default function CompanyDetailDialog({
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="filters">L1 Filters</TabsTrigger>
-            <TabsTrigger value="notes">Notes</TabsTrigger>
-            <TabsTrigger value="links">Links</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-2">
+            <TabsList className="grid grid-cols-6 flex-1">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="company-card">Company Card</TabsTrigger>
+              <TabsTrigger value="filters">L1 Filters</TabsTrigger>
+              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="links">Links</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+            </TabsList>
+            <Button
+              size="sm"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2 shrink-0"
+              onClick={analysis?.status === 'completed' ? regenerateAnalysis : generateAnalysis}
+              disabled={analysisGenerating}
+            >
+              {analysisGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {analysisGenerating
+                ? 'Generating...'
+                : analysis?.status === 'completed'
+                  ? 'Regenerate'
+                  : 'AI Company Card'}
+            </Button>
+          </div>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
             {/* Company Description */}
@@ -567,6 +698,153 @@ export default function CompanyDetailDialog({
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="company-card" className="space-y-4 mt-4">
+            {analysisGenerating && !analysis?.business_overview ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-accent">Generating AI Company Card</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Researching company data from multiple sources. This may take 1-2 minutes...
+                  </p>
+                </div>
+              </div>
+            ) : analysis?.status === 'failed' ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-destructive">Analysis Failed</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {analysis.error_message || 'An error occurred while generating the analysis.'}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={regenerateAnalysis} disabled={analysisGenerating}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            ) : analysis?.status === 'completed' ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-accent" />
+                    <h3 className="text-lg font-semibold text-accent">AI Company Card</h3>
+                    <span className="text-xs text-muted-foreground ml-2">AI-generated analysis</span>
+                  </div>
+                  {analysis.updated_at && (
+                    <span className="text-xs text-muted-foreground">
+                      Last: {format(new Date(analysis.updated_at), 'MMM d, yyyy HH:mm')}
+                    </span>
+                  )}
+                </div>
+
+                {analysis.sources && Array.isArray(analysis.sources) && analysis.sources.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Sources:</span>
+                    {(analysis.sources as AnalysisSource[]).map((source, idx) => (
+                      source.url ? (
+                        <a
+                          key={idx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
+                        >
+                          <Globe className="h-3 w-3" />
+                          {source.title || new URL(source.url).hostname}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      ) : (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs"
+                        >
+                          {source.type === 'database' ? (
+                            <FileText className="h-3 w-3" />
+                          ) : source.type === 'inven' ? (
+                            <Search className="h-3 w-3" />
+                          ) : source.type === 'meeting_notes' ? (
+                            <FileText className="h-3 w-3" />
+                          ) : (
+                            <Globe className="h-3 w-3" />
+                          )}
+                          {source.title || source.type}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                )}
+
+                <CompanyAnalysisSection
+                  title="Business Overview"
+                  description="Products, end markets, customer types, and geographic footprint."
+                  icon={Building2}
+                  content={analysis.business_overview || ''}
+                  colorVariant="default"
+                />
+
+                <CompanyAnalysisSection
+                  title="Business Model & Value Chain Summary"
+                  description="How the company operates economically and its position in the value chain."
+                  icon={Briefcase}
+                  content={analysis.business_model_summary || ''}
+                  colorVariant="teal"
+                />
+
+                <CompanyAnalysisSection
+                  title="Key Takeaways"
+                  description="The most important implications from the analysis (3-5 synthesized insights)."
+                  icon={Lightbulb}
+                  content={analysis.key_takeaways || ''}
+                  colorVariant="blue"
+                />
+
+                <CompanyAnalysisSection
+                  title="Investment Highlights"
+                  description="Upside drivers linked to the company's business model and positioning."
+                  icon={TrendingUp}
+                  content={analysis.investment_highlights || ''}
+                  colorVariant="green"
+                />
+
+                <CompanyAnalysisSection
+                  title="Investment Risks"
+                  description="Risks inherent to the company's business model and value chain."
+                  icon={AlertTriangle}
+                  content={analysis.investment_risks || ''}
+                  colorVariant="amber"
+                />
+
+                <CompanyAnalysisSection
+                  title="Diligence Priorities"
+                  description="Critical unknowns to resolve before advancing investment (3-7 items)."
+                  icon={Search}
+                  content={analysis.diligence_priorities || ''}
+                  colorVariant="rose"
+                />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
+                <Sparkles className="h-10 w-10 text-accent/50" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-muted-foreground">No AI Analysis Yet</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Click &quot;AI Company Card&quot; to generate a comprehensive analysis using AI.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
+                  onClick={generateAnalysis}
+                  disabled={analysisGenerating}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Generate AI Company Card
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="filters" className="space-y-4 mt-4">
