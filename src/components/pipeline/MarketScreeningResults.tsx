@@ -14,22 +14,51 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Plus, ExternalLink, Sparkles, Trash2, Calendar } from 'lucide-react';
-import MarketScreeningDetailDialog from './MarketScreeningDetailDialog';
+import CompanyDetailDialog from './CompanyDetailDialog';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MarketScreeningResult {
   id: string;
-  company_name: string;
-  sector: string | null;
-  description: string | null;
-  match_score: number | null;
-  match_reason: string | null;
+  target: string | null;
+  segment: string | null;
   website: string | null;
-  estimated_revenue: string | null;
-  estimated_valuation: string | null;
-  is_added_to_pipeline: boolean;
-  discovered_at: string;
+  pipeline_stage: string;
+  created_at: string;
   thesis_content: string | null;
+  remarks: string | null;
+
+  // Extended fields
+  segment_related_offerings: string | null;
+  company_focus: string | null;
+  ownership: string | null;
+  geography: string | null;
+
+  // Revenue (USD Mn)
+  revenue_2021_usd_mn: number | null;
+  revenue_2022_usd_mn: number | null;
+  revenue_2023_usd_mn: number | null;
+  revenue_2024_usd_mn: number | null;
+
+  // EBITDA (USD Mn)
+  ebitda_2021_usd_mn: number | null;
+  ebitda_2022_usd_mn: number | null;
+  ebitda_2023_usd_mn: number | null;
+  ebitda_2024_usd_mn: number | null;
+
+  // Valuation
+  ev_2024: number | null;
+  ev_ebitda_2024: number | null;
+
+  // Growth metrics
+  revenue_cagr_2021_2022: number | null;
+  revenue_cagr_2022_2023: number | null;
+  revenue_cagr_2023_2024: number | null;
+
+  // Margins
+  ebitda_margin_2021: number | null;
+  ebitda_margin_2022: number | null;
+  ebitda_margin_2023: number | null;
+  ebitda_margin_2024: number | null;
 }
 
 interface MarketScreeningResultsProps {
@@ -47,12 +76,11 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
 
   const fetchResults = async () => {
     try {
-      const { data, error } = await (supabase as any)
-        .from('market_screening_results')
+      const { data, error } = await supabase
+        .from('companies')
         .select('*')
-        .eq('is_added_to_pipeline', false)
-        .order('match_score', { ascending: false })
-        .order('discovered_at', { ascending: false });
+        .eq('pipeline_stage', 'market_screening')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setResults((data || []) as MarketScreeningResult[]);
@@ -100,35 +128,22 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
       const selectedResults = results.filter(r => selectedIds.has(r.id));
 
       for (const result of selectedResults) {
-        // Create company with pipeline_stage set to L0
-        const { data: company, error: companyError } = await supabase
+        // Promote company from market_screening to L0 pipeline stage
+        const { error: updateError } = await supabase
           .from('companies')
-          .insert({
-            target: result.company_name,
-            segment: result.sector || 'Unknown',
-            pipeline_stage: 'L0',
-            // Parse estimated values if available
-            ev_2024: parseEstimatedValue(result.estimated_valuation),
-          })
-          .select()
-          .single();
+          .update({ pipeline_stage: 'L0' })
+          .eq('id', result.id);
 
-        if (companyError) {
-          console.error('Error creating company:', companyError);
+        if (updateError) {
+          console.error('Error promoting company to L0:', updateError);
           continue;
         }
 
-        // Log the addition
+        // Log the promotion
         await supabase.from('company_logs').insert({
-          company_id: company.id,
-          action: 'ADDED_FROM_MARKET_SCREENING',
+          company_id: result.id,
+          action: 'PROMOTED_FROM_MARKET_SCREENING_TO_L0',
         });
-
-        // Mark as added
-        await (supabase as any)
-          .from('market_screening_results')
-          .update({ is_added_to_pipeline: true })
-          .eq('id', result.id);
       }
 
       toast.success(`Added ${selectedResults.length} companies to L0`);
@@ -143,27 +158,10 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     }
   };
 
-  const parseEstimatedValue = (value: string | null): number | null => {
-    if (!value) return null;
-
-    // Try to extract a number from strings like "$10M-$50M" or "$100M"
-    const match = value.match(/\$?([\d.]+)\s*(M|B|K)?/i);
-    if (!match) return null;
-
-    let num = parseFloat(match[1]);
-    const suffix = match[2]?.toUpperCase();
-
-    if (suffix === 'B') num *= 1_000_000_000;
-    else if (suffix === 'M') num *= 1_000_000;
-    else if (suffix === 'K') num *= 1_000;
-
-    return num;
-  };
-
   const dismissResult = async (id: string) => {
     try {
-      await (supabase as any)
-        .from('market_screening_results')
+      await supabase
+        .from('companies')
         .delete()
         .eq('id', id);
 
@@ -173,13 +171,6 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
       console.error('Error dismissing result:', error);
       toast.error('Failed to dismiss result');
     }
-  };
-
-  const getMatchScoreColor = (score: number | null) => {
-    if (score === null) return 'bg-muted text-muted-foreground';
-    if (score >= 80) return 'bg-emerald-500/20 text-emerald-600';
-    if (score >= 60) return 'bg-amber-500/20 text-amber-600';
-    return 'bg-red-500/20 text-red-600';
   };
 
   if (loading) {
@@ -275,11 +266,11 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
               <TableRow>
                 <TableHead className="w-[50px]">Select</TableHead>
                 <TableHead>Company</TableHead>
-                <TableHead>Sector</TableHead>
-                <TableHead>Match Score</TableHead>
-                <TableHead>Est. Revenue</TableHead>
-                <TableHead>Est. Valuation</TableHead>
+                <TableHead>Segment</TableHead>
+                <TableHead>Revenue 2024</TableHead>
+                <TableHead>EV 2024</TableHead>
                 <TableHead>Discovered</TableHead>
+                <TableHead className="max-w-[200px]">Remarks</TableHead>
                 <TableHead className="max-w-[150px]">Thesis</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -302,7 +293,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                         }}
                         className="font-medium text-left hover:text-primary hover:underline transition-colors"
                       >
-                        {result.company_name}
+                        {result.target}
                       </button>
                       {result.website && (
                         <a
@@ -319,24 +310,28 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{result.sector || 'Unknown'}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getMatchScoreColor(result.match_score)}>
-                      {result.match_score !== null ? `${result.match_score}%` : '-'}
-                    </Badge>
+                    <Badge variant="outline">{result.segment || 'Unknown'}</Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {result.estimated_revenue || '-'}
+                    {result.revenue_2024_usd_mn != null ? `$${result.revenue_2024_usd_mn.toFixed(1)}M` : '-'}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {result.estimated_valuation || '-'}
+                    {result.ev_2024 != null ? `$${result.ev_2024.toFixed(1)}M` : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      {formatDistanceToNow(new Date(result.discovered_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(result.created_at), { addSuffix: true })}
                     </div>
+                  </TableCell>
+                  <TableCell className="max-w-[200px]">
+                    {result.remarks ? (
+                      <p className="text-xs text-muted-foreground line-clamp-2" title={result.remarks}>
+                        {result.remarks}
+                      </p>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-[150px]">
                     <p className="text-xs text-muted-foreground truncate" title={result.thesis_content || ''}>
@@ -359,11 +354,33 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
           </Table>
         </div>
 
-        <MarketScreeningDetailDialog
-          result={selectedResult}
-          open={detailDialogOpen}
-          onOpenChange={setDetailDialogOpen}
-        />
+        {selectedResult && (
+          <CompanyDetailDialog
+            company={{
+              id: selectedResult.id,
+              target: selectedResult.target,
+              segment: selectedResult.segment,
+              watchlist_status: null,
+              pipeline_stage: selectedResult.pipeline_stage,
+              revenue_2021_usd_mn: selectedResult.revenue_2021_usd_mn,
+              revenue_2022_usd_mn: selectedResult.revenue_2022_usd_mn,
+              revenue_2023_usd_mn: selectedResult.revenue_2023_usd_mn,
+              revenue_2024_usd_mn: selectedResult.revenue_2024_usd_mn,
+              ebitda_2021_usd_mn: selectedResult.ebitda_2021_usd_mn,
+              ebitda_2022_usd_mn: selectedResult.ebitda_2022_usd_mn,
+              ebitda_2023_usd_mn: selectedResult.ebitda_2023_usd_mn,
+              ebitda_2024_usd_mn: selectedResult.ebitda_2024_usd_mn,
+              ev_2024: selectedResult.ev_2024,
+              l1_screening_result: null,
+              remarks: selectedResult.remarks,
+              created_at: selectedResult.created_at,
+              updated_at: selectedResult.created_at,
+            }}
+            open={detailDialogOpen}
+            onOpenChange={setDetailDialogOpen}
+            onUpdate={fetchResults}
+          />
+        )}
       </CardContent>
     </Card>
   );
