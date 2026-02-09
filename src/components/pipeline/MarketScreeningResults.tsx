@@ -14,7 +14,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Plus, ExternalLink, Sparkles, Trash2, Calendar } from 'lucide-react';
-import MarketScreeningDetailDialog from './MarketScreeningDetailDialog';
+import CompanyDetailDialog from './CompanyDetailDialog';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MarketScreeningResult {
@@ -354,11 +354,33 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
           </Table>
         </div>
 
-        <MarketScreeningDetailDialog
-          result={selectedResult}
-          open={detailDialogOpen}
-          onOpenChange={setDetailDialogOpen}
-        />
+        {selectedResult && (
+          <CompanyDetailDialog
+            company={{
+              id: selectedResult.id,
+              target: selectedResult.target,
+              segment: selectedResult.segment,
+              watchlist_status: null,
+              pipeline_stage: selectedResult.pipeline_stage,
+              revenue_2021_usd_mn: selectedResult.revenue_2021_usd_mn,
+              revenue_2022_usd_mn: selectedResult.revenue_2022_usd_mn,
+              revenue_2023_usd_mn: selectedResult.revenue_2023_usd_mn,
+              revenue_2024_usd_mn: selectedResult.revenue_2024_usd_mn,
+              ebitda_2021_usd_mn: selectedResult.ebitda_2021_usd_mn,
+              ebitda_2022_usd_mn: selectedResult.ebitda_2022_usd_mn,
+              ebitda_2023_usd_mn: selectedResult.ebitda_2023_usd_mn,
+              ebitda_2024_usd_mn: selectedResult.ebitda_2024_usd_mn,
+              ev_2024: selectedResult.ev_2024,
+              l1_screening_result: null,
+              remarks: selectedResult.remarks,
+              created_at: selectedResult.created_at,
+              updated_at: selectedResult.created_at,
+            }}
+            open={detailDialogOpen}
+            onOpenChange={setDetailDialogOpen}
+            onUpdate={fetchResults}
+          />
+        )}
       </CardContent>
     </Card>
   );
