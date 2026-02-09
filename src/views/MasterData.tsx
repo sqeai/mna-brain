@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import CompanyDetailDialog, { type CompanyData } from '@/components/pipeline/CompanyDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,8 @@ import {
   Minus,
   CheckCircle2,
   Bot,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import type { DealStage } from '@/lib/types';
 
@@ -94,10 +97,18 @@ export default function MasterData() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [sectorFilter, setSectorFilter] = useState<string>('all');
+  const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(null);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchCompanies();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, stageFilter, sectorFilter]);
 
   const fetchCompanies = async () => {
     try {
@@ -149,6 +160,65 @@ export default function MasterData() {
     return company.pipeline_stage;
   };
 
+  const openCompanyDialog = async (companyId: string) => {
+    setDialogLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select(`
+          id,
+          target,
+          segment,
+          watchlist_status,
+          revenue_2021_usd_mn,
+          revenue_2022_usd_mn,
+          revenue_2023_usd_mn,
+          revenue_2024_usd_mn,
+          ebitda_2021_usd_mn,
+          ebitda_2022_usd_mn,
+          ebitda_2023_usd_mn,
+          ebitda_2024_usd_mn,
+          ev_2024,
+          pipeline_stage,
+          l1_screening_result,
+          created_at,
+          updated_at,
+          remarks
+        `)
+        .eq('id', companyId)
+        .single();
+
+      if (error) throw error;
+      if (!data) return;
+
+      const companyData: CompanyData = {
+        id: data.id,
+        target: data.target ?? null,
+        segment: data.segment ?? null,
+        watchlist_status: data.watchlist_status ?? null,
+        pipeline_stage: data.pipeline_stage ?? null,
+        revenue_2021_usd_mn: data.revenue_2021_usd_mn ?? null,
+        revenue_2022_usd_mn: data.revenue_2022_usd_mn ?? null,
+        revenue_2023_usd_mn: data.revenue_2023_usd_mn ?? null,
+        revenue_2024_usd_mn: data.revenue_2024_usd_mn ?? null,
+        ebitda_2021_usd_mn: data.ebitda_2021_usd_mn ?? null,
+        ebitda_2022_usd_mn: data.ebitda_2022_usd_mn ?? null,
+        ebitda_2023_usd_mn: data.ebitda_2023_usd_mn ?? null,
+        ebitda_2024_usd_mn: data.ebitda_2024_usd_mn ?? null,
+        ev_2024: data.ev_2024 ?? null,
+        l1_screening_result: data.l1_screening_result ?? null,
+        created_at: data.created_at ?? '',
+        updated_at: data.updated_at ?? '',
+        remarks: data.remarks ?? null,
+      };
+      setSelectedCompany(companyData);
+    } catch (error) {
+      console.error('Error fetching company:', error);
+    } finally {
+      setDialogLoading(false);
+    }
+  };
+
   const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))];
 
   const filteredCompanies = companies.filter(company => {
@@ -161,6 +231,12 @@ export default function MasterData() {
 
     return matchesSearch && matchesStage && matchesSector;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / itemsPerPage));
+  const paginatedCompanies = filteredCompanies.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const stats = {
     total: companies.length,
@@ -261,6 +337,7 @@ export default function MasterData() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Stages</SelectItem>
+                  <SelectItem value="market_screening">Market Screening</SelectItem>
                   <SelectItem value="L0">L0 - Sourcing</SelectItem>
                   <SelectItem value="L1">L1 - Screening</SelectItem>
                   <SelectItem value="L2">L2 - Initial Review</SelectItem>
@@ -300,6 +377,7 @@ export default function MasterData() {
                 <p>No companies found matching your filters.</p>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -319,20 +397,29 @@ export default function MasterData() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCompanies.map((company) => {
+                    {paginatedCompanies.map((company) => {
                       const displayStage = getDisplayStage(company);
                       const revenueChange = getRevenueChange(company.revenue_2023_usd_mn, company.revenue_2024_usd_mn);
 
                       return (
                         <TableRow key={company.id}>
-                          <TableCell className="font-medium">{company.target}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              type="button"
+                              onClick={() => openCompanyDialog(company.id)}
+                              disabled={dialogLoading}
+                              className="text-left hover:text-primary hover:underline transition-colors disabled:opacity-50"
+                            >
+                              {company.target}
+                            </button>
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{company.segment}</Badge>
                           </TableCell>
                           <TableCell>
                             {displayStage ? (
                               <Badge className={`${stageColors[displayStage as DealStage]} text-white`}>
-                                {`${displayStage} - ${stageLabels[displayStage as DealStage]}`}
+                                {displayStage === 'market_screening' ? 'Market Screening' : `${displayStage} - ${stageLabels[displayStage as DealStage]}`}
                               </Badge>
                             ) : (
                               <Badge variant="outline">Not in Pipeline</Badge>
@@ -385,9 +472,44 @@ export default function MasterData() {
                   </TableBody>
                 </Table>
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages} ({filteredCompanies.length} companies)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </CardContent>
         </Card>
+
+        {selectedCompany && (
+          <CompanyDetailDialog
+            company={selectedCompany}
+            open={!!selectedCompany}
+            onOpenChange={(open) => !open && setSelectedCompany(null)}
+            onUpdate={fetchCompanies}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

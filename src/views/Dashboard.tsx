@@ -109,7 +109,7 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchDashboardData();
