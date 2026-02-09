@@ -204,7 +204,25 @@ export default function Pipeline() {
     try {
       const { data, error } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          id,
+          target,
+          segment,
+          watchlist_status,
+          revenue_2021_usd_mn,
+          revenue_2022_usd_mn,
+          revenue_2023_usd_mn,
+          revenue_2024_usd_mn,
+          ebitda_2021_usd_mn,
+          ebitda_2022_usd_mn,
+          ebitda_2023_usd_mn,
+          ebitda_2024_usd_mn,
+          ev_2024,
+          pipeline_stage,
+          l1_screening_result,
+          created_at,
+          updated_at
+        `)
         .not('pipeline_stage', 'is', null)
         .neq('pipeline_stage', 'market_screening')
         .order('updated_at', { ascending: false });
