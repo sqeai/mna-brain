@@ -73,7 +73,7 @@ interface CompanyData {
   ebitda_margin_2023: number | null;
   ebitda_margin_2024: number | null;
   // AI Market Screening Remarks
-  remarks: string | null;
+  remarks?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
