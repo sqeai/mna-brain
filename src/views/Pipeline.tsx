@@ -80,6 +80,7 @@ interface PipelineCompany {
   ev_2024: number | null;
   pipeline_stage: DealStage;
   l1_screening_result: string | null;
+  remarks: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -847,6 +848,7 @@ export default function Pipeline() {
                                     <SortIcon field="valuation" />
                                   </button>
                                 </TableHead>
+                                <TableHead className="max-w-[200px]">Remarks</TableHead>
                                 <TableHead>
                                   <button
                                     onClick={() => toggleSort('updated')}
@@ -899,6 +901,15 @@ export default function Pipeline() {
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
                                       {formatCurrency(company.ev_2024)}
+                                    </TableCell>
+                                    <TableCell className="max-w-[200px]">
+                                      {company.remarks ? (
+                                        <p className="text-xs text-muted-foreground truncate" title={company.remarks}>
+                                          {company.remarks}
+                                        </p>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground text-sm">
                                       {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}

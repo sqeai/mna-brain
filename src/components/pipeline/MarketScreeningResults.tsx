@@ -30,6 +30,7 @@ interface MarketScreeningResult {
   is_added_to_pipeline: boolean;
   discovered_at: string;
   thesis_content: string | null;
+  remarks: string | null;
 }
 
 interface MarketScreeningResultsProps {
@@ -109,6 +110,8 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
             pipeline_stage: 'L0',
             // Parse estimated values if available
             ev_2024: parseEstimatedValue(result.estimated_valuation),
+            // AI-generated remarks cross-matched with thesis
+            remarks: result.remarks,
           })
           .select()
           .single();
@@ -280,6 +283,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                 <TableHead>Est. Revenue</TableHead>
                 <TableHead>Est. Valuation</TableHead>
                 <TableHead>Discovered</TableHead>
+                <TableHead className="max-w-[200px]">Remarks</TableHead>
                 <TableHead className="max-w-[150px]">Thesis</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -337,6 +341,15 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                       <Calendar className="h-3 w-3" />
                       {formatDistanceToNow(new Date(result.discovered_at), { addSuffix: true })}
                     </div>
+                  </TableCell>
+                  <TableCell className="max-w-[200px]">
+                    {result.remarks ? (
+                      <p className="text-xs text-muted-foreground line-clamp-2" title={result.remarks}>
+                        {result.remarks}
+                      </p>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-[150px]">
                     <p className="text-xs text-muted-foreground truncate" title={result.thesis_content || ''}>

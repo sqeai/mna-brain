@@ -114,6 +114,8 @@ export const companiesSchema = [
   { name: "ebitda_margin_2022", type: "numeric" },
   { name: "ebitda_margin_2023", type: "numeric" },
   { name: "ebitda_margin_2024", type: "numeric" },
+  // AI Market Screening Remarks
+  { name: "remarks", type: "text" },
 ];
 
 export const invenCacheSchema = [

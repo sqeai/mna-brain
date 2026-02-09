@@ -72,6 +72,8 @@ interface CompanyData {
   ebitda_margin_2022: number | null;
   ebitda_margin_2023: number | null;
   ebitda_margin_2024: number | null;
+  // AI Market Screening Remarks
+  remarks: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -489,6 +491,13 @@ export default function CompanyDetailPage() {
                   <div className="mt-4 pt-4 border-t">
                     <p className="text-sm text-muted-foreground mb-2">Comments</p>
                     <p className="text-sm">{company.comments}</p>
+                  </div>
+                )}
+                {/* AI Remarks */}
+                {company.remarks && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-1">AI Remarks (Thesis Cross-Match)</p>
+                    <p className="text-sm bg-muted/50 rounded-lg p-3">{company.remarks}</p>
                   </div>
                 )}
               </CardContent>

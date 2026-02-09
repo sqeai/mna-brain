@@ -63,6 +63,7 @@ interface CompanyData {
   ebitda_2024_usd_mn: number | null;
   ev_2024: number | null;
   l1_screening_result: string | null;
+  remarks: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -432,6 +433,14 @@ export default function CompanyDetailDialog({
                     </div>
                   </div>
                 </div>
+
+                {/* AI Remarks */}
+                {company.remarks && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-1">AI Remarks (Thesis Cross-Match)</p>
+                    <p className="text-sm bg-muted/50 rounded-lg p-3">{company.remarks}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
