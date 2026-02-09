@@ -32,6 +32,7 @@ interface MarketScreeningResult {
   estimated_valuation: string | null;
   is_added_to_pipeline: boolean;
   discovered_at: string;
+  remarks: string | null;
 }
 
 interface MarketScreeningDetailDialogProps {
@@ -231,6 +232,16 @@ export default function MarketScreeningDetailDialog({
                       Why This Company Matches Your Thesis
                     </h4>
                     <p className="text-sm leading-relaxed">{result.match_reason}</p>
+                  </div>
+                )}
+
+                {result.remarks && (
+                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20 mt-4">
+                    <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Thesis Cross-Match Remarks
+                    </h4>
+                    <p className="text-sm leading-relaxed">{result.remarks}</p>
                   </div>
                 )}
               </CardContent>

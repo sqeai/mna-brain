@@ -95,6 +95,7 @@ export type Database = {
           ownership: string | null
           pct_from_domestic: number | null
           pipeline_stage: string | null
+          remarks: string | null
           revenue_2021_usd_mn: number | null
           revenue_2022_usd_mn: number | null
           revenue_2023_usd_mn: number | null
@@ -170,6 +171,7 @@ export type Database = {
           ownership?: string | null
           pct_from_domestic?: number | null
           pipeline_stage?: string | null
+          remarks?: string | null
           revenue_2021_usd_mn?: number | null
           revenue_2022_usd_mn?: number | null
           revenue_2023_usd_mn?: number | null
@@ -245,6 +247,7 @@ export type Database = {
           ownership?: string | null
           pct_from_domestic?: number | null
           pipeline_stage?: string | null
+          remarks?: string | null
           revenue_2021_usd_mn?: number | null
           revenue_2022_usd_mn?: number | null
           revenue_2023_usd_mn?: number | null
@@ -778,6 +781,7 @@ export type Database = {
           is_added_to_pipeline: boolean | null
           match_reason: string | null
           match_score: number | null
+          remarks: string | null
           sector: string | null
           website: string | null
         }
@@ -791,6 +795,7 @@ export type Database = {
           is_added_to_pipeline?: boolean | null
           match_reason?: string | null
           match_score?: number | null
+          remarks?: string | null
           sector?: string | null
           website?: string | null
         }
@@ -804,6 +809,7 @@ export type Database = {
           is_added_to_pipeline?: boolean | null
           match_reason?: string | null
           match_score?: number | null
+          remarks?: string | null
           sector?: string | null
           website?: string | null
         }

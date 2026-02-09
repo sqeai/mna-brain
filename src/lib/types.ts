@@ -111,6 +111,9 @@ export interface Company {
   fx_ebitda_above_10_l3y: string | null;
   l1_screening_result: string | null;
   
+  // AI Market Screening Remarks (cross-matched with thesis)
+  remarks: string | null;
+  
   // Metadata
   created_at: string;
   updated_at: string;
@@ -274,6 +277,9 @@ export interface CompanyInsert {
   fx_rationale?: string | null;
   fx_ebitda_above_10_l3y?: string | null;
   l1_screening_result?: string | null;
+  
+  // AI Market Screening Remarks (cross-matched with thesis)
+  remarks?: string | null;
 }
 
 export interface CriteriaInsert {

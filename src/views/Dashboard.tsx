@@ -48,6 +48,7 @@ interface CompanyData {
   ebitda_2024_usd_mn: number | null;
   ev_2024: number | null;
   l1_screening_result: string | null;
+  remarks: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -135,6 +136,7 @@ export default function Dashboard() {
           ebitda_2024_usd_mn,
           ev_2024,
           l1_screening_result,
+          remarks,
           created_at,
           updated_at
         `)

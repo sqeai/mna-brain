@@ -61,6 +61,8 @@ interface DiscoveredCompany {
   ebitda_margin_2022?: number;
   ebitda_margin_2023?: number;
   ebitda_margin_2024?: number;
+  // AI-generated remarks cross-matched with thesis
+  remarks?: string;
   // Legacy fields for backwards compatibility
   sector?: string;
   description?: string;
@@ -130,6 +132,13 @@ For each company, try to find and populate ALL of these fields (use null if data
 - revenue_cagr_{year1}_{year2}: Revenue growth rate between years
 - ebitda_margin_{year}: EBITDA margin percentage for each year
 
+## Remarks Field (IMPORTANT)
+For each company, generate a "remarks" field that provides a concise assessment of how the company aligns with the investment thesis. The remarks should:
+- Cross-reference the company's characteristics against each key point of the investment thesis
+- Highlight which thesis criteria are met and which are not
+- Note any standout strengths or concerns relative to the thesis
+- Be concise (2-4 sentences) but substantive
+
 ## Required Output Format
 After searching, return your findings as a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
@@ -138,6 +147,7 @@ After searching, return your findings as a JSON object with EXACTLY this structu
       "company_name": "Company Name (REQUIRED)",
       "match_score": 85,
       "match_reason": "Why this company matches the thesis",
+      "remarks": "Concise thesis cross-match assessment (2-4 sentences)",
 ${schemaFields}
     }
   ]
@@ -150,13 +160,16 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
       messages: [new HumanMessage(prompt)],
     });
 
-    const msg = result.messages[0];
+    // Get the last AI message (not the first, which is the HumanMessage)
+    const aiMessages = result.messages.filter(
+      (m: any) => m._getType?.() === 'ai' || m.constructor?.name === 'AIMessage'
+    );
+    const msg = aiMessages[aiMessages.length - 1];
     const responseText = msg ? (typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)) : "";
 
     // Parse the JSON response
     let companies: DiscoveredCompany[] = [];
     try {
-      // Try to extract JSON from the response
       const jsonMatch = responseText.match(/\{[\s\S]*"companies"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -165,12 +178,6 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
       console.error('Raw response:', responseText.substring(0, 1000));
-      // If parsing fails, return a more informative error
-      return NextResponse.json({
-        count: 0,
-        message: 'AI search completed but could not parse results',
-        rawResponse: responseText.substring(0, 500)
-      });
     }
 
     if (companies.length === 0) {
@@ -225,6 +232,8 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
       ebitda_margin_2022: company.ebitda_margin_2022,
       ebitda_margin_2023: company.ebitda_margin_2023,
       ebitda_margin_2024: company.ebitda_margin_2024,
+      // AI-generated remarks cross-matched with thesis
+      remarks: company.remarks || null,
       // Legacy fields for backwards compatibility
       sector: company.sector || company.segment,
       description: company.description || company.company_focus,
