@@ -1,4 +1,4 @@
-# Terraform - IAM for MnA Meeting Notes S3 Access
+# Terraform - IAM for MnA Files S3 Access
 
 This directory contains Terraform configuration for IAM resources to access the S3 bucket.
 
@@ -6,9 +6,9 @@ This directory contains Terraform configuration for IAM resources to access the 
 
 | Resource | Name | Description |
 |----------|------|-------------|
-| IAM Policy | `mna-meeting-notes-s3-policy` | Read/write access to S3 bucket |
-| IAM Role | `mna-meeting-notes-role` | Assumable by EC2/Lambda |
-| IAM User | `mna-meeting-notes-user` | For programmatic access |
+| IAM Policy | `mna-files-s3-policy` | Read/write access to S3 bucket |
+| IAM Role | `mna-files-role` | Assumable by EC2/Lambda |
+| IAM User | `mna-files-user` | For programmatic access |
 | Access Key | - | Credentials for the IAM user |
 
 ## Prerequisites
@@ -75,12 +75,12 @@ To use with other services, modify the `assume_role_policy` in `main.tf`.
 Configure AWS CLI with the user credentials:
 
 ```bash
-aws configure --profile mna-meeting-notes
+aws configure --profile mna-files
 # Enter the access key ID and secret access key
 ```
 
 Then use the profile:
 
 ```bash
-aws s3 ls s3://mna-meeting-notes --profile mna-meeting-notes
+aws s3 ls s3://mna-files --profile mna-files
 ```
