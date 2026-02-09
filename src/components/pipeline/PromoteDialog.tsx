@@ -72,6 +72,15 @@ export default function PromoteDialog({
         action: `PROMOTED_FROM_${currentStage}_TO_${nextStage}`,
       });
 
+      // Auto-trigger AI Company Card when promoting to L1
+      if (nextStage === 'L1') {
+        fetch('/api/company-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId: dealId }),
+        }).catch(() => {}); // Silent — don't block promotion on analysis
+      }
+
       toast.success(`Promoted to ${nextStage}`);
       resetForm();
       onOpenChange(false);

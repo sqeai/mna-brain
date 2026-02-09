@@ -103,46 +103,25 @@ interface DealDocument {
 
 interface CompanyAnalysis {
   id?: string;
-  deal_id: string;
+  company_id: string;
+  status: string;
   business_overview: string | null;
   business_model_summary: string | null;
   key_takeaways: string | null;
   investment_highlights: string | null;
   investment_risks: string | null;
   diligence_priorities: string | null;
+  sources: AnalysisSource[] | null;
+  error_message: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-// Mock data for analysis sections
-const MOCK_ANALYSIS: CompanyAnalysis = {
-  deal_id: '',
-  business_overview: `- **Primary Products**: Specialty polyurethane foam systems, custom-formulated adhesives, and coating solutions
-- **End Markets**: Automotive interiors, construction insulation, furniture manufacturing, and industrial packaging
-- **Customer Types**: OEM manufacturers, tier-1 automotive suppliers, commercial construction contractors
-- **Geographic Footprint**: Headquarters in Munich, Germany; production facilities in Poland and Czech Republic`,
-  business_model_summary: `- **Core Focus**: Niche specialty formulator focused on high-performance polyurethane systems
-- **Value Chain Position**: Midstream specialty producer—sources base chemicals from upstream suppliers and formulates proprietary blends for downstream OEMs
-- **Revenue Model**: Volume-based sales with 60% recurring contract manufacturing; 40% project-based custom formulations
-- **Competitive Dimension**: Technical specification compliance and rapid formulation turnaround; customers face moderate switching costs due to qualification requirements`,
-  key_takeaways: `1. **Strong customer stickiness** driven by qualification-based switching costs in automotive applications
-2. **Margin profile protected** by technical differentiation rather than commodity pricing dynamics
-3. **Geographic concentration risk** with 85% of revenue from DACH region
-4. **Growth constrained** by capacity utilization at 92%—expansion capex likely required for material growth
-5. **Management depth untested** following recent CFO departure`,
-  investment_highlights: `- **Market Position**: Top-3 specialty formulator in DACH automotive foam market with 15+ year customer relationships
-- **Differentiation**: Proprietary low-VOC formulation technology aligned with tightening EU regulations
-- **Strategic Fit**: Direct alignment with thesis focus on specialty chemical platforms with regulatory tailwinds
-- **Growth Vectors**: EV lightweighting trend driving demand for high-performance foam systems; pipeline of 3 new OEM qualifications expected in 2025`,
-  investment_risks: `- **Customer Concentration**: Top 3 customers represent 55% of revenue
-- **Regulatory Exposure**: REACH compliance costs increasing; potential reformulation requirements
-- **End-Market Cyclicality**: Automotive represents 70% of revenue; vulnerable to production slowdowns
-- **Data Gaps**: Limited visibility into raw material cost pass-through mechanisms and contract terms`,
-  diligence_priorities: `1. What is the actual customer churn rate over the past 5 years, and what drove any losses?
-2. Can management provide detailed margin bridge showing raw material pass-through effectiveness?
-3. What capex is required to address capacity constraints, and what is the expected ROI?
-4. Validate the 3 pending OEM qualifications—stage, timeline, and expected revenue contribution
-5. Assess CFO departure circumstances and current finance function capabilities
-6. Review REACH compliance roadmap and associated cost estimates`,
-};
+interface AnalysisSource {
+  type: string;
+  url?: string;
+  title?: string;
+}
 
 const formatCurrency = (value: number | null) => {
   if (value === null) return '-';
@@ -166,13 +145,13 @@ export default function CompanyDetailPage() {
   const [links, setLinks] = useState<DealLink[]>([]);
   const [documents, setDocuments] = useState<DealDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const displayAnalysis = MOCK_ANALYSIS;
+  const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
+  const [analysisGenerating, setAnalysisGenerating] = useState(false);
 
   const [newNote, setNewNote] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastEvaluationAt] = useState<Date | null>(new Date('2025-02-03T14:30:00'));
 
   useEffect(() => {
     if (companyId) {
@@ -193,6 +172,7 @@ export default function CompanyDetailPage() {
       if (data) {
         setCompany(data as CompanyData);
         fetchDetails();
+        fetchAnalysis();
       }
     } catch (error) {
       console.error('Error fetching company:', error);
@@ -229,6 +209,95 @@ export default function CompanyDetailPage() {
     } catch (error) {
       console.error('Error fetching details:', error);
     }
+  };
+
+  const fetchAnalysis = async () => {
+    if (!companyId) return;
+    try {
+      const res = await fetch(`/api/company-analysis?companyId=${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysis(data);
+        // If still generating, poll until complete
+        if (data.status === 'generating') {
+          setAnalysisGenerating(true);
+          pollAnalysis();
+        }
+      }
+      // 404 is fine — no analysis yet
+    } catch (error) {
+      console.error('Error fetching analysis:', error);
+    }
+  };
+
+  const pollAnalysis = () => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/company-analysis?companyId=${companyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAnalysis(data);
+          if (data.status !== 'generating') {
+            setAnalysisGenerating(false);
+            clearInterval(interval);
+          }
+        }
+      } catch {
+        clearInterval(interval);
+        setAnalysisGenerating(false);
+      }
+    }, 5000);
+    // Clean up after 5 minutes max
+    setTimeout(() => {
+      clearInterval(interval);
+      setAnalysisGenerating(false);
+    }, 300000);
+  };
+
+  const generateAnalysis = async () => {
+    if (!companyId) return;
+    setAnalysisGenerating(true);
+
+    try {
+      const res = await fetch('/api/company-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate analysis');
+      }
+
+      const data = await res.json();
+      setAnalysis(data);
+      toast.success('AI Company Card generated successfully');
+    } catch (error) {
+      console.error('Error generating analysis:', error);
+      toast.error((error as Error).message || 'Failed to generate AI Company Card');
+      // Re-fetch to get the latest status (might be 'failed')
+      fetchAnalysis();
+    } finally {
+      setAnalysisGenerating(false);
+    }
+  };
+
+  const regenerateAnalysis = async () => {
+    if (!companyId) return;
+
+    try {
+      // Delete existing analysis first
+      await fetch(`/api/company-analysis?companyId=${companyId}`, {
+        method: 'DELETE',
+      });
+      setAnalysis(null);
+    } catch {
+      // Continue even if delete fails
+    }
+
+    // Generate fresh
+    await generateAnalysis();
   };
 
   const addNote = async () => {
@@ -424,13 +493,26 @@ export default function CompanyDetailPage() {
               <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <div className="flex flex-col items-end gap-1">
-              <Button size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Company Card
+              <Button
+                size="sm"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
+                onClick={analysis?.status === 'completed' ? regenerateAnalysis : generateAnalysis}
+                disabled={analysisGenerating}
+              >
+                {analysisGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {analysisGenerating
+                  ? 'Generating...'
+                  : analysis?.status === 'completed'
+                    ? 'Regenerate'
+                    : 'AI Company Card'}
               </Button>
-              {lastEvaluationAt && (
+              {analysis?.updated_at && analysis.status === 'completed' && (
                 <span className="text-xs text-muted-foreground">
-                  Last: {format(lastEvaluationAt, 'MMM d, yyyy HH:mm')}
+                  Last: {format(new Date(analysis.updated_at), 'MMM d, yyyy HH:mm')}
                 </span>
               )}
             </div>
@@ -514,100 +596,154 @@ export default function CompanyDetailPage() {
             />
 
             {/* AI Company Card Section */}
-            <div className="rounded-lg border border-accent/30 bg-accent/5 p-6 space-y-6">
-              <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-accent" />
-                  <h3 className="text-lg font-semibold text-accent">AI Company Card</h3>
-                  <span className="text-xs text-muted-foreground ml-2">AI-generated analysis</span>
+            {analysisGenerating && !analysis?.business_overview ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-accent">Generating AI Company Card</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Researching company data from multiple sources. This may take 1-2 minutes...
+                  </p>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
+              </div>
+            ) : analysis?.status === 'failed' ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-destructive">Analysis Failed</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {analysis.error_message || 'An error occurred while generating the analysis.'}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={regenerateAnalysis} disabled={analysisGenerating}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            ) : analysis?.status === 'completed' ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-6 space-y-6">
+                <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Sources:</span>
-                    <a
-                      href="https://www.crunchbase.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
-                    >
-                      <Globe className="h-3 w-3" />
-                      crunchbase.com
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                    <a
-                      href="https://www.linkedin.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
-                    >
-                      <Globe className="h-3 w-3" />
-                      linkedin.com
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs">
-                      <FileText className="h-3 w-3" />
-                      Company_Profile.pdf
-                    </span>
+                    <Sparkles className="h-5 w-5 text-accent" />
+                    <h3 className="text-lg font-semibold text-accent">AI Company Card</h3>
+                    <span className="text-xs text-muted-foreground ml-2">AI-generated analysis</span>
                   </div>
+                  {analysis.sources && Array.isArray(analysis.sources) && analysis.sources.length > 0 && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Sources:</span>
+                        {(analysis.sources as AnalysisSource[]).map((source, idx) => (
+                          source.url ? (
+                            <a
+                              key={idx}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
+                            >
+                              <Globe className="h-3 w-3" />
+                              {source.title || new URL(source.url).hostname}
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          ) : (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs"
+                            >
+                              {source.type === 'database' ? (
+                                <FileText className="h-3 w-3" />
+                              ) : source.type === 'inven' ? (
+                                <Search className="h-3 w-3" />
+                              ) : source.type === 'meeting_notes' ? (
+                                <FileText className="h-3 w-3" />
+                              ) : (
+                                <Globe className="h-3 w-3" />
+                              )}
+                              {source.title || source.type}
+                            </span>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Business Overview */}
-              <CompanyAnalysisSection
-                title="Business Overview"
-                description="Establish a factual baseline: products, end markets, customer types, and geographic footprint."
-                icon={Building2}
-                content={displayAnalysis.business_overview || ''}
-                colorVariant="default"
-              />
-
-              {/* Business Model & Value Chain Summary */}
-              <CompanyAnalysisSection
-                title="Business Model & Value Chain Summary"
-                description="Explain how the company operates economically and where it sits in the industry value chain."
-                icon={Briefcase}
-                content={displayAnalysis.business_model_summary || ''}
-                colorVariant="teal"
-              />
-
-              {/* Key Takeaways */}
-              <CompanyAnalysisSection
-                title="Key Takeaways"
-                description="Surface the most important implications from the analysis above (3-5 synthesized insights)."
-                icon={Lightbulb}
-                content={displayAnalysis.key_takeaways || ''}
-                colorVariant="blue"
-              />
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Investment Highlights */}
+                {/* Business Overview */}
                 <CompanyAnalysisSection
-                  title="Investment Highlights"
-                  description="Identify upside drivers linked to the company's business model and positioning."
-                  icon={TrendingUp}
-                  content={displayAnalysis.investment_highlights || ''}
-                  colorVariant="green"
+                  title="Business Overview"
+                  description="Establish a factual baseline: products, end markets, customer types, and geographic footprint."
+                  icon={Building2}
+                  content={analysis.business_overview || ''}
+                  colorVariant="default"
                 />
 
-                {/* Investment Risks */}
+                {/* Business Model & Value Chain Summary */}
                 <CompanyAnalysisSection
-                  title="Investment Risks"
-                  description="Identify risks inherent to the company's business model and value chain."
-                  icon={AlertTriangle}
-                  content={displayAnalysis.investment_risks || ''}
-                  colorVariant="amber"
+                  title="Business Model & Value Chain Summary"
+                  description="Explain how the company operates economically and where it sits in the industry value chain."
+                  icon={Briefcase}
+                  content={analysis.business_model_summary || ''}
+                  colorVariant="teal"
+                />
+
+                {/* Key Takeaways */}
+                <CompanyAnalysisSection
+                  title="Key Takeaways"
+                  description="Surface the most important implications from the analysis above (3-5 synthesized insights)."
+                  icon={Lightbulb}
+                  content={analysis.key_takeaways || ''}
+                  colorVariant="blue"
+                />
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Investment Highlights */}
+                  <CompanyAnalysisSection
+                    title="Investment Highlights"
+                    description="Identify upside drivers linked to the company's business model and positioning."
+                    icon={TrendingUp}
+                    content={analysis.investment_highlights || ''}
+                    colorVariant="green"
+                  />
+
+                  {/* Investment Risks */}
+                  <CompanyAnalysisSection
+                    title="Investment Risks"
+                    description="Identify risks inherent to the company's business model and value chain."
+                    icon={AlertTriangle}
+                    content={analysis.investment_risks || ''}
+                    colorVariant="amber"
+                  />
+                </div>
+
+                {/* Diligence Priorities */}
+                <CompanyAnalysisSection
+                  title="Diligence Priorities"
+                  description="Define the most critical unknowns to resolve before advancing investment (3-7 items)."
+                  icon={Search}
+                  content={analysis.diligence_priorities || ''}
+                  colorVariant="rose"
                 />
               </div>
-
-              {/* Diligence Priorities */}
-              <CompanyAnalysisSection
-                title="Diligence Priorities"
-                description="Define the most critical unknowns to resolve before advancing investment (3-7 items)."
-                icon={Search}
-                content={displayAnalysis.diligence_priorities || ''}
-                colorVariant="rose"
-              />
-            </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
+                <Sparkles className="h-10 w-10 text-accent/50" />
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-muted-foreground">No AI Analysis Yet</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Click &quot;AI Company Card&quot; to generate a comprehensive analysis using AI.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
+                  onClick={generateAnalysis}
+                  disabled={analysisGenerating}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Generate AI Company Card
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="filters" className="mt-6">

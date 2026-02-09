@@ -211,6 +211,13 @@ export default function ScreeningProgressPanel({
         .delete()
         .eq('company_id', companyId);
 
+      // Fire-and-forget: trigger AI Company Card generation
+      fetch('/api/company-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+      }).catch(() => {}); // Silent — don't block promotion on analysis
+
       toast.success(`${companyName} moved to L1`);
       onScreeningComplete?.();
       fetchScreenings();

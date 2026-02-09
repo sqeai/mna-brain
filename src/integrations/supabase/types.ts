@@ -558,6 +558,62 @@ export type Database = {
           },
         ]
       }
+      company_analyses: {
+        Row: {
+          id: string
+          company_id: string
+          status: string
+          business_overview: string | null
+          business_model_summary: string | null
+          key_takeaways: string | null
+          investment_highlights: string | null
+          investment_risks: string | null
+          diligence_priorities: string | null
+          sources: Json | null
+          error_message: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          status?: string
+          business_overview?: string | null
+          business_model_summary?: string | null
+          key_takeaways?: string | null
+          investment_highlights?: string | null
+          investment_risks?: string | null
+          diligence_priorities?: string | null
+          sources?: Json | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          status?: string
+          business_overview?: string | null
+          business_model_summary?: string | null
+          key_takeaways?: string | null
+          investment_highlights?: string | null
+          investment_risks?: string | null
+          diligence_priorities?: string | null
+          sources?: Json | null
+          error_message?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_analyses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       criterias: {
         Row: {
           created_at: string | null
