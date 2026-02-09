@@ -114,6 +114,9 @@ export interface Company {
   // AI Market Screening Remarks (cross-matched with thesis)
   remarks: string | null;
   
+  // Market Screening Fields
+  thesis_content: string | null;
+  
   // Metadata
   created_at: string;
   updated_at: string;
@@ -171,7 +174,7 @@ export type WatchlistStatus = 'Active' | 'Inactive' | 'Pending' | 'Removed';
 // ============================================
 // Pipeline Stage Enum
 // ============================================
-export type DealStage = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+export type DealStage = 'market_screening' | 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
 
 // ============================================
 // L1 Status Enum
@@ -280,6 +283,9 @@ export interface CompanyInsert {
   
   // AI Market Screening Remarks (cross-matched with thesis)
   remarks?: string | null;
+  
+  // Market Screening Fields
+  thesis_content?: string | null;
 }
 
 export interface CriteriaInsert {

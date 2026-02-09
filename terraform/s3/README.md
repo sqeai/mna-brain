@@ -1,4 +1,4 @@
-# Terraform - S3 Bucket for MnA Meeting Notes
+# Terraform - S3 Bucket for MnA Files
 
 This directory contains Terraform configuration for AWS S3 infrastructure.
 
@@ -79,7 +79,7 @@ git push
 
 | Resource | Name | Description |
 |----------|------|-------------|
-| S3 Bucket | `mna-meeting-notes` | Storage for meeting notes |
+| S3 Bucket | `mna-files-notes` | Storage for files notes |
 
 ### Bucket Configuration
 

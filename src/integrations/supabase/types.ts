@@ -111,6 +111,7 @@ export type Database = {
           segment_revenue_total_ratio: number | null
           segment_specific_revenue_pct: number | null
           target: string | null
+          thesis_content: string | null
           updated_at: string | null
           watchlist_id: number | null
           watchlist_status: string | null
@@ -187,6 +188,7 @@ export type Database = {
           segment_revenue_total_ratio?: number | null
           segment_specific_revenue_pct?: number | null
           target?: string | null
+          thesis_content?: string | null
           updated_at?: string | null
           watchlist_id?: number | null
           watchlist_status?: string | null
@@ -263,6 +265,7 @@ export type Database = {
           segment_revenue_total_ratio?: number | null
           segment_specific_revenue_pct?: number | null
           target?: string | null
+          thesis_content?: string | null
           updated_at?: string | null
           watchlist_id?: number | null
           watchlist_status?: string | null
@@ -823,51 +826,6 @@ export type Database = {
           sources_count?: number | null
           title?: string
           updated_at?: string | null
-        }
-        Relationships: []
-      }
-      market_screening_results: {
-        Row: {
-          company_name: string
-          description: string | null
-          discovered_at: string | null
-          estimated_revenue: string | null
-          estimated_valuation: string | null
-          id: string
-          is_added_to_pipeline: boolean | null
-          match_reason: string | null
-          match_score: number | null
-          remarks: string | null
-          sector: string | null
-          website: string | null
-        }
-        Insert: {
-          company_name: string
-          description?: string | null
-          discovered_at?: string | null
-          estimated_revenue?: string | null
-          estimated_valuation?: string | null
-          id?: string
-          is_added_to_pipeline?: boolean | null
-          match_reason?: string | null
-          match_score?: number | null
-          remarks?: string | null
-          sector?: string | null
-          website?: string | null
-        }
-        Update: {
-          company_name?: string
-          description?: string | null
-          discovered_at?: string | null
-          estimated_revenue?: string | null
-          estimated_valuation?: string | null
-          id?: string
-          is_added_to_pipeline?: boolean | null
-          match_reason?: string | null
-          match_score?: number | null
-          remarks?: string | null
-          sector?: string | null
-          website?: string | null
         }
         Relationships: []
       }
