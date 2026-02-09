@@ -29,8 +29,6 @@ function getSchemaFieldsForPrompt(): string {
 interface DiscoveredCompany {
   // Required fields
   company_name: string;
-  match_score: number;
-  match_reason: string;
   // Optional fields from companiesSchema
   target?: string;
   segment?: string;
@@ -145,8 +143,6 @@ After searching, return your findings as a JSON object with EXACTLY this structu
   "companies": [
     {
       "company_name": "Company Name (REQUIRED)",
-      "match_score": 85,
-      "match_reason": "Why this company matches the thesis",
       "remarks": "Concise thesis cross-match assessment (2-4 sentences)",
 ${schemaFields}
     }
@@ -193,17 +189,14 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
       return NextResponse.json({ count: 0, message: 'All found companies are already in the database' });
     }
 
-    // Insert results into the database with all schema fields
+    // Insert results directly into the companies table with pipeline_stage='market_screening'
     const insertData = filteredCompanies.map((company) => ({
+      // Pipeline stage for market screening
+      pipeline_stage: 'market_screening',
       // Core fields
-      company_name: company.company_name,
-      match_score: company.match_score,
-      match_reason: company.match_reason,
-      is_added_to_pipeline: false,
-      discovered_at: new Date().toISOString(),
+      target: company.target || company.company_name,
       thesis_content: thesis,
       // Basic info from schema
-      target: company.target || company.company_name,
       segment: company.segment || company.sector,
       segment_related_offerings: company.segment_related_offerings,
       company_focus: company.company_focus,
@@ -234,15 +227,10 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
       ebitda_margin_2024: company.ebitda_margin_2024,
       // AI-generated remarks cross-matched with thesis
       remarks: company.remarks || null,
-      // Legacy fields for backwards compatibility
-      sector: company.sector || company.segment,
-      description: company.description || company.company_focus,
-      estimated_revenue: company.estimated_revenue,
-      estimated_valuation: company.estimated_valuation,
     }));
 
-    const { error: insertError } = await (supabase as any)
-      .from('market_screening_results')
+    const { error: insertError } = await supabase
+      .from('companies')
       .insert(insertData);
 
     if (insertError) {

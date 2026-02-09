@@ -5,7 +5,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,16 +21,14 @@ import { format } from 'date-fns';
 
 interface MarketScreeningResult {
   id: string;
-  company_name: string;
-  sector: string | null;
-  description: string | null;
-  match_score: number | null;
-  match_reason: string | null;
+  target: string | null;
+  segment: string | null;
+  company_focus: string | null;
   website: string | null;
-  estimated_revenue: string | null;
-  estimated_valuation: string | null;
-  is_added_to_pipeline: boolean;
-  discovered_at: string;
+  revenue_2024_usd_mn: number | null;
+  ev_2024: number | null;
+  pipeline_stage: string;
+  created_at: string;
   remarks: string | null;
 }
 
@@ -48,244 +45,145 @@ export default function MarketScreeningDetailDialog({
 }: MarketScreeningDetailDialogProps) {
   if (!result) return null;
 
-  const getMatchScoreColor = (score: number | null) => {
-    if (score === null) return 'bg-muted text-muted-foreground';
-    if (score >= 80) return 'bg-emerald-500/20 text-emerald-600';
-    if (score >= 60) return 'bg-amber-500/20 text-amber-600';
-    return 'bg-red-500/20 text-red-600';
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-2xl">
             <Building2 className="h-6 w-6" />
-            {result.company_name}
+            {result.target}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
-            <Badge variant="outline">{result.sector || 'Unknown Sector'}</Badge>
+            <Badge variant="outline">{result.segment || 'Unknown Sector'}</Badge>
             <Badge variant="secondary">AI Discovered</Badge>
-            {result.match_score !== null && (
-              <Badge className={getMatchScoreColor(result.match_score)}>
-                <Sparkles className="h-3 w-3 mr-1" />
-                {result.match_score}% Match
-              </Badge>
-            )}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="match">AI Match Analysis</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4 mt-4">
-            {/* Company Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Company Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Company Name</p>
-                      <p className="font-semibold text-lg">{result.company_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Sector</p>
-                      <p className="font-medium">{result.sector || 'Unknown'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Source</p>
-                      <Badge variant="secondary">
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        AI Discovery
-                      </Badge>
-                    </div>
+        <div className="space-y-4 mt-4">
+          {/* Company Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Company Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Company Name</p>
+                    <p className="font-semibold text-lg">{result.target}</p>
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Website</p>
-                      {result.website ? (
-                        <a
-                          href={result.website.startsWith('http') ? result.website : `https://${result.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline flex items-center gap-1 font-medium"
-                        >
-                          <Globe className="h-4 w-4" />
-                          {result.website}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">Not available</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Discovered</p>
-                      <p className="font-medium flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        {format(new Date(result.discovered_at), 'MMM d, yyyy HH:mm')}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Sector</p>
+                    <p className="font-medium">{result.segment || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Source</p>
+                    <Badge variant="secondary">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      AI Discovery
+                    </Badge>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Description */}
-            {result.description && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Description
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed">{result.description}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Financial Estimates */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Financial Estimates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="p-4 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <TrendingUp className="h-4 w-4" />
-                      <span className="text-sm font-medium">Estimated Revenue</span>
-                    </div>
-                    <p className="text-2xl font-semibold font-mono text-primary">
-                      {result.estimated_revenue || '-'}
-                    </p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Website</p>
+                    {result.website ? (
+                      <a
+                        href={result.website.startsWith('http') ? result.website : `https://${result.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1 font-medium"
+                      >
+                        <Globe className="h-4 w-4" />
+                        {result.website}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">Not available</span>
+                    )}
                   </div>
-                  <div className="p-4 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <DollarSign className="h-4 w-4" />
-                      <span className="text-sm font-medium">Estimated Valuation</span>
-                    </div>
-                    <p className="text-2xl font-semibold font-mono text-primary">
-                      {result.estimated_valuation || '-'}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Discovered</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      {format(new Date(result.created_at), 'MMM d, yyyy HH:mm')}
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  * These are AI-generated estimates and should be verified during due diligence
-                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Company Focus */}
+          {result.company_focus && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Company Focus
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-relaxed">{result.company_focus}</p>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          <TabsContent value="match" className="space-y-4 mt-4">
-            {/* Match Score */}
+          {/* Remarks */}
+          {result.remarks && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-purple-500" />
-                  Investment Thesis Match
+                  Thesis Cross-Match Remarks
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="text-center">
-                    <div className={`text-4xl font-bold ${result.match_score !== null && result.match_score >= 80
-                        ? 'text-emerald-600'
-                        : result.match_score !== null && result.match_score >= 60
-                          ? 'text-amber-600'
-                          : 'text-red-600'
-                      }`}>
-                      {result.match_score !== null ? `${result.match_score}%` : '-'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Match Score</p>
-                  </div>
-                  <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${result.match_score !== null && result.match_score >= 80
-                          ? 'bg-emerald-500'
-                          : result.match_score !== null && result.match_score >= 60
-                            ? 'bg-amber-500'
-                            : 'bg-red-500'
-                        }`}
-                      style={{ width: `${result.match_score || 0}%` }}
-                    />
-                  </div>
+                <div className="p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 bg-purple-50/50 dark:bg-purple-950/20">
+                  <p className="text-sm leading-relaxed">{result.remarks}</p>
                 </div>
-
-                {result.match_reason && (
-                  <div className="p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 bg-purple-50/50 dark:bg-purple-950/20">
-                    <h4 className="font-medium text-purple-700 dark:text-purple-400 mb-2 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Why This Company Matches Your Thesis
-                    </h4>
-                    <p className="text-sm leading-relaxed">{result.match_reason}</p>
-                  </div>
-                )}
-
-                {result.remarks && (
-                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20 mt-4">
-                    <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Thesis Cross-Match Remarks
-                    </h4>
-                    <p className="text-sm leading-relaxed">{result.remarks}</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
+          )}
 
-            {/* Score Breakdown placeholder */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Score Factors</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm">Sector Alignment</span>
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600">
-                      Strong
-                    </Badge>
+          {/* Financial Data */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Financial Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="text-sm font-medium">Revenue 2024 (USD Mn)</span>
                   </div>
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm">Size Fit</span>
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600">
-                      Good
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <span className="text-sm">Growth Potential</span>
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600">
-                      Moderate
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm">Market Position</span>
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600">
-                      Strong
-                    </Badge>
-                  </div>
+                  <p className="text-2xl font-semibold font-mono text-primary">
+                    {result.revenue_2024_usd_mn != null ? `$${result.revenue_2024_usd_mn.toFixed(1)}M` : '-'}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  * Score factors are AI-generated based on available data
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <div className="p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span className="text-sm font-medium">Enterprise Value 2024</span>
+                  </div>
+                  <p className="text-2xl font-semibold font-mono text-primary">
+                    {result.ev_2024 != null ? `$${result.ev_2024.toFixed(1)}M` : '-'}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                * These are AI-generated estimates and should be verified during due diligence
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -216,6 +216,7 @@ export default function Pipeline() {
           updated_at
         `)
         .not('pipeline_stage', 'is', null)
+        .neq('pipeline_stage', 'market_screening')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -255,11 +256,11 @@ export default function Pipeline() {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { count, error } = await (supabase as any)
-        .from('market_screening_results')
+      const { count, error } = await supabase
+        .from('companies')
         .select('*', { count: 'exact', head: true })
-        .eq('is_added_to_pipeline', false)
-        .gte('discovered_at', sevenDaysAgo.toISOString());
+        .eq('pipeline_stage', 'market_screening')
+        .gte('created_at', sevenDaysAgo.toISOString());
 
       if (error) throw error;
       setNewCandidatesCount(count || 0);
