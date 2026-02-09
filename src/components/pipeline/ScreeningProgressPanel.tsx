@@ -185,14 +185,14 @@ export default function ScreeningProgressPanel({
     return Array.from(grouped.values());
   };
 
-  const moveToL1 = async (companyId: string, companyName: string) => {
+  const moveToL2 = async (companyId: string, companyName: string) => {
     setMovingCompanyId(companyId);
     try {
-      // Update the company's pipeline stage to L1
+      // Update the company's pipeline stage to L2
       const { error: updateError } = await supabase
         .from('companies')
         .update({
-          pipeline_stage: 'L1',
+          pipeline_stage: 'L2',
           l1_screening_result: 'Pass',
         })
         .eq('id', companyId);
@@ -202,7 +202,7 @@ export default function ScreeningProgressPanel({
       // Log the screening action
       await supabase.from('company_logs').insert({
         company_id: companyId,
-        action: 'PROMOTED_TO_L1',
+        action: 'PROMOTED_TO_L2',
       });
 
       // Delete the screening records for this company (they've been applied)
@@ -211,19 +211,12 @@ export default function ScreeningProgressPanel({
         .delete()
         .eq('company_id', companyId);
 
-      // Fire-and-forget: trigger AI Company Card generation
-      fetch('/api/company-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId }),
-      }).catch(() => {}); // Silent — don't block promotion on analysis
-
-      toast.success(`${companyName} moved to L1`);
+      toast.success(`${companyName} moved to L2`);
       onScreeningComplete?.();
       fetchScreenings();
     } catch (error: any) {
-      console.error('Error moving company to L1:', error);
-      toast.error('Failed to move company to L1');
+      console.error('Error moving company to L2:', error);
+      toast.error('Failed to move company to L2');
     } finally {
       setMovingCompanyId(null);
     }
@@ -272,7 +265,7 @@ export default function ScreeningProgressPanel({
           </div>
           {passedCount > 0 && (
             <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              {passedCount} ready for L1
+              {passedCount} ready for L2
             </Badge>
           )}
         </div>
@@ -322,7 +315,7 @@ export default function ScreeningProgressPanel({
                       size="sm"
                       variant="outline"
                       className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                      onClick={() => moveToL1(summary.company_id, summary.company_name)}
+                      onClick={() => moveToL2(summary.company_id, summary.company_name)}
                       disabled={movingCompanyId === summary.company_id}
                     >
                       {movingCompanyId === summary.company_id ? (
@@ -330,7 +323,7 @@ export default function ScreeningProgressPanel({
                       ) : (
                         <>
                           <ArrowRight className="h-3 w-3 mr-1" />
-                          Promote to L1
+                          Promote to L2
                         </>
                       )}
                     </Button>
@@ -390,14 +383,14 @@ export default function ScreeningProgressPanel({
                         size="sm"
                         variant="default"
                         className="bg-green-600 hover:bg-green-700"
-                        onClick={() => moveToL1(summary.company_id, summary.company_name)}
+                        onClick={() => moveToL2(summary.company_id, summary.company_name)}
                         disabled={movingCompanyId === summary.company_id}
                       >
                         {movingCompanyId === summary.company_id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <>
-                            Move to L1
+                            Move to L2
                             <ArrowRight className="h-3 w-3 ml-1" />
                           </>
                         )}
@@ -411,7 +404,7 @@ export default function ScreeningProgressPanel({
                           size="sm"
                           variant="outline"
                           className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                          onClick={() => moveToL1(summary.company_id, summary.company_name)}
+                          onClick={() => moveToL2(summary.company_id, summary.company_name)}
                           disabled={movingCompanyId === summary.company_id}
                         >
                           {movingCompanyId === summary.company_id ? (
@@ -419,7 +412,7 @@ export default function ScreeningProgressPanel({
                           ) : (
                             <>
                               <ArrowRight className="h-3 w-3 mr-1" />
-                              Promote to L1
+                              Promote to L2
                             </>
                           )}
                         </Button>
