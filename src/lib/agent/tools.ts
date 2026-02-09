@@ -1613,7 +1613,7 @@ export const queryMeetingNotes = tool(
       const supabase = getSupabaseClient();
 
       let query = supabase
-        .from("minutes_of_meeting")
+        .from("files")
         .select("*")
         .order('file_date', { ascending: false })
         .limit(Math.min(limit, 20));

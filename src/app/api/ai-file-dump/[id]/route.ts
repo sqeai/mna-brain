@@ -1,9 +1,10 @@
 /**
- * API Route for getting a signed download URL for a meeting note
+ * API Route for individual file operations
+ * Handles DELETE requests for specific files
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getSignedUrl } from "@/lib/s3";
+import { deleteFile } from "@/lib/s3";
 
 // Create a server-side Supabase client
 function getSupabaseClient() {
@@ -22,9 +23,10 @@ interface RouteContext {
 }
 
 /**
- * GET - Get a signed URL for downloading/previewing a meeting note
+ * DELETE - Remove a file record
+ * Deletes both the S3 file and the database record
  */
-export async function GET(
+export async function DELETE(
   request: NextRequest,
   context: RouteContext
 ) {
@@ -33,40 +35,58 @@ export async function GET(
 
     if (!id) {
       return NextResponse.json(
-        { error: "Meeting note ID is required" },
+        { error: "File ID is required" },
         { status: 400 }
       );
     }
 
     const supabase = getSupabaseClient();
 
-    // Get the record to find the S3 key
+    // First, get the record to find the S3 key
     const { data: record, error: fetchError } = await supabase
-      .from("minutes_of_meeting")
-      .select("file_link, file_name")
+      .from("files")
+      .select("file_link")
       .eq("id", id)
       .single();
 
     if (fetchError || !record) {
       console.error("Record not found:", fetchError);
       return NextResponse.json(
-        { error: "Meeting note not found" },
+        { error: "File not found" },
         { status: 404 }
       );
     }
 
-    // Generate signed URL
-    const url = await getSignedUrl(record.file_link);
+    // Delete from S3
+    try {
+      await deleteFile(record.file_link);
+    } catch (s3Error) {
+      console.error("S3 delete error:", s3Error);
+      // Continue with database deletion even if S3 fails
+    }
+
+    // Delete from database
+    const { error: deleteError } = await supabase
+      .from("files")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Database delete error:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete file record" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      url,
-      fileName: record.file_name,
+      message: "File deleted successfully",
     });
   } catch (error) {
-    console.error("Get download URL error:", error);
+    console.error("Delete file error:", error);
     return NextResponse.json(
-      { error: (error as Error).message || "Failed to get download URL" },
+      { error: (error as Error).message || "Failed to delete file" },
       { status: 500 }
     );
   }
