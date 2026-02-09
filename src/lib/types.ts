@@ -168,7 +168,7 @@ export type WatchlistStatus = 'Active' | 'Inactive' | 'Pending' | 'Removed';
 // ============================================
 // Pipeline Stage Enum
 // ============================================
-export type DealStage = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+export type DealStage = 'market_screening' | 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
 
 // ============================================
 // L1 Status Enum
