@@ -236,6 +236,7 @@ export default function Pipeline() {
         ev_2024: company.ev_2024,
         pipeline_stage: (company.pipeline_stage || 'L0') as DealStage,
         l1_screening_result: company.l1_screening_result,
+        remarks: company.remarks,
         created_at: company.created_at,
         updated_at: company.updated_at,
       })) || [];
