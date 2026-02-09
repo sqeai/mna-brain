@@ -54,7 +54,7 @@ interface MasterDataCompany {
 }
 
 const stageLabels: Record<DealStage | 'Acquired', string> = {
-  market_screening: 'Screened',
+  market_screening: 'Market Scanning',
   L0: 'Sourcing',
   L1: 'Screening',
   L2: 'Initial Review',
