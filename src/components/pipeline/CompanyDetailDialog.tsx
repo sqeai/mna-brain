@@ -665,6 +665,149 @@ export default function CompanyDetailDialog({
               </CardContent>
             </Card>
 
+            {/* AI Company Card Summary in Overview */}
+            {analysisGenerating && !analysis?.business_overview ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-8 flex flex-col items-center justify-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                <div className="text-center">
+                  <h3 className="text-base font-semibold text-accent">Generating AI Company Card</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Researching company data from multiple sources. This may take 1-2 minutes...
+                  </p>
+                </div>
+              </div>
+            ) : analysis?.status === 'failed' ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 flex flex-col items-center justify-center gap-3">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+                <div className="text-center">
+                  <h3 className="text-base font-semibold text-destructive">Analysis Failed</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {analysis.error_message || 'An error occurred while generating the analysis.'}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={regenerateAnalysis} disabled={analysisGenerating}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            ) : analysis?.status === 'completed' ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-accent" />
+                    <h3 className="text-lg font-semibold text-accent">AI Company Card</h3>
+                    <span className="text-xs text-muted-foreground ml-2">AI-generated analysis</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {analysis.updated_at && (
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(analysis.updated_at), 'MMM d, yyyy HH:mm')}
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-accent hover:text-accent/80 text-xs h-7 px-2"
+                      onClick={regenerateAnalysis}
+                      disabled={analysisGenerating}
+                    >
+                      {analysisGenerating ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Sparkles className="h-3 w-3 mr-1" />
+                      )}
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+
+                {analysis.sources && Array.isArray(analysis.sources) && analysis.sources.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Sources:</span>
+                    {(analysis.sources as AnalysisSource[]).map((source, idx) => (
+                      source.url ? (
+                        <a
+                          key={idx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
+                        >
+                          <Globe className="h-3 w-3" />
+                          {source.title || new URL(source.url).hostname}
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      ) : (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs"
+                        >
+                          {source.type === 'database' ? (
+                            <FileText className="h-3 w-3" />
+                          ) : source.type === 'inven' ? (
+                            <Search className="h-3 w-3" />
+                          ) : source.type === 'meeting_notes' ? (
+                            <FileText className="h-3 w-3" />
+                          ) : (
+                            <Globe className="h-3 w-3" />
+                          )}
+                          {source.title || source.type}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                )}
+
+                <CompanyAnalysisSection
+                  title="Business Overview"
+                  description="Products, end markets, customer types, and geographic footprint."
+                  icon={Building2}
+                  content={analysis.business_overview || ''}
+                  colorVariant="default"
+                />
+
+                <CompanyAnalysisSection
+                  title="Business Model & Value Chain Summary"
+                  description="How the company operates economically and its position in the value chain."
+                  icon={Briefcase}
+                  content={analysis.business_model_summary || ''}
+                  colorVariant="teal"
+                />
+
+                <CompanyAnalysisSection
+                  title="Key Takeaways"
+                  description="The most important implications from the analysis (3-5 synthesized insights)."
+                  icon={Lightbulb}
+                  content={analysis.key_takeaways || ''}
+                  colorVariant="blue"
+                />
+
+                <CompanyAnalysisSection
+                  title="Investment Highlights"
+                  description="Upside drivers linked to the company's business model and positioning."
+                  icon={TrendingUp}
+                  content={analysis.investment_highlights || ''}
+                  colorVariant="green"
+                />
+
+                <CompanyAnalysisSection
+                  title="Investment Risks"
+                  description="Risks inherent to the company's business model and value chain."
+                  icon={AlertTriangle}
+                  content={analysis.investment_risks || ''}
+                  colorVariant="amber"
+                />
+
+                <CompanyAnalysisSection
+                  title="Diligence Priorities"
+                  description="Critical unknowns to resolve before advancing investment (3-7 items)."
+                  icon={Search}
+                  content={analysis.diligence_priorities || ''}
+                  colorVariant="rose"
+                />
+              </div>
+            ) : null}
+
             {/* Stage History */}
             <Card>
               <CardHeader>
