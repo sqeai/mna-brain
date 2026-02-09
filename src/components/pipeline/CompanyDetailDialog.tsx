@@ -54,7 +54,7 @@ import {
   Legend,
 } from 'recharts';
 
-interface CompanyData {
+export interface CompanyData {
   id: string;
   target: string | null;
   segment: string | null;
