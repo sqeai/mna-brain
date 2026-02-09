@@ -88,6 +88,7 @@ interface PipelineCompany {
 const STAGES: DealStage[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
 const stageDescriptions: Record<DealStage, string> = {
+  market_screening: 'AI Market Scanning - AI-discovered companies',
   L0: 'Company Sourcing - Inbound & Outbound companies',
   L1: 'Automated Screening - Filter evaluation',
   L2: 'Initial Review - Manual assessment',
@@ -97,6 +98,7 @@ const stageDescriptions: Record<DealStage, string> = {
 };
 
 const stageColors: Record<DealStage, { bg: string; text: string; bgLight: string; textLight: string }> = {
+  market_screening: { bg: 'bg-purple-500', text: 'text-white', bgLight: 'bg-purple-500/15', textLight: 'text-purple-600' },
   L0: { bg: 'bg-stage-l0', text: 'text-white', bgLight: 'bg-stage-l0/15', textLight: 'text-foreground' },
   L1: { bg: 'bg-stage-l1', text: 'text-white', bgLight: 'bg-stage-l1/15', textLight: 'text-stage-l1' },
   L2: { bg: 'bg-stage-l2', text: 'text-white', bgLight: 'bg-stage-l2/15', textLight: 'text-stage-l2' },
