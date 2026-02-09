@@ -138,7 +138,7 @@ export default function AIFileDump() {
       if (result.success) {
         setMeetingNotes(result.data);
       } else {
-        toast.error('Failed to load meeting notes');
+        toast.error('Failed to load MoM');
       }
     } catch (error) {
       console.error('Error fetching meeting notes:', error);
@@ -154,6 +154,7 @@ export default function AIFileDump() {
       const result = await response.json();
 
       if (result.success) {
+        console.log('Prospectus:', result.data);
         setProspectus(result.data);
       } else {
         toast.error('Failed to load prospectus');
@@ -186,7 +187,9 @@ export default function AIFileDump() {
 
   useEffect(() => {
     fetchMeetingNotes();
-  }, [fetchMeetingNotes]);
+    fetchProspectus();
+    fetchOtherFiles();
+  }, [fetchMeetingNotes, fetchProspectus, fetchOtherFiles]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -352,6 +355,8 @@ export default function AIFileDump() {
       if (result.success) {
         toast.success('Meeting note deleted successfully');
         fetchMeetingNotes();
+        fetchProspectus();
+        fetchOtherFiles();
       } else {
         toast.error(result.error || 'Failed to delete meeting note');
       }
@@ -445,6 +450,66 @@ export default function AIFileDump() {
   };
 
   const filteredAndSortedNotes = meetingNotes
+    .filter((note) => {
+      const searchLower = searchQuery.toLowerCase();
+      const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
+      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+      const companiesMatch = note.matched_companies?.some(company =>
+        company.name.toLowerCase().includes(searchLower)
+      );
+      return fileNameMatch || tagsMatch || companiesMatch;
+    })
+    .sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      let comparison = 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        comparison = aValue.localeCompare(bValue);
+      } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
+        comparison = aValue.length - bValue.length;
+      } else {
+        comparison = aValue < bValue ? -1 : 1;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    const filteredAndSortedProspectus = prospectus
+    .filter((note) => {
+      const searchLower = searchQuery.toLowerCase();
+      const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
+      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+      const companiesMatch = note.matched_companies?.some(company =>
+        company.name.toLowerCase().includes(searchLower)
+      );
+      return fileNameMatch || tagsMatch || companiesMatch;
+    })
+    .sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (aValue === bValue) return 0;
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      let comparison = 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        comparison = aValue.localeCompare(bValue);
+      } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
+        comparison = aValue.length - bValue.length;
+      } else {
+        comparison = aValue < bValue ? -1 : 1;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    const filteredAndSortedOtherFiles = otherFiles
     .filter((note) => {
       const searchLower = searchQuery.toLowerCase();
       const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
@@ -654,8 +719,8 @@ export default function AIFileDump() {
                       <>
                         <Upload className="h-4 w-4 mr-2" />
                         {selectedFiles.length > 1
-                          ? `Upload ${selectedFiles.length} Meeting Notes`
-                          : 'Upload Meeting Note'
+                          ? `Upload ${selectedFiles.length} Files`
+                          : 'Upload File'
                         }
                       </>
                     )}
@@ -991,7 +1056,7 @@ export default function AIFileDump() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Prospectus ({filteredAndSortedNotes.length})
+                Prospectus ({filteredAndSortedProspectus.length})
               </CardTitle>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1005,13 +1070,13 @@ export default function AIFileDump() {
             </div>
           </CardHeader>
           <CardContent>
-            {meetingNotes.length === 0 ? (
+            {prospectus.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No meeting notes uploaded yet.</p>
-                <p className="text-sm">Upload your first meeting note using the form above.</p>
+                <p>No prospectus uploaded yet.</p>
+                <p className="text-sm">Upload your first prospectus using the form above.</p>
               </div>
-            ) : filteredAndSortedNotes.length === 0 ? (
+            ) : filteredAndSortedProspectus.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
                 <p>No results found for &quot;{searchQuery}&quot;</p>
@@ -1054,7 +1119,7 @@ export default function AIFileDump() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAndSortedNotes.map((note) => (
+                    {filteredAndSortedProspectus.map((note) => (
                       <TableRow key={note.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -1310,7 +1375,7 @@ export default function AIFileDump() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Other ({filteredAndSortedNotes.length})
+                Other ({filteredAndSortedOtherFiles.length})
               </CardTitle>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1324,13 +1389,13 @@ export default function AIFileDump() {
             </div>
           </CardHeader>
           <CardContent>
-            {meetingNotes.length === 0 ? (
+            {otherFiles.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No meeting notes uploaded yet.</p>
-                <p className="text-sm">Upload your first meeting note using the form above.</p>
+                <p>No other files uploaded yet.</p>
+                <p className="text-sm">Upload your files using the form above.</p>
               </div>
-            ) : filteredAndSortedNotes.length === 0 ? (
+            ) : filteredAndSortedOtherFiles.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
                 <p>No results found for &quot;{searchQuery}&quot;</p>
@@ -1373,7 +1438,7 @@ export default function AIFileDump() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAndSortedNotes.map((note) => (
+                    {filteredAndSortedOtherFiles.map((note) => (
                       <TableRow key={note.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">

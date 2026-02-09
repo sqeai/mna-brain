@@ -15,6 +15,7 @@ const generateSystemPrompt = (companies_list) => `You are a specialized M&A File
 4. **Identify Companies**: Identify which of the "Known Companies" provided in the prompt are mentioned in the text.
 5. **Extract Company Notes**: For each identified company, extract specific notes or context.
 6. **Extract Meeting Date**: Identify the date of the meeting/document (usually mentioned in the title or content).
+7. **Categorize The File Type**: Identify the file type of the document.
 
 ## Known Companies:
 ${companies_list}
@@ -23,6 +24,7 @@ ${companies_list}
 1. Review the "Known Companies" list.
 2. Identify which of those companies appear in the text.
 3. **Detect Codenames**: Actively scan for and include project codenames (such as "Project Utopia", "Project Tulia", "Project Notos", "Project gChem", etc.) even if they do not match the "Known Companies" list. Treat these as valid detected companies.
+3. **Categorize File Type**: Choose between "prospectus", "mom", and "other" file type.
 4. Final Output must be a valid JSON block containing:
    - summary: A concise overview of the meeting/document.
    - key_points: Array of main takeaways.
@@ -36,6 +38,7 @@ ${companies_list}
 Your response should end with a JSON block in this format:
 \`\`\`json
 {
+  "file_type": "...",
   "summary": "...",
   "key_points": ["...", "..."],
   "action_items": ["...", "..."],
@@ -154,6 +157,10 @@ export async function processFileContent(rawText: string) {
       }
 
       parsed.matched_companies = finalMatchedCompanies;
+
+      if (!parsed.file_type) {
+        parsed.file_type = 'other';
+      }
 
       return parsed;
     } catch (e) {
