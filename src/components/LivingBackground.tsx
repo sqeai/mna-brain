@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
 
 function shuffle<T>(arr: T[]): T[] {
   const out = [...arr];
@@ -12,14 +13,29 @@ function shuffle<T>(arr: T[]): T[] {
   return out;
 }
 
-const GREY_TRACE = 'rgba(148, 163, 184, 0.25)';
-const GREY_GLOW = 'rgba(148, 163, 184, 0.35)';
-const GREY_CHIP = 'rgba(203, 213, 225, 0.5)';
-const GREY_CHIP_BORDER = 'rgba(148, 163, 184, 0.4)';
-const CHIP_GLOW_FILL = 'rgba(30, 58, 138, 0.75)';
-const CHIP_GLOW_NEIGHBOR_FILL = 'rgba(51, 65, 85, 0.55)';
-const ZAP_HEAD = 'rgba(255, 255, 255, 0.95)';
-const ZAP_TAIL = 'rgba(148, 163, 184, 0.2)';
+// Light mode colors
+const LIGHT = {
+  GREY_TRACE: 'rgba(148, 163, 184, 0.25)',
+  GREY_GLOW: 'rgba(148, 163, 184, 0.35)',
+  GREY_CHIP: 'rgba(203, 213, 225, 0.5)',
+  GREY_CHIP_BORDER: 'rgba(148, 163, 184, 0.4)',
+  CHIP_GLOW_FILL: 'rgba(30, 58, 138, 0.75)',
+  CHIP_GLOW_NEIGHBOR_FILL: 'rgba(51, 65, 85, 0.55)',
+  ZAP_HEAD: 'rgba(255, 255, 255, 0.95)',
+  ZAP_TAIL: 'rgba(148, 163, 184, 0.2)',
+} as const;
+
+// Dark mode colors
+const DARK = {
+  GREY_TRACE: 'rgba(100, 116, 139, 0.22)',
+  GREY_GLOW: 'rgba(148, 163, 184, 0.28)',
+  GREY_CHIP: 'rgba(71, 85, 105, 0.55)',
+  GREY_CHIP_BORDER: 'rgba(100, 116, 139, 0.45)',
+  CHIP_GLOW_FILL: 'rgba(96, 165, 250, 0.75)',
+  CHIP_GLOW_NEIGHBOR_FILL: 'rgba(71, 85, 105, 0.65)',
+  ZAP_HEAD: 'rgba(147, 197, 253, 0.92)',
+  ZAP_TAIL: 'rgba(51, 65, 85, 0.35)',
+} as const;
 
 // Dense horizontal traces (y, path segments) - motherboard-style buses
 const H_TRACES = [
@@ -198,6 +214,10 @@ function chipShapePath(x: number, y: number, w: number, h: number): string {
 }
 
 export function LivingBackground() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const c = isDark ? DARK : LIGHT;
+
   const [glowStep, setGlowStep] = useState(0);
   const glowOrder = useMemo(() => shuffle(CHIPS.map((_, i) => i)), []);
 
@@ -226,12 +246,20 @@ export function LivingBackground() {
       className="fixed inset-0 z-0 pointer-events-none overflow-hidden"
       aria-hidden
     >
-      {/* Base gradient - subtle grey */}
+      {/* Base gradient - light */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 dark:opacity-0"
         style={{
           background:
             'linear-gradient(160deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.96) 50%, rgba(248, 250, 252, 0.97) 100%)',
+        }}
+      />
+      {/* Base gradient - dark */}
+      <div
+        className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-300"
+        style={{
+          background:
+            'linear-gradient(160deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.97) 50%, rgba(15, 23, 42, 0.98) 100%)',
         }}
       />
 
@@ -243,14 +271,14 @@ export function LivingBackground() {
       >
         <defs>
           <linearGradient id="traceH" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={GREY_TRACE} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={GREY_GLOW} stopOpacity="0.8" />
-            <stop offset="100%" stopColor={GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="0%" stopColor={c.GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={c.GREY_GLOW} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={c.GREY_TRACE} stopOpacity="0.5" />
           </linearGradient>
           <linearGradient id="traceV" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={GREY_TRACE} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={GREY_GLOW} stopOpacity="0.8" />
-            <stop offset="100%" stopColor={GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="0%" stopColor={c.GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={c.GREY_GLOW} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={c.GREY_TRACE} stopOpacity="0.5" />
           </linearGradient>
           <filter id="traceGlow">
             <feGaussianBlur stdDeviation="0.8" result="coloredBlur" />
@@ -268,14 +296,14 @@ export function LivingBackground() {
           </filter>
           {/* Zap gradient: dark tail (0%) → bright head (100%) along the path */}
           <linearGradient id="zapGradientH" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={ZAP_TAIL} />
-            <stop offset="60%" stopColor={ZAP_TAIL} />
-            <stop offset="100%" stopColor={ZAP_HEAD} />
+            <stop offset="0%" stopColor={c.ZAP_TAIL} />
+            <stop offset="60%" stopColor={c.ZAP_TAIL} />
+            <stop offset="100%" stopColor={c.ZAP_HEAD} />
           </linearGradient>
           <linearGradient id="zapGradientV" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={ZAP_TAIL} />
-            <stop offset="60%" stopColor={ZAP_TAIL} />
-            <stop offset="100%" stopColor={ZAP_HEAD} />
+            <stop offset="0%" stopColor={c.ZAP_TAIL} />
+            <stop offset="60%" stopColor={c.ZAP_TAIL} />
+            <stop offset="100%" stopColor={c.ZAP_HEAD} />
           </linearGradient>
           {/* Per-edge gradients so zap head/tail follow the line direction (chip-to-chip) */}
           {CHIP_EDGES.map((edge, i) => {
@@ -290,9 +318,9 @@ export function LivingBackground() {
                 x2={x2}
                 y2={y2}
               >
-                <stop offset="0%" stopColor={ZAP_TAIL} />
-                <stop offset="60%" stopColor={ZAP_TAIL} />
-                <stop offset="100%" stopColor={ZAP_HEAD} />
+                <stop offset="0%" stopColor={c.ZAP_TAIL} />
+                <stop offset="60%" stopColor={c.ZAP_TAIL} />
+                <stop offset="100%" stopColor={c.ZAP_HEAD} />
               </linearGradient>
             );
           })}
@@ -327,15 +355,15 @@ export function LivingBackground() {
         </g> */}
 
         {/* Chips - square with 3 symmetrical lines per side; dark blue glow in random order with neighbor bleed */}
-        <g stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
+        <g stroke={c.GREY_CHIP_BORDER} strokeWidth="1.2">
           {CHIPS.map(([x, y, w, h], i) => {
             const isPrimary = i === primaryIndex || i === primaryIndex2;
             const isNeighbor = neighborSet.has(i);
             const fill = isPrimary
-              ? CHIP_GLOW_FILL
+              ? c.CHIP_GLOW_FILL
               : isNeighbor
-                ? CHIP_GLOW_NEIGHBOR_FILL
-                : GREY_CHIP;
+                ? c.CHIP_GLOW_NEIGHBOR_FILL
+                : c.GREY_CHIP;
             const opacity = isPrimary
               ? CHIP_OPACITY_GLOW
               : isNeighbor
@@ -346,7 +374,7 @@ export function LivingBackground() {
                 key={`chip-${i}`}
                 d={chipShapePath(x, y, w, h)}
                 fillRule="evenodd"
-                initial={{ fill: GREY_CHIP, opacity: CHIP_OPACITY_BASE }}
+                initial={{ fill: c.GREY_CHIP, opacity: CHIP_OPACITY_BASE }}
                 animate={{ fill, opacity }}
                 transition={{
                   duration: 0.4,
@@ -383,9 +411,9 @@ export function LivingBackground() {
         </g>
       </svg>
 
-      {/* Subtle noise */}
+      {/* Subtle noise - lighter in light mode, very subtle in dark */}
       <div
-        className="absolute inset-0 opacity-[0.025]"
+        className="absolute inset-0 opacity-[0.025] dark:opacity-[0.04]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
           backgroundRepeat: 'repeat',
