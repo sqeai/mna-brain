@@ -191,17 +191,13 @@ export default function Pipeline() {
   // Source filter
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
-  // L1 pagination
-  const [l1Page, setL1Page] = useState(0);
-  const L1_PAGE_SIZE = 10;
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotingCompany, setPromotingCompany] = useState<PipelineCompany | null>(null);
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -290,14 +286,14 @@ export default function Pipeline() {
   const handleTabChange = (value: string) => {
     setActiveTab(value as DealStage);
     setSelectedIds(new Set());
-    setL1Page(0);
+    setCurrentPage(1);
     router.push(`/pipeline?stage=${value}`);
   };
 
-  // Reset L1 page when filters change
+  // Reset page when filters change
   useEffect(() => {
-    setL1Page(0);
-  }, [searchQuery, sectorFilter, l1StatusFilter]);
+    setCurrentPage(1);
+  }, [searchQuery, sectorFilter, l1StatusFilter, activeTab]);
 
   // Get unique sectors for filter
   const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))].sort();
@@ -639,155 +635,155 @@ export default function Pipeline() {
                               </div>
                             ) : (
                               <>
-                              <div className="overflow-x-auto">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead className="w-[50px]">Select</TableHead>
-                                      <TableHead>
-                                        <button
-                                          onClick={() => toggleSort('name')}
-                                          className="flex items-center hover:text-foreground transition-colors"
-                                        >
-                                          Company
-                                          <SortIcon field="name" />
-                                        </button>
-                                      </TableHead>
-                                      <TableHead>
-                                        <button
-                                          onClick={() => toggleSort('sector')}
-                                          className="flex items-center hover:text-foreground transition-colors"
-                                        >
-                                          Sector
-                                          <SortIcon field="sector" />
-                                        </button>
-                                      </TableHead>
-                                      <TableHead className="text-right">Revenue 2023</TableHead>
-                                      <TableHead className="text-right">Revenue 2024</TableHead>
-                                      <TableHead className="text-right">
-                                        <button
-                                          onClick={() => toggleSort('revenue')}
-                                          className="flex items-center justify-end w-full hover:text-foreground transition-colors"
-                                        >
-                                          Revenue 2025
-                                          <SortIcon field="revenue" />
-                                        </button>
-                                      </TableHead>
-                                      <TableHead className="text-right">EBITDA 2023</TableHead>
-                                      <TableHead className="text-right">EBITDA 2024</TableHead>
-                                      <TableHead className="text-right">
-                                        <button
-                                          onClick={() => toggleSort('ebitda')}
-                                          className="flex items-center justify-end w-full hover:text-foreground transition-colors"
-                                        >
-                                          EBITDA 2025
-                                          <SortIcon field="ebitda" />
-                                        </button>
-                                      </TableHead>
-                                      <TableHead className="text-right">
-                                        <button
-                                          onClick={() => toggleSort('valuation')}
-                                          className="flex items-center justify-end w-full hover:text-foreground transition-colors"
-                                        >
-                                          Valuation
-                                          <SortIcon field="valuation" />
-                                        </button>
-                                      </TableHead>
-                                      <TableHead className="text-center">Source</TableHead>
-                                      <TableHead className="text-center">Actions</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {paginatedCompanies.map((company) => (
-                                      <TableRow key={company.id} className="hover:bg-muted/50">
-                                        <TableCell>
-                                          <Checkbox
-                                            checked={selectedIds.has(company.id)}
-                                            onCheckedChange={() => toggleSelect(company.id)}
-                                          />
-                                        </TableCell>
-                                        <TableCell>
+                                <div className="overflow-x-auto">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-[50px]">Select</TableHead>
+                                        <TableHead>
                                           <button
-                                            onClick={() => setSelectedCompany(company)}
-                                            className="font-medium text-left hover:text-primary hover:underline transition-colors"
+                                            onClick={() => toggleSort('name')}
+                                            className="flex items-center hover:text-foreground transition-colors"
                                           >
-                                            {company.target}
+                                            Company
+                                            <SortIcon field="name" />
                                           </button>
-                                        </TableCell>
-                                        <TableCell>
-                                          <span className="text-muted-foreground">{company.segment}</span>
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.revenue_2022_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.revenue_2023_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.revenue_2024_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.ebitda_2022_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.ebitda_2023_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.ebitda_2024_usd_mn)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(company.ev_2024)}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Badge variant="outline">
-                                            {company.pipeline_stage}
-                                          </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setPromotingCompany(company);
-                                              setPromoteDialogOpen(true);
-                                            }}
+                                        </TableHead>
+                                        <TableHead>
+                                          <button
+                                            onClick={() => toggleSort('sector')}
+                                            className="flex items-center hover:text-foreground transition-colors"
                                           >
-                                            <ChevronRight className="h-4 w-4 mr-1" />
-                                            Promote to L1
-                                          </Button>
-                                        </TableCell>
+                                            Sector
+                                            <SortIcon field="sector" />
+                                          </button>
+                                        </TableHead>
+                                        <TableHead className="text-right">Revenue 2023</TableHead>
+                                        <TableHead className="text-right">Revenue 2024</TableHead>
+                                        <TableHead className="text-right">
+                                          <button
+                                            onClick={() => toggleSort('revenue')}
+                                            className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                                          >
+                                            Revenue 2025
+                                            <SortIcon field="revenue" />
+                                          </button>
+                                        </TableHead>
+                                        <TableHead className="text-right">EBITDA 2023</TableHead>
+                                        <TableHead className="text-right">EBITDA 2024</TableHead>
+                                        <TableHead className="text-right">
+                                          <button
+                                            onClick={() => toggleSort('ebitda')}
+                                            className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                                          >
+                                            EBITDA 2025
+                                            <SortIcon field="ebitda" />
+                                          </button>
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                          <button
+                                            onClick={() => toggleSort('valuation')}
+                                            className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                                          >
+                                            Valuation
+                                            <SortIcon field="valuation" />
+                                          </button>
+                                        </TableHead>
+                                        <TableHead className="text-center">Source</TableHead>
+                                        <TableHead className="text-center">Actions</TableHead>
                                       </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                              {totalPages > 1 && (
-                                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                  <p className="text-sm text-muted-foreground">
-                                    Page {currentPage} of {totalPages} ({sortedCompanies.length} companies)
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                      disabled={currentPage === 1}
-                                    >
-                                      <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                      disabled={currentPage === totalPages}
-                                    >
-                                      <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                  </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {paginatedCompanies.map((company) => (
+                                        <TableRow key={company.id} className="hover:bg-muted/50">
+                                          <TableCell>
+                                            <Checkbox
+                                              checked={selectedIds.has(company.id)}
+                                              onCheckedChange={() => toggleSelect(company.id)}
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <button
+                                              onClick={() => setSelectedCompany(company)}
+                                              className="font-medium text-left hover:text-primary hover:underline transition-colors"
+                                            >
+                                              {company.target}
+                                            </button>
+                                          </TableCell>
+                                          <TableCell>
+                                            <span className="text-muted-foreground">{company.segment}</span>
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.revenue_2022_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.revenue_2023_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.revenue_2024_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.ebitda_2022_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.ebitda_2023_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.ebitda_2024_usd_mn)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {formatCurrency(company.ev_2024)}
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <Badge variant="outline">
+                                              {company.pipeline_stage}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPromotingCompany(company);
+                                                setPromoteDialogOpen(true);
+                                              }}
+                                            >
+                                              <ChevronRight className="h-4 w-4 mr-1" />
+                                              Promote to L1
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
                                 </div>
-                              )}
+                                {totalPages > 1 && (
+                                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                    <p className="text-sm text-muted-foreground">
+                                      Page {currentPage} of {totalPages} ({sortedCompanies.length} companies)
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                      >
+                                        <ChevronLeft className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                      >
+                                        <ChevronRight className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                               </>
                             )}
                           </CardContent>
@@ -871,147 +867,180 @@ export default function Pipeline() {
                         </div>
                       ) : (
                         <>
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                {stage === 'L1' && <TableHead className="w-[50px]">Select</TableHead>}
-                                <TableHead>
-                                  <button
-                                    onClick={() => toggleSort('name')}
-                                    className="flex items-center hover:text-foreground transition-colors"
-                                  >
-                                    Company
-                                    <SortIcon field="name" />
-                                  </button>
-                                </TableHead>
-                                <TableHead>
-                                  <button
-                                    onClick={() => toggleSort('sector')}
-                                    className="flex items-center hover:text-foreground transition-colors"
-                                  >
-                                    Sector
-                                    <SortIcon field="sector" />
-                                  </button>
-                                </TableHead>
-                                {stage === 'L1' && <TableHead>PIC</TableHead>}
-                                <TableHead className="text-right">Rev 2023</TableHead>
-                                <TableHead className="text-right">Rev 2024</TableHead>
-                                <TableHead className="text-right">Rev 2025</TableHead>
-                                <TableHead className="text-right">EBITDA 2023</TableHead>
-                                <TableHead className="text-right">EBITDA 2024</TableHead>
-                                <TableHead className="text-right">EBITDA 2025</TableHead>
-                                <TableHead>
-                                  <button
-                                    onClick={() => toggleSort('valuation')}
-                                    className="flex items-center hover:text-foreground transition-colors"
-                                  >
-                                    Valuation
-                                    <SortIcon field="valuation" />
-                                  </button>
-                                </TableHead>
-                                <TableHead className="max-w-[200px]">Remarks</TableHead>
-                                <TableHead>
-                                  <button
-                                    onClick={() => toggleSort('updated')}
-                                    className="flex items-center hover:text-foreground transition-colors"
-                                  >
-                                    Updated
-                                    <SortIcon field="updated" />
-                                  </button>
-                                </TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {(() => {
-                                const paginatedCompanies = stage === 'L1'
-                                  ? sortedCompanies.slice(l1Page * L1_PAGE_SIZE, (l1Page + 1) * L1_PAGE_SIZE)
-                                  : sortedCompanies;
-                                return paginatedCompanies.map((company) => (
-                                  <TableRow key={company.id} className="hover:bg-muted/50">
-                                    {stage === 'L1' && (
-                                      <TableCell>
-                                        <Checkbox
-                                          checked={selectedIds.has(company.id)}
-                                          onCheckedChange={() => toggleSelect(company.id)}
-                                        />
-                                      </TableCell>
-                                    )}
-                                    <TableCell>
-                                      <button
-                                        onClick={() => setSelectedCompany(company)}
-                                        className="font-medium text-left hover:text-primary hover:underline transition-colors"
-                                      >
-                                        {company.target}
-                                      </button>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline">{company.segment}</Badge>
-                                    </TableCell>
-                                    {stage === 'L1' && (
-                                      <TableCell>
-                                        <span className="text-sm text-muted-foreground">
-                                          {company.pic || '-'}
-                                        </span>
-                                      </TableCell>
-                                    )}
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.revenue_2022_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.revenue_2023_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.revenue_2024_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.ebitda_2022_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.ebitda_2023_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.ebitda_2024_usd_mn)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(company.ev_2024)}
-                                    </TableCell>
-                                    <TableCell className="max-w-[200px]">
-                                      {company.remarks ? (
-                                        <p className="text-xs text-muted-foreground truncate" title={company.remarks}>
-                                          {company.remarks}
-                                        </p>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground">-</span>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {stage === 'L1' && <TableHead className="w-[50px]">Select</TableHead>}
+                                  <TableHead>
+                                    <button
+                                      onClick={() => toggleSort('name')}
+                                      className="flex items-center hover:text-foreground transition-colors"
+                                    >
+                                      Company
+                                      <SortIcon field="name" />
+                                    </button>
+                                  </TableHead>
+                                  <TableHead>
+                                    <button
+                                      onClick={() => toggleSort('sector')}
+                                      className="flex items-center hover:text-foreground transition-colors"
+                                    >
+                                      Sector
+                                      <SortIcon field="sector" />
+                                    </button>
+                                  </TableHead>
+                                  {stage === 'L1' && <TableHead>PIC</TableHead>}
+                                  <TableHead className="text-right">Rev 2023</TableHead>
+                                  <TableHead className="text-right">Rev 2024</TableHead>
+                                  <TableHead className="text-right">Rev 2025</TableHead>
+                                  <TableHead className="text-right">EBITDA 2023</TableHead>
+                                  <TableHead className="text-right">EBITDA 2024</TableHead>
+                                  <TableHead className="text-right">EBITDA 2025</TableHead>
+                                  <TableHead>
+                                    <button
+                                      onClick={() => toggleSort('valuation')}
+                                      className="flex items-center hover:text-foreground transition-colors"
+                                    >
+                                      Valuation
+                                      <SortIcon field="valuation" />
+                                    </button>
+                                  </TableHead>
+                                  <TableHead className="max-w-[200px]">Remarks</TableHead>
+                                  <TableHead>
+                                    <button
+                                      onClick={() => toggleSort('updated')}
+                                      className="flex items-center hover:text-foreground transition-colors"
+                                    >
+                                      Updated
+                                      <SortIcon field="updated" />
+                                    </button>
+                                  </TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {(() => {
+                                  const paginatedCompanies = sortedCompanies.slice(
+                                    (currentPage - 1) * itemsPerPage,
+                                    currentPage * itemsPerPage
+                                  );
+
+                                  return paginatedCompanies.map((company) => (
+                                    <TableRow key={company.id} className="hover:bg-muted/50">
+                                      {stage === 'L1' && (
+                                        <TableCell>
+                                          <Checkbox
+                                            checked={selectedIds.has(company.id)}
+                                            onCheckedChange={() => toggleSelect(company.id)}
+                                          />
+                                        </TableCell>
                                       )}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground text-sm">
-                                      {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {stage !== 'L5' && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setPromotingCompany(company);
-                                            setPromoteDialogOpen(true);
-                                          }}
+                                      <TableCell>
+                                        <button
+                                          onClick={() => setSelectedCompany(company)}
+                                          className="font-medium text-left hover:text-primary hover:underline transition-colors"
                                         >
-                                          Promote
-                                          <ChevronRight className="ml-1 h-4 w-4" />
-                                        </Button>
+                                          {company.target}
+                                        </button>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">{company.segment}</Badge>
+                                      </TableCell>
+                                      {stage === 'L1' && (
+                                        <TableCell>
+                                          <span className="text-sm text-muted-foreground">
+                                            {company.pic || '-'}
+                                          </span>
+                                        </TableCell>
                                       )}
-                                    </TableCell>
-                                  </TableRow>
-                                ));
-                              })()}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        {totalPages > 1 && (
-                          <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.revenue_2022_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.revenue_2023_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.revenue_2024_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.ebitda_2022_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.ebitda_2023_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.ebitda_2024_usd_mn)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatCurrency(company.ev_2024)}
+                                      </TableCell>
+                                      <TableCell className="max-w-[200px]">
+                                        {company.remarks ? (
+                                          <p className="text-xs text-muted-foreground truncate" title={company.remarks}>
+                                            {company.remarks}
+                                          </p>
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">-</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-muted-foreground text-sm">
+                                        {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {stage !== 'L5' && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              setPromotingCompany(company);
+                                              setPromoteDialogOpen(true);
+                                            }}
+                                          >
+                                            Promote
+                                            <ChevronRight className="ml-1 h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ));
+                                })()}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                              <p className="text-sm text-muted-foreground">
+                                Page {currentPage} of {totalPages} ({sortedCompanies.length} companies)
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                  disabled={currentPage === 1}
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                  disabled={currentPage === totalPages}
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(() => {
+                        const totalPages = Math.ceil(sortedCompanies.length / itemsPerPage);
+                        if (totalPages <= 1) return null;
+                        return (
+                          <div className="flex items-center justify-between pt-4">
                             <p className="text-sm text-muted-foreground">
                               Page {currentPage} of {totalPages} ({sortedCompanies.length} companies)
                             </p>
@@ -1034,39 +1063,8 @@ export default function Pipeline() {
                               </Button>
                             </div>
                           </div>
-                        )}
-                        </>
-                      )}
-
-                      {/* L1 Pagination */}
-                      {stage === 'L1' && sortedCompanies.length > L1_PAGE_SIZE && (
-                        <div className="flex items-center justify-between pt-4">
-                          <p className="text-sm text-muted-foreground">
-                            Showing {l1Page * L1_PAGE_SIZE + 1}-{Math.min((l1Page + 1) * L1_PAGE_SIZE, sortedCompanies.length)} of {sortedCompanies.length} companies
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setL1Page((p) => Math.max(0, p - 1))}
-                              disabled={l1Page === 0}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-sm text-muted-foreground">
-                              Page {l1Page + 1} of {Math.ceil(sortedCompanies.length / L1_PAGE_SIZE)}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setL1Page((p) => Math.min(Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1, p + 1))}
-                              disabled={l1Page >= Math.ceil(sortedCompanies.length / L1_PAGE_SIZE) - 1}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                     </>
                   )}
