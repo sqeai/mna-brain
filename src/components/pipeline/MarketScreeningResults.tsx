@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -69,8 +68,7 @@ interface MarketScreeningResultsProps {
 export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeline }: MarketScreeningResultsProps) {
   const [results, setResults] = useState<MarketScreeningResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [addingId, setAddingId] = useState<string | null>(null);
   const [selectedResult, setSelectedResult] = useState<MarketScreeningResult | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
@@ -95,66 +93,33 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     fetchResults();
   }, [refreshTrigger]);
 
-  const toggleSelect = (id: string) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
-    setSelectedIds(newSet);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === results.length && results.length > 0) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(results.map(r => r.id)));
-    }
-  };
-
-  const isAllSelected = () => {
-    return results.length > 0 && selectedIds.size === results.length;
-  };
-
-  const addToL0 = async () => {
-    if (selectedIds.size === 0) {
-      toast.error('Please select at least one company');
-      return;
-    }
-
-    setAdding(true);
+  const addToL0 = async (result: MarketScreeningResult) => {
+    setAddingId(result.id);
     try {
-      const selectedResults = results.filter(r => selectedIds.has(r.id));
+      const { error: updateError } = await supabase
+        .from('companies')
+        .update({ pipeline_stage: 'L0' })
+        .eq('id', result.id);
 
-      for (const result of selectedResults) {
-        // Promote company from market_screening to L0 pipeline stage
-        const { error: updateError } = await supabase
-          .from('companies')
-          .update({ pipeline_stage: 'L0' })
-          .eq('id', result.id);
-
-        if (updateError) {
-          console.error('Error promoting company to L0:', updateError);
-          continue;
-        }
-
-        // Log the promotion
-        await supabase.from('company_logs').insert({
-          company_id: result.id,
-          action: 'PROMOTED_FROM_MARKET_SCREENING_TO_L0',
-        });
+      if (updateError) {
+        console.error('Error promoting company to L0:', updateError);
+        toast.error('Failed to add company to L0');
+        return;
       }
 
-      toast.success(`Added ${selectedResults.length} companies to L0`);
-      setSelectedIds(new Set());
+      await supabase.from('company_logs').insert({
+        company_id: result.id,
+        action: 'PROMOTED_FROM_MARKET_SCREENING_TO_L0',
+      });
+
+      toast.success(`Added ${result.target || 'company'} to L0`);
       fetchResults();
       onAddedToPipeline();
     } catch (error: any) {
       console.error('Error adding to L0:', error);
-      toast.error('Failed to add companies to pipeline');
+      toast.error('Failed to add company to pipeline');
     } finally {
-      setAdding(false);
+      setAddingId(null);
     }
   };
 
@@ -217,54 +182,19 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
   return (
     <Card className="border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-violet-50/30 dark:from-purple-950/20 dark:to-violet-950/10">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              AI-Discovered Companies
-            </CardTitle>
-            <CardDescription>
-              {results.length} companies matching your investment thesis
-            </CardDescription>
-          </div>
-          <Button
-            onClick={addToL0}
-            disabled={adding || selectedIds.size === 0}
-            className="bg-stage-l0 hover:bg-stage-l0/90"
-          >
-            {adding ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Adding...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Add to L0 ({selectedIds.size})
-              </>
-            )}
-          </Button>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-purple-500" />
+          AI-Discovered Companies
+        </CardTitle>
+        <CardDescription>
+          {results.length} companies matching your investment thesis
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Select All */}
-        <div className="flex items-center gap-2 mb-4">
-          <Checkbox
-            checked={isAllSelected()}
-            onCheckedChange={toggleSelectAll}
-            id="select-all-results"
-          />
-          <label htmlFor="select-all-results" className="text-sm font-medium cursor-pointer">
-            Select All
-          </label>
-        </div>
-
-        {/* Results Table */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">Select</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Segment</TableHead>
                 <TableHead>Revenue 2024</TableHead>
@@ -272,18 +202,12 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                 <TableHead>Discovered</TableHead>
                 <TableHead className="max-w-[200px]">Remarks</TableHead>
                 <TableHead className="max-w-[150px]">Thesis</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {results.map((result) => (
                 <TableRow key={result.id} className="hover:bg-muted/50">
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(result.id)}
-                      onCheckedChange={() => toggleSelect(result.id)}
-                    />
-                  </TableCell>
                   <TableCell>
                     <div>
                       <button
@@ -339,14 +263,31 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                     </p>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => dismissResult(result.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        onClick={() => addToL0(result)}
+                        disabled={addingId === result.id}
+                        className="bg-stage-l0 hover:bg-stage-l0/90"
+                      >
+                        {addingId === result.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add to L0
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => dismissResult(result.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

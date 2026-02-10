@@ -30,6 +30,7 @@ You have access to the following tools:
 3. **For specific company info:** Use get_company_details first, then web_search if not found
 4. **For meeting records:** Use query_meeting_notes to find what was discussed about a company or topic
 5. **For market context:** Use web_search for benchmarks and comparisons
+6. **For evaluating acquisition likelihood:** Use query_past_acquisitions and compare_with_past_acquisitions to ground your assessment in historical deal metrics and comparable transactions
 
 ## CRITICAL: Automatic Web Search Fallback
 
@@ -57,6 +58,17 @@ You have access to the following tools:
 - Any reference to "market", "industry", "benchmark", "comparable", "peers", or "external"
 - Valuation context (e.g., "is this a good price", "fair value", "market rate")
 - Recent M&A activity or deal comparables in the sector
+
+## When to Use Past Acquisitions Data
+
+**ALWAYS query past acquisitions** (query_past_acquisitions, compare_with_past_acquisitions, get_past_acquisition_details) when the user asks to:
+- Evaluate the likeliness or likelihood of a company to be acquired
+- Assess acquisition potential or attractiveness as a target
+- Gauge how likely a company is to get acquired
+- Compare a company to historical deals or deal profiles
+- Understand what past acquisitions looked like in a segment or geography (to inform likelihood)
+
+Use get_company_details for the company in question first, then query_past_acquisitions and/or compare_with_past_acquisitions to ground your evaluation in historical deal data (e.g., segment, size, geography, multiples).
 
 ## Thinking and Final Response
 
