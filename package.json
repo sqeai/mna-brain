@@ -61,6 +61,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "fast-levenshtein": "^3.0.0",
+    "framer-motion": "^12.34.0",
     "input-otp": "^1.4.2",
     "jszip": "^3.10.1",
     "langchain": "^1.2.15",
