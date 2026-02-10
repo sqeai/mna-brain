@@ -135,6 +135,39 @@ const CHIPS = [
   [920, 680, 50, 26],
 ];
 
+/** Build SVG path for chip shape: central square + 3 lines out from each side. */
+function chipShapePath(x: number, y: number, w: number, h: number): string {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const s = Math.min(w, h) * 0.32; // half-size of inner square
+  const lead = Math.min(w, h) * 0.28; // length of each pin line
+  const pad = s / 2; // spacing between the 3 lines on each side (symmetrical)
+  const t = cy - s,
+    b = cy + s,
+    l = cx - s,
+    r = cx + s;
+  const segments: string[] = [];
+  // Central square
+  segments.push(`M ${l} ${t} L ${r} ${t} L ${r} ${b} L ${l} ${b} Z`);
+  // Top: 3 lines up from (cx-pad, t), (cx, t), (cx+pad, t)
+  segments.push(`M ${cx - pad} ${t} L ${cx - pad} ${t - lead}`);
+  segments.push(`M ${cx} ${t} L ${cx} ${t - lead}`);
+  segments.push(`M ${cx + pad} ${t} L ${cx + pad} ${t - lead}`);
+  // Right
+  segments.push(`M ${r} ${cy - pad} L ${r + lead} ${cy - pad}`);
+  segments.push(`M ${r} ${cy} L ${r + lead} ${cy}`);
+  segments.push(`M ${r} ${cy + pad} L ${r + lead} ${cy + pad}`);
+  // Bottom
+  segments.push(`M ${cx - pad} ${b} L ${cx - pad} ${b + lead}`);
+  segments.push(`M ${cx} ${b} L ${cx} ${b + lead}`);
+  segments.push(`M ${cx + pad} ${b} L ${cx + pad} ${b + lead}`);
+  // Left
+  segments.push(`M ${l} ${cy - pad} L ${l - lead} ${cy - pad}`);
+  segments.push(`M ${l} ${cy} L ${l - lead} ${cy}`);
+  segments.push(`M ${l} ${cy + pad} L ${l - lead} ${cy + pad}`);
+  return segments.join(' ');
+}
+
 export function LivingBackground() {
   return (
     <div
@@ -204,19 +237,13 @@ export function LivingBackground() {
           ))}
         </g>
 
-        {/* Chips - drawn on top like components on a board */}
-        <g>
+        {/* Chips - square with 3 symmetrical lines per side (IC-style) */}
+        <g fill={GREY_CHIP} stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
           {CHIPS.map(([x, y, w, h], i) => (
-            <motion.rect
+            <motion.path
               key={`chip-${i}`}
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              rx={2}
-              fill={GREY_CHIP}
-              stroke={GREY_CHIP_BORDER}
-              strokeWidth="1.5"
+              d={chipShapePath(x, y, w, h)}
+              fillRule="evenodd"
               initial={{ opacity: 0.5 }}
               animate={{ opacity: [0.5, 0.7, 0.5] }}
               transition={{
