@@ -39,6 +39,7 @@ import {
   Search,
   Briefcase,
   Globe,
+  HelpCircle,
 } from 'lucide-react';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
 import { DealStage, L1Status } from '@/lib/types';
@@ -1061,9 +1062,19 @@ export default function CompanyDetailDialog({
                     <div className="pt-3 border-t">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Overall Status</span>
-                        <Badge variant={company.l1_screening_result?.toLowerCase() === 'pass' ? 'default' : 'destructive'}>
-                          {company.l1_screening_result || 'Pending'}
-                        </Badge>
+                        {(() => {
+                          const isPending = screenings.some(s => s.state === 'pending');
+                          const hasFail = screenings.some(s => s.result?.toLowerCase() === 'fail');
+
+                          if (isPending) {
+                            return <Badge variant="secondary">Pending</Badge>;
+                          }
+                          if (hasFail) {
+                            return <Badge variant="destructive">Fail</Badge>;
+                          }
+
+                          return <Badge variant="default">Pass</Badge>;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1260,7 +1271,7 @@ function ScreeningStateIcon({ state, result }: { state: 'pending' | 'completed' 
   if (state === 'pending') {
     return (
       <div className="flex items-center gap-1 text-yellow-600">
-        <AlertCircle className="h-4 w-4" />
+        <Loader2 className="h-4 w-4 animate-spin" /> {/* Changed to Loader2 to make it look active */}
         <span className="text-sm font-medium">Pending</span>
       </div>
     );
@@ -1273,8 +1284,20 @@ function ScreeningStateIcon({ state, result }: { state: 'pending' | 'completed' 
       </div>
     );
   }
+
   // For completed state, check the result
-  const isPassed = result?.toLowerCase() === 'pass' || result?.toLowerCase() === 'yes';
+  const resultLower = result?.toLowerCase();
+
+  if (resultLower === 'inconclusive') {
+    return (
+      <div className="flex items-center gap-1 text-amber-500">
+        <HelpCircle className="h-4 w-4" />
+        <span className="text-sm font-medium">Inconclusive</span>
+      </div>
+    );
+  }
+
+  const isPassed = resultLower === 'pass' || resultLower === 'yes';
   return (
     <div className={`flex items-center gap-1 ${isPassed ? 'text-green-600' : 'text-red-600'}`}>
       {isPassed ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
