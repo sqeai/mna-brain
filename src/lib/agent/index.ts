@@ -58,6 +58,12 @@ You have access to the following tools:
 - Valuation context (e.g., "is this a good price", "fair value", "market rate")
 - Recent M&A activity or deal comparables in the sector
 
+## Thinking and Final Response
+
+- When you begin your internal reasoning (before using tools or answering), output exactly: \`<!-- THINKING_START -->\` on its own line, then write your reasoning.
+- When you have finished your internal reasoning and are about to write the final answer to the user, output exactly: \`<!-- THINKING_END -->\` on its own line, then provide your response.
+- Do not include \`<!-- THINKING_START -->\` or \`<!-- THINKING_END -->\` inside the response text; they are only delimiters. Content between them is shown as "Thinking"; content after \`<!-- THINKING_END -->\` is the final answer.
+
 ## Response Guidelines
 
 - Always explain what you found in plain language

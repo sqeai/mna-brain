@@ -1,7 +1,7 @@
 import { type UIMessage } from "@ai-sdk/react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Bot, User, ChevronDown, ChevronRight, Wrench, Loader2, FileText, X, Sparkles, FileSearch } from "lucide-react";
+import { Bot, User, ChevronDown, ChevronRight, Wrench, Loader2, FileText, X, Sparkles, FileSearch, Brain } from "lucide-react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import {
   Collapsible,
@@ -75,10 +75,10 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
       (part as any).state !== "output-available"
   );
 
-  // Show thinking indicator when: no text content yet OR tools are running
+  // Show thinking indicator when: no text content yet OR tools are running (but not if thinking text is streaming)
   const showThinking = !isUser && (!hasTextContent || hasRunningTools) && !isStreamingComplete;
 
-  // Auto-collapse tool results when text starts streaming
+  // Auto-collapse tool results when response text starts streaming
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
 
   useEffect(() => {
@@ -117,6 +117,46 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
     (part) => part.type === "dynamic-tool" || part.type === "tool-invocation"
   );
   const textParts = parts.filter((part) => part.type === "text");
+
+  // Delimiters: thinking is between THINKING_START and THINKING_END; response is after THINKING_END.
+  const THINKING_START_DELIMITER = "<!-- THINKING_START -->";
+  const THINKING_END_DELIMITER = "<!-- THINKING_END -->";
+
+  const fullText = textParts.map((part) => (part as any).text || "").join("");
+  const startIndex = fullText.indexOf(THINKING_START_DELIMITER);
+  const endIndex = fullText.indexOf(THINKING_END_DELIMITER);
+
+  let thinkingText = "";
+  let responseText = "";
+
+  const hasEitherDelimiter = startIndex !== -1 || endIndex !== -1;
+
+  if (!hasEitherDelimiter) {
+    // No thinking delimiters — treat everything as the main response (e.g. simple reply, no tools).
+    responseText = fullText;
+  } else {
+    // Thinking: between THINKING_START and THINKING_END (or from start / to end if one delimiter missing).
+    const thinkingFrom = startIndex === -1 ? 0 : startIndex + THINKING_START_DELIMITER.length;
+    const thinkingTo = endIndex === -1 ? fullText.length : endIndex;
+    thinkingText = fullText.substring(thinkingFrom, thinkingTo).trim();
+
+    // Response: only content after THINKING_END.
+    if (endIndex !== -1) {
+      responseText = fullText.substring(endIndex + THINKING_END_DELIMITER.length);
+    }
+  }
+
+  const hasThinkingContent = thinkingText.trim().length > 0;
+  const hasResponseContent = responseText.trim().length > 0;
+
+  // Auto-collapse thinking when response text starts streaming
+  const [thinkingCollapsed, setThinkingCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (hasResponseContent && !thinkingCollapsed) {
+      setThinkingCollapsed(true);
+    }
+  }, [hasResponseContent]);
 
   // Extract citations from all web_search tool results
   const allCitations: { title: string; url: string }[] = [];
@@ -289,21 +329,55 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
           </Collapsible>
         )}
 
+        {/* Thinking Text - Agent reasoning about tools (collapsible, muted style) */}
+        {hasThinkingContent && (() => {
+          const tailLength = 120;
+          const plainTail = thinkingText.replace(/\s+/g, " ").trim();
+          const tailPreview =
+            plainTail.length > tailLength
+              ? "…" + plainTail.slice(-tailLength)
+              : plainTail;
+          return (
+          <Collapsible
+            open={!thinkingCollapsed}
+            onOpenChange={(open) => setThinkingCollapsed(!open)}
+            className="w-full"
+          >
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 px-3 w-full bg-muted/30 rounded-lg border border-dashed hover:bg-muted/50 text-left">
+              <Brain className="h-4 w-4 flex-shrink-0" />
+              <span className="font-medium flex-shrink-0">Thinking</span>
+              {thinkingCollapsed && tailPreview ? (
+                <span className="min-w-0 flex-1 truncate text-xs ml-1" title={tailPreview}>
+                  {tailPreview}
+                </span>
+              ) : null}
+              {thinkingCollapsed ? (
+                <ChevronRight className="h-4 w-4 flex-shrink-0 ml-auto" />
+              ) : (
+                <ChevronDown className="h-4 w-4 flex-shrink-0 ml-auto" />
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 rounded-lg bg-muted/20 border border-dashed p-4 text-muted-foreground">
+                <div className="text-sm">
+                  <MarkdownRenderer
+                    content={thinkingText}
+                    className="prose-sm [&_*]:text-muted-foreground"
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          );
+        })()}
+
         {/* Thinking Indicator - Shows when agent is still processing */}
         {showThinking && <ThinkingIndicator />}
 
-        {/* Text Content - Inside the chat bubble */}
-        {textParts.some((part) => (part as any).text?.trim()) && (
+        {/* Response Text - Final answer inside the chat bubble */}
+        {hasResponseContent && (
           <div className="rounded-2xl px-5 py-4 w-full bg-card border shadow-sm">
-            {textParts.map((part, index) => {
-              const text = (part as any).text;
-              if (!text?.trim()) return null;
-              return (
-                <div key={index}>
-                  <MarkdownRenderer content={text} />
-                </div>
-              );
-            })}
+            <MarkdownRenderer content={responseText} />
           </div>
         )}
 
