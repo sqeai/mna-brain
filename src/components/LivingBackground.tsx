@@ -1,6 +1,16 @@
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 const GREY_TRACE = 'rgba(148, 163, 184, 0.25)';
 const GREY_GLOW = 'rgba(148, 163, 184, 0.35)';
@@ -124,7 +134,7 @@ const ZAP_TRAVEL_DURATION = 1.6;
 const ZAP_REPEAT_DELAY = 3.2;
 
 // Chips: [x, y, w, h] in viewBox 1000×800 — evenly distributed in a grid
-const GRID_COLS = 8;
+const GRID_COLS = 9;
 const GRID_ROWS = 6;
 const GRID_PAD_X = 50;
 const GRID_PAD_Y = 60;
@@ -146,6 +156,22 @@ const CHIPS = (() => {
   }
   return out;
 })();
+
+const CHIP_GLOW_DURATION = 5;
+const CHIP_OPACITY_BASE = 0.5;
+const CHIP_OPACITY_GLOW = 1;
+const CHIP_OPACITY_NEIGHBOR = 0.5 + (CHIP_OPACITY_GLOW - CHIP_OPACITY_BASE) * 0.5;
+
+function getNeighborIndices(index: number): number[] {
+  const col = index % GRID_COLS;
+  const row = Math.floor(index / GRID_COLS);
+  const out: number[] = [];
+  if (col > 0) out.push(index - 1);
+  if (col < GRID_COLS - 1) out.push(index + 1);
+  if (row > 0) out.push(index - GRID_COLS);
+  if (row < GRID_ROWS - 1) out.push(index + GRID_COLS);
+  return out;
+}
 
 /** Build SVG path for chip shape: central square + 3 lines out from each side. */
 function chipShapePath(x: number, y: number, w: number, h: number): string {
@@ -181,6 +207,22 @@ function chipShapePath(x: number, y: number, w: number, h: number): string {
 }
 
 export function LivingBackground() {
+  const [glowStep, setGlowStep] = useState(0);
+  const glowOrder = useMemo(() => shuffle(CHIPS.map((_, i) => i)), []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setGlowStep((s) => s + 1);
+    }, CHIP_GLOW_DURATION * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const primaryIndex = glowOrder[glowStep % CHIPS.length];
+  const neighborSet = useMemo(() => {
+    const set = new Set(getNeighborIndices(primaryIndex));
+    return set;
+  }, [primaryIndex]);
+
   return (
     <div
       className="fixed inset-0 z-0 pointer-events-none overflow-hidden"
@@ -267,23 +309,30 @@ export function LivingBackground() {
           ))}
         </g>
 
-        {/* Chips - square with 3 symmetrical lines per side (IC-style) */}
+        {/* Chips - square with 3 symmetrical lines per side; glow in random order with neighbor bleed */}
         <g fill={GREY_CHIP} stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
-          {CHIPS.map(([x, y, w, h], i) => (
-            <motion.path
-              key={`chip-${i}`}
-              d={chipShapePath(x, y, w, h)}
-              fillRule="evenodd"
-              initial={{ opacity: 0.5 }}
-              animate={{ opacity: [0.5, 0.7, 0.5] }}
-              transition={{
-                duration: 2.2 + (i % 5) * 0.2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: (i % 8) * 0.15,
-              }}
-            />
-          ))}
+          {CHIPS.map(([x, y, w, h], i) => {
+            const isPrimary = i === primaryIndex;
+            const isNeighbor = neighborSet.has(i);
+            const opacity = isPrimary
+              ? CHIP_OPACITY_GLOW
+              : isNeighbor
+                ? CHIP_OPACITY_NEIGHBOR
+                : CHIP_OPACITY_BASE;
+            return (
+              <motion.path
+                key={`chip-${i}`}
+                d={chipShapePath(x, y, w, h)}
+                fillRule="evenodd"
+                initial={{ opacity: CHIP_OPACITY_BASE }}
+                animate={{ opacity }}
+                transition={{
+                  duration: 0.4,
+                  ease: 'easeInOut',
+                }}
+              />
+            );
+          })}
         </g>
 
         {/* Electricity zaps - traveling bright head with dark tail along each segment */}
