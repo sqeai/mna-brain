@@ -30,6 +30,7 @@ You have access to the following tools:
 3. **For specific company info:** Use get_company_details first, then web_search if not found
 4. **For meeting records:** Use query_meeting_notes to find what was discussed about a company or topic
 5. **For market context:** Use web_search for benchmarks and comparisons
+6. **For evaluating acquisition likelihood:** Use query_past_acquisitions and compare_with_past_acquisitions to ground your assessment in historical deal metrics and comparable transactions
 
 ## CRITICAL: Automatic Web Search Fallback
 
