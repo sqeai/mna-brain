@@ -96,42 +96,6 @@ const V_TRACES = [
   { x: 960, d: 'M 960 0 L 960 800', dash: 6, speed: 3.1 },
 ];
 
-// Zap lines - [x1, y1, x2, y2, delay]. Travel duration is shared (slow); gradient gives bright head / dark tail.
-const ZAPS = [
-  // Horizontal zaps
-  [120, 55, 280, 55, 0],
-  [380, 95, 520, 95, 0.4],
-  [180, 135, 340, 135, 1.2],
-  [520, 185, 680, 185, 2.1],
-  [80, 245, 200, 245, 0.8],
-  [420, 275, 580, 275, 3.0],
-  [640, 295, 820, 295, 1.5],
-  [100, 335, 260, 335, 2.4],
-  [400, 365, 560, 365, 0.3],
-  [720, 385, 900, 385, 1.8],
-  [240, 435, 400, 435, 2.7],
-  [520, 475, 680, 475, 0.6],
-  [60, 525, 220, 525, 3.2],
-  [400, 555, 580, 555, 1.1],
-  [140, 605, 320, 605, 2.0],
-  [480, 655, 640, 655, 0.5],
-  [700, 705, 880, 705, 2.9],
-  // Vertical zaps
-  [70, 80, 70, 220, 0.7],
-  [250, 140, 250, 300, 2.2],
-  [430, 200, 430, 360, 1.4],
-  [600, 260, 600, 400, 3.1],
-  [770, 320, 770, 480, 0.9],
-  [150, 400, 150, 560, 2.5],
-  [330, 460, 330, 620, 0.2],
-  [510, 520, 510, 680, 1.7],
-  [690, 580, 690, 720, 2.8],
-  [880, 120, 880, 280, 1.0],
-  [200, 340, 200, 500, 0.4],
-  [380, 500, 380, 660, 2.3],
-  [560, 600, 560, 740, 1.3],
-];
-
 const ZAP_TRAVEL_DURATION = 1.6;
 const ZAP_REPEAT_DELAY = 3.2;
 
@@ -159,7 +123,7 @@ const CHIPS = (() => {
   return out;
 })();
 
-const CHIP_GLOW_DURATION = 5;
+const CHIP_GLOW_DURATION = 3;
 const CHIP_OPACITY_BASE = 0.5;
 const CHIP_OPACITY_GLOW = 1;
 const CHIP_OPACITY_NEIGHBOR = 0.5 + (CHIP_OPACITY_GLOW - CHIP_OPACITY_BASE) * 0.5;
@@ -173,6 +137,31 @@ function getNeighborIndices(index: number): number[] {
   if (row > 0) out.push(index - GRID_COLS);
   if (row < GRID_ROWS - 1) out.push(index + GRID_COLS);
   return out;
+}
+
+function chipCenter(index: number): [number, number] {
+  const [x, y, w, h] = CHIPS[index];
+  return [x + w / 2, y + h / 2];
+}
+
+// Edges between neighboring chips: [chipA, chipB] with chipA < chipB (each edge once)
+const CHIP_EDGES: [number, number][] = (() => {
+  const out: [number, number][] = [];
+  for (let i = 0; i < CHIPS.length; i++) {
+    for (const n of getNeighborIndices(i)) {
+      if (n > i) out.push([i, n]);
+    }
+  }
+  return out;
+})();
+
+// Zap line coords and per-edge delay for stagger: [x1, y1, x2, y2, delay]
+function getChipZapCoords(edge: [number, number], edgeIndex: number): [number, number, number, number, number] {
+  const [a, b] = edge;
+  const [x1, y1] = chipCenter(a);
+  const [x2, y2] = chipCenter(b);
+  const delay = (edgeIndex % 12) * 0.25;
+  return [x1, y1, x2, y2, delay];
 }
 
 /** Build SVG path for chip shape: central square + 3 lines out from each side. */
@@ -281,6 +270,25 @@ export function LivingBackground() {
             <stop offset="60%" stopColor={ZAP_TAIL} />
             <stop offset="100%" stopColor={ZAP_HEAD} />
           </linearGradient>
+          {/* Per-edge gradients so zap head/tail follow the line direction (chip-to-chip) */}
+          {CHIP_EDGES.map((edge, i) => {
+            const [x1, y1, x2, y2] = getChipZapCoords(edge, i);
+            return (
+              <linearGradient
+                key={i}
+                id={`zapGrad-${i}`}
+                gradientUnits="userSpaceOnUse"
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+              >
+                <stop offset="0%" stopColor={ZAP_TAIL} />
+                <stop offset="60%" stopColor={ZAP_TAIL} />
+                <stop offset="100%" stopColor={ZAP_HEAD} />
+              </linearGradient>
+            );
+          })}
         </defs>
 
         {/* Dense horizontal traces */}
@@ -342,16 +350,16 @@ export function LivingBackground() {
           })}
         </g>
 
-        {/* Electricity zaps - traveling bright head with dark tail along each segment */}
+        {/* Electricity zaps - chip-to-chip lines, traveling bright head with dark tail */}
         <g fill="none" strokeWidth="2.5" strokeLinecap="round" filter="url(#zapGlow)">
-          {ZAPS.map(([x1, y1, x2, y2, delay], i) => {
-            const isHorizontal = y1 === y2;
+          {CHIP_EDGES.map((edge, i) => {
+            const [x1, y1, x2, y2, delay] = getChipZapCoords(edge, i);
             return (
               <motion.path
                 key={`zap-${i}`}
                 d={`M ${x1} ${y1} L ${x2} ${y2}`}
                 pathLength={1}
-                stroke={isHorizontal ? 'url(#zapGradientH)' : 'url(#zapGradientV)'}
+                stroke={`url(#zapGrad-${i})`}
                 strokeDasharray="0.12 1"
                 initial={{ strokeDashoffset: 0 }}
                 animate={{ strokeDashoffset: -1 }}
@@ -359,7 +367,7 @@ export function LivingBackground() {
                   duration: ZAP_TRAVEL_DURATION,
                   repeat: Infinity,
                   repeatDelay: ZAP_REPEAT_DELAY + (i % 4) * 0.5,
-                  delay: (delay as number) + (i % 3) * 0.2,
+                  delay: delay + (i % 3) * 0.2,
                   ease: 'linear',
                 }}
               />
