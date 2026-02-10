@@ -299,7 +299,7 @@ export function LivingBackground() {
         </defs>
 
         {/* Dense horizontal traces */}
-        <g fill="none" stroke="url(#traceH)" strokeWidth="0.9" filter="url(#traceGlow)">
+        {/* <g fill="none" stroke="url(#traceH)" strokeWidth="0.9" filter="url(#traceGlow)">
           {H_TRACES.map((t, i) => (
             <motion.path
               key={`h-${i}`}
@@ -310,10 +310,10 @@ export function LivingBackground() {
               transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
             />
           ))}
-        </g>
+        </g> */}
 
         {/* Dense vertical traces */}
-        <g fill="none" stroke="url(#traceV)" strokeWidth="0.9" filter="url(#traceGlow)">
+        {/* <g fill="none" stroke="url(#traceV)" strokeWidth="0.9" filter="url(#traceGlow)">
           {V_TRACES.map((t, i) => (
             <motion.path
               key={`v-${i}`}
@@ -324,7 +324,7 @@ export function LivingBackground() {
               transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
             />
           ))}
-        </g>
+        </g> */}
 
         {/* Chips - square with 3 symmetrical lines per side; dark blue glow in random order with neighbor bleed */}
         <g stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
