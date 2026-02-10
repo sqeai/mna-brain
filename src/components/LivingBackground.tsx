@@ -2,10 +2,10 @@
 
 import { motion } from 'framer-motion';
 
-const PURPLE_TRACE = 'rgba(196, 181, 253, 0.5)';
-const PURPLE_GLOW = 'rgba(167, 139, 250, 0.6)';
-const PURPLE_CHIP = 'rgba(221, 214, 254, 0.85)';
-const PURPLE_CHIP_BORDER = 'rgba(196, 181, 253, 0.7)';
+const GREY_TRACE = 'rgba(148, 163, 184, 0.25)';
+const GREY_GLOW = 'rgba(148, 163, 184, 0.35)';
+const GREY_CHIP = 'rgba(203, 213, 225, 0.5)';
+const GREY_CHIP_BORDER = 'rgba(148, 163, 184, 0.4)';
 
 // Dense horizontal traces (y, path segments) - motherboard-style buses
 const H_TRACES = [
@@ -141,12 +141,12 @@ export function LivingBackground() {
       className="fixed inset-0 z-0 pointer-events-none overflow-hidden"
       aria-hidden
     >
-      {/* Base gradient - subtle board color */}
+      {/* Base gradient - subtle grey */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(160deg, rgba(245, 243, 255, 0.95) 0%, rgba(237, 233, 254, 0.92) 50%, rgba(243, 232, 255, 0.94) 100%)',
+            'linear-gradient(160deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.96) 50%, rgba(248, 250, 252, 0.97) 100%)',
         }}
       />
 
@@ -154,18 +154,18 @@ export function LivingBackground() {
         className="absolute inset-0 w-full h-full"
         viewBox="0 0 1000 800"
         preserveAspectRatio="xMidYMid slice"
-        style={{ opacity: 0.9 }}
+        style={{ opacity: 1 }}
       >
         <defs>
           <linearGradient id="traceH" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={PURPLE_TRACE} stopOpacity="0.4" />
-            <stop offset="50%" stopColor={PURPLE_GLOW} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={PURPLE_TRACE} stopOpacity="0.4" />
+            <stop offset="0%" stopColor={GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={GREY_GLOW} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={GREY_TRACE} stopOpacity="0.5" />
           </linearGradient>
           <linearGradient id="traceV" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={PURPLE_TRACE} stopOpacity="0.4" />
-            <stop offset="50%" stopColor={PURPLE_GLOW} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={PURPLE_TRACE} stopOpacity="0.4" />
+            <stop offset="0%" stopColor={GREY_TRACE} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={GREY_GLOW} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={GREY_TRACE} stopOpacity="0.5" />
           </linearGradient>
           <filter id="traceGlow">
             <feGaussianBlur stdDeviation="0.8" result="coloredBlur" />
@@ -177,7 +177,7 @@ export function LivingBackground() {
         </defs>
 
         {/* Dense horizontal traces */}
-        <g fill="none" stroke="url(#traceH)" strokeWidth="1.2" filter="url(#traceGlow)">
+        <g fill="none" stroke="url(#traceH)" strokeWidth="0.9" filter="url(#traceGlow)">
           {H_TRACES.map((t, i) => (
             <motion.path
               key={`h-${i}`}
@@ -191,7 +191,7 @@ export function LivingBackground() {
         </g>
 
         {/* Dense vertical traces */}
-        <g fill="none" stroke="url(#traceV)" strokeWidth="1.2" filter="url(#traceGlow)">
+        <g fill="none" stroke="url(#traceV)" strokeWidth="0.9" filter="url(#traceGlow)">
           {V_TRACES.map((t, i) => (
             <motion.path
               key={`v-${i}`}
@@ -214,11 +214,11 @@ export function LivingBackground() {
               width={w}
               height={h}
               rx={2}
-              fill={PURPLE_CHIP}
-              stroke={PURPLE_CHIP_BORDER}
+              fill={GREY_CHIP}
+              stroke={GREY_CHIP_BORDER}
               strokeWidth="1.5"
-              initial={{ opacity: 0.85 }}
-              animate={{ opacity: [0.85, 1, 0.85] }}
+              initial={{ opacity: 0.5 }}
+              animate={{ opacity: [0.5, 0.7, 0.5] }}
               transition={{
                 duration: 2.2 + (i % 5) * 0.2,
                 repeat: Infinity,
