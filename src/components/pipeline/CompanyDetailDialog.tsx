@@ -1272,7 +1272,6 @@ export default function CompanyDetailDialog({
                           >
                             {doc.file_name}
                           </button>
-                          <Badge variant="outline" className="text-xs">{doc.stage}</Badge>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => deleteDocument(doc)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
