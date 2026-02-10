@@ -118,8 +118,10 @@ export default function AIFileDump() {
   // File drop state
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [rawNotes, setRawNotes] = useState('');
-  const [structuredNotes, setStructuredNotes] = useState('');
+  /** Per-file raw notes: key = `${file.name}-${index}` */
+  const [fileRawNotes, setFileRawNotes] = useState<Record<string, string>>({});
+  /** Which file note dropdowns are expanded: key = `${file.name}-${index}` */
+  const [expandedFileNotes, setExpandedFileNotes] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Sorting and Filtering state
@@ -284,16 +286,21 @@ export default function AIFileDump() {
         }
 
         // 3. Notify server of completion
+        const fileKey = `${fileName}-${i}`;
+        const rawNotesForFile = fileRawNotes[fileKey]?.trim() || undefined;
+        const body: Record<string, unknown> = {
+          key,
+          fileName,
+          contentType,
+        };
+        if (rawNotesForFile) body.raw_notes = rawNotesForFile;
+
         const notifyResponse = await fetch('/api/ai-file-dump', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            key,
-            fileName,
-            contentType,
-          }),
+          body: JSON.stringify(body),
         });
 
         const notifyResult = await notifyResponse.json();
@@ -325,7 +332,8 @@ export default function AIFileDump() {
         toast.error(`Failed to upload ${results.failed} files`);
       }
       setSelectedFiles([]);
-      setRawNotes('');
+      setFileRawNotes({});
+      setExpandedFileNotes({});
       fetchMeetingNotes();
       fetchProspectus();
       fetchOtherFiles();
@@ -374,8 +382,8 @@ export default function AIFileDump() {
 
   const clearSelectedFiles = () => {
     setSelectedFiles([]);
-    setRawNotes('');
-    setStructuredNotes('');
+    setFileRawNotes({});
+    setExpandedFileNotes({});
   };
 
   const handleSort = (field: keyof MeetingNote) => {
@@ -610,7 +618,7 @@ export default function AIFileDump() {
               </div>
             </div>
 
-            {/* Selected Files List */}
+            {/* Selected Files List with per-file Raw Notes dropdown */}
             {selectedFiles.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -619,66 +627,76 @@ export default function AIFileDump() {
                     Clear all
                   </Button>
                 </div>
-                <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-2">
+                <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">
                   {selectedFiles.map((file, index) => {
+                    const fileKey = `${file.name}-${index}`;
                     const isDuplicate = meetingNotes.some(note => note.file_name === file.name);
+                    const notesExpanded = expandedFileNotes[fileKey];
+                    const hasNotes = (fileRawNotes[fileKey] ?? '').trim() !== '';
                     return (
-                      <div key={`${file.name}-${index}`} className={cn(
-                        "flex items-center justify-between p-2 rounded-md border transition-colors",
-                        isDuplicate ? "bg-orange-500/5 border-orange-200" : "bg-muted/40 border-muted"
-                      )}>
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <FileText className={cn("h-4 w-4 shrink-0", isDuplicate ? "text-orange-500" : "text-primary")} />
-                          <div className="overflow-hidden">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium truncate">{file.name}</p>
-                              {isDuplicate && (
-                                <Badge variant="outline" className="text-[10px] h-4 py-0 px-1 text-orange-600 bg-orange-500/5 border-orange-200">
-                                  Duplicate
-                                </Badge>
-                              )}
+                      <div
+                        key={fileKey}
+                        className={cn(
+                          "rounded-md border transition-colors",
+                          isDuplicate ? "bg-orange-500/5 border-orange-200" : "bg-muted/40 border-muted"
+                        )}
+                      >
+                        <div className="flex items-center justify-between p-2">
+                          <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                            <FileText className={cn("h-4 w-4 shrink-0", isDuplicate ? "text-orange-500" : "text-primary")} />
+                            <div className="overflow-hidden min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium truncate">{file.name}</p>
+                                {isDuplicate && (
+                                  <Badge variant="outline" className="text-[10px] h-4 py-0 px-1 text-orange-600 bg-orange-500/5 border-orange-200 shrink-0">
+                                    Duplicate
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </p>
                             </div>
-                            <p className="text-[10px] text-muted-foreground">
-                              {(file.size / 1024).toFixed(1)} KB
-                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => setExpandedFileNotes(prev => ({ ...prev, [fileKey]: !prev[fileKey] }))}
+                            >
+                              {notesExpanded ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                              Raw notes {hasNotes && <span className="text-primary">•</span>}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeFile(index)}
+                              className="h-7 w-7"
+                              disabled={uploading}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFile(index)}
-                          className="h-7 w-7 shrink-0"
-                          disabled={uploading}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                        {notesExpanded && (
+                          <div className="border-t border-muted px-2 pb-2 pt-1">
+                            <Textarea
+                              placeholder="Paste raw notes for this file (optional)..."
+                              value={fileRawNotes[fileKey] ?? ''}
+                              onChange={(e) => setFileRawNotes(prev => ({ ...prev, [fileKey]: e.target.value }))}
+                              rows={3}
+                              className="resize-none text-sm"
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
-
-            {/* Notes Fields (Only for single file) */}
-            {selectedFiles.length === 1 && (
-              <div className="grid md:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Raw Notes (Optional)</label>
-                  <Textarea
-                    placeholder="Paste raw notes from the meeting..."
-                    value={rawNotes}
-                    onChange={(e) => setRawNotes(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Structured Notes (Optional)</label>
-                  <Textarea
-                    placeholder="Add structured/formatted notes..."
-                    value={structuredNotes}
-                    onChange={(e) => setStructuredNotes(e.target.value)}
-                    rows={4}
-                  />
                 </div>
               </div>
             )}

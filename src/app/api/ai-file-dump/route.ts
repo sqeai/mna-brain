@@ -69,8 +69,12 @@ export async function POST(request: NextRequest) {
     let matched_companies: any[] = [];
 
     try {
-      // 1. Extract raw text from supported formats
-      rawText = await extractTextFromFile(buffer, fileType, fileName);
+      // 1. Use user-provided raw notes if present, otherwise extract from file
+      if (userRawNotes != null && String(userRawNotes).trim() !== '') {
+        rawText = String(userRawNotes).trim();
+      } else {
+        rawText = await extractTextFromFile(buffer, fileType, fileName);
+      }
 
       // 2. Invoke the agent to structure the text
       structuredResult = await processFileContent(rawText);
