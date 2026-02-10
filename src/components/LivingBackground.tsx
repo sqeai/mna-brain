@@ -6,6 +6,8 @@ const GREY_TRACE = 'rgba(148, 163, 184, 0.25)';
 const GREY_GLOW = 'rgba(148, 163, 184, 0.35)';
 const GREY_CHIP = 'rgba(203, 213, 225, 0.5)';
 const GREY_CHIP_BORDER = 'rgba(148, 163, 184, 0.4)';
+const ZAP_HEAD = 'rgba(255, 255, 255, 0.95)';
+const ZAP_TAIL = 'rgba(148, 163, 184, 0.2)';
 
 // Dense horizontal traces (y, path segments) - motherboard-style buses
 const H_TRACES = [
@@ -82,58 +84,68 @@ const V_TRACES = [
   { x: 960, d: 'M 960 0 L 960 800', dash: 6, speed: 3.1 },
 ];
 
-// Chips: [x, y, w, h] in viewBox coordinates - evenly distributed across 1000×800
-const CHIPS = [
-  // Top row (y ~50–80)
-  [60, 50, 50, 28],
-  [220, 65, 55, 32],
-  [400, 50, 48, 26],
-  [580, 65, 52, 30],
-  [760, 50, 46, 28],
-  [920, 65, 50, 26],
-  // Upper-mid (y ~160–220)
-  [80, 170, 55, 32],
-  [260, 185, 48, 28],
-  [440, 170, 60, 35],
-  [620, 185, 50, 30],
-  [800, 170, 52, 28],
-  [80, 250, 45, 26],
-  [260, 235, 58, 34],
-  [440, 250, 48, 28],
-  [620, 235, 55, 32],
-  [800, 250, 46, 26],
-  // Middle (y ~320–400)
-  [60, 330, 52, 30],
-  [220, 350, 48, 26],
-  [400, 330, 62, 38],
-  [580, 350, 50, 28],
-  [760, 330, 54, 32],
-  [920, 350, 48, 26],
-  [60, 420, 48, 28],
-  [220, 400, 55, 32],
-  [400, 420, 50, 26],
-  [580, 400, 58, 34],
-  [760, 420, 46, 28],
-  [920, 400, 52, 30],
-  // Lower-mid (y ~500–560)
-  [80, 510, 55, 32],
-  [260, 530, 50, 28],
-  [440, 510, 48, 26],
-  [620, 530, 56, 34],
-  [800, 510, 50, 30],
-  [80, 590, 46, 28],
-  [260, 570, 52, 30],
-  [440, 590, 54, 32],
-  [620, 570, 48, 26],
-  [800, 590, 50, 28],
-  // Bottom row (y ~650–700)
-  [60, 660, 50, 28],
-  [220, 680, 52, 30],
-  [400, 660, 48, 26],
-  [580, 680, 55, 32],
-  [760, 660, 46, 28],
-  [920, 680, 50, 26],
+// Zap lines - [x1, y1, x2, y2, delay]. Travel duration is shared (slow); gradient gives bright head / dark tail.
+const ZAPS = [
+  // Horizontal zaps
+  [120, 55, 280, 55, 0],
+  [380, 95, 520, 95, 0.4],
+  [180, 135, 340, 135, 1.2],
+  [520, 185, 680, 185, 2.1],
+  [80, 245, 200, 245, 0.8],
+  [420, 275, 580, 275, 3.0],
+  [640, 295, 820, 295, 1.5],
+  [100, 335, 260, 335, 2.4],
+  [400, 365, 560, 365, 0.3],
+  [720, 385, 900, 385, 1.8],
+  [240, 435, 400, 435, 2.7],
+  [520, 475, 680, 475, 0.6],
+  [60, 525, 220, 525, 3.2],
+  [400, 555, 580, 555, 1.1],
+  [140, 605, 320, 605, 2.0],
+  [480, 655, 640, 655, 0.5],
+  [700, 705, 880, 705, 2.9],
+  // Vertical zaps
+  [70, 80, 70, 220, 0.7],
+  [250, 140, 250, 300, 2.2],
+  [430, 200, 430, 360, 1.4],
+  [600, 260, 600, 400, 3.1],
+  [770, 320, 770, 480, 0.9],
+  [150, 400, 150, 560, 2.5],
+  [330, 460, 330, 620, 0.2],
+  [510, 520, 510, 680, 1.7],
+  [690, 580, 690, 720, 2.8],
+  [880, 120, 880, 280, 1.0],
+  [200, 340, 200, 500, 0.4],
+  [380, 500, 380, 660, 2.3],
+  [560, 600, 560, 740, 1.3],
 ];
+
+const ZAP_TRAVEL_DURATION = 1.6;
+const ZAP_REPEAT_DELAY = 3.2;
+
+// Chips: [x, y, w, h] in viewBox 1000×800 — evenly distributed in a grid
+const GRID_COLS = 8;
+const GRID_ROWS = 6;
+const GRID_PAD_X = 50;
+const GRID_PAD_Y = 60;
+const CHIP_W = 50;
+const CHIP_H = 28;
+
+const CHIPS = (() => {
+  const viewW = 1000;
+  const viewH = 800;
+  const cellW = (viewW - 2 * GRID_PAD_X) / GRID_COLS;
+  const cellH = (viewH - 2 * GRID_PAD_Y) / GRID_ROWS;
+  const out: [number, number, number, number][] = [];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      const x = GRID_PAD_X + (col + 0.5) * cellW - CHIP_W / 2;
+      const y = GRID_PAD_Y + (row + 0.5) * cellH - CHIP_H / 2;
+      out.push([x, y, CHIP_W, CHIP_H]);
+    }
+  }
+  return out;
+})();
 
 /** Build SVG path for chip shape: central square + 3 lines out from each side. */
 function chipShapePath(x: number, y: number, w: number, h: number): string {
@@ -207,6 +219,24 @@ export function LivingBackground() {
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <filter id="zapGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Zap gradient: dark tail (0%) → bright head (100%) along the path */}
+          <linearGradient id="zapGradientH" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={ZAP_TAIL} />
+            <stop offset="60%" stopColor={ZAP_TAIL} />
+            <stop offset="100%" stopColor={ZAP_HEAD} />
+          </linearGradient>
+          <linearGradient id="zapGradientV" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={ZAP_TAIL} />
+            <stop offset="60%" stopColor={ZAP_TAIL} />
+            <stop offset="100%" stopColor={ZAP_HEAD} />
+          </linearGradient>
         </defs>
 
         {/* Dense horizontal traces */}
@@ -254,6 +284,31 @@ export function LivingBackground() {
               }}
             />
           ))}
+        </g>
+
+        {/* Electricity zaps - traveling bright head with dark tail along each segment */}
+        <g fill="none" strokeWidth="2.5" strokeLinecap="round" filter="url(#zapGlow)">
+          {ZAPS.map(([x1, y1, x2, y2, delay], i) => {
+            const isHorizontal = y1 === y2;
+            return (
+              <motion.path
+                key={`zap-${i}`}
+                d={`M ${x1} ${y1} L ${x2} ${y2}`}
+                pathLength={1}
+                stroke={isHorizontal ? 'url(#zapGradientH)' : 'url(#zapGradientV)'}
+                strokeDasharray="0.12 1"
+                initial={{ strokeDashoffset: 0 }}
+                animate={{ strokeDashoffset: -1 }}
+                transition={{
+                  duration: ZAP_TRAVEL_DURATION,
+                  repeat: Infinity,
+                  repeatDelay: ZAP_REPEAT_DELAY + (i % 4) * 0.5,
+                  delay: (delay as number) + (i % 3) * 0.2,
+                  ease: 'linear',
+                }}
+              />
+            );
+          })}
         </g>
       </svg>
 
