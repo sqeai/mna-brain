@@ -25,7 +25,7 @@ function getSupabaseClient() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { key, fileName, contentType } = await request.json();
+    const { key, fileName, contentType, raw_notes: userRawNotes } = await request.json();
 
     if (!key || !fileName) {
       return NextResponse.json(
