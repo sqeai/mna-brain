@@ -9,11 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Bot, Send, X, Maximize2, Minimize2, Building2 } from 'lucide-react';
+import { Bot, Send, X, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
-import CompanyDetailDialog, { type CompanyData } from '@/components/pipeline/CompanyDetailDialog';
-import { supabase } from '@/integrations/supabase/client';
 
 const STORAGE_KEY = 'mna-chat-history';
 
@@ -42,16 +40,15 @@ function getTextFromUIMessage(m: UIMessage): string {
   return parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
 }
 
-const COMMON_WORDS = [
-  'analyze', 'deep', 'dive', 'review', 'assessment', 'evaluate', 'compare',
-  'vs', 'versus', 'synergy', 'synergies', 'find', 'show', 'list', 'discover', 'search',
-  'companies', 'company', 'the', 'a', 'an', 'in', 'for', 'about', 'what', 'how', 'tell', 'me',
-];
-
-function extractPotentialCompanyNames(query: string): string[] {
-  return query.split(/\s+/).filter(
-    (word) => word.length > 2 && !COMMON_WORDS.includes(word.toLowerCase())
-  );
+/** Hide THINKING_START/THINKING_END blocks; show only content after THINKING_END (matches full chat behavior). */
+function scrubThinkingMarkers(text: string): string {
+  const start = '<!-- THINKING_START -->';
+  const end = '<!-- THINKING_END -->';
+  const endIdx = text.indexOf(end);
+  if (endIdx !== -1) return text.slice(endIdx + end.length).trim();
+  const startIdx = text.indexOf(start);
+  if (startIdx !== -1) return text.slice(0, startIdx).trim();
+  return text;
 }
 
 export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }) {
@@ -59,9 +56,6 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [matchedCompanyForLastUser, setMatchedCompanyForLastUser] = useState<{ name: string; id: string } | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(null);
-  const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat' }), []);
@@ -88,59 +82,6 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [messages, status]);
 
-  const findCompanyInDatabase = async (query: string): Promise<{ name: string; id: string } | null> => {
-    const names = extractPotentialCompanyNames(query);
-    for (const name of names) {
-      try {
-        const { data } = await supabase
-          .from('companies')
-          .select('id, target')
-          .ilike('target', `%${name}%`)
-          .limit(1)
-          .maybeSingle();
-        if (data?.id && data?.target) return { name: data.target, id: data.id };
-      } catch {
-        // continue
-      }
-    }
-    return null;
-  };
-
-  const fetchCompanyByName = async (companyName: string): Promise<CompanyData | null> => {
-    const { data, error } = await supabase
-      .from('companies')
-      .select(`
-        id, target, segment, watchlist_status,
-        revenue_2021_usd_mn, revenue_2022_usd_mn, revenue_2023_usd_mn, revenue_2024_usd_mn,
-        ebitda_2021_usd_mn, ebitda_2022_usd_mn, ebitda_2023_usd_mn, ebitda_2024_usd_mn,
-        ev_2024, pipeline_stage, l1_screening_result, created_at, updated_at, remarks
-      `)
-      .ilike('target', `%${companyName}%`)
-      .limit(1)
-      .maybeSingle();
-    if (error || !data) return null;
-    return {
-      id: data.id,
-      target: data.target ?? null,
-      segment: data.segment ?? null,
-      watchlist_status: data.watchlist_status ?? null,
-      pipeline_stage: data.pipeline_stage ?? null,
-      revenue_2021_usd_mn: data.revenue_2021_usd_mn ?? null,
-      revenue_2022_usd_mn: data.revenue_2022_usd_mn ?? null,
-      revenue_2023_usd_mn: data.revenue_2023_usd_mn ?? null,
-      revenue_2024_usd_mn: data.revenue_2024_usd_mn ?? null,
-      ebitda_2021_usd_mn: data.ebitda_2021_usd_mn ?? null,
-      ebitda_2022_usd_mn: data.ebitda_2022_usd_mn ?? null,
-      ebitda_2023_usd_mn: data.ebitda_2023_usd_mn ?? null,
-      ebitda_2024_usd_mn: data.ebitda_2024_usd_mn ?? null,
-      ev_2024: data.ev_2024 ?? null,
-      l1_screening_result: data.l1_screening_result ?? null,
-      remarks: data.remarks ?? null,
-      created_at: data.created_at ?? '',
-      updated_at: data.updated_at ?? '',
-    };
-  };
-
   const [input, setInput] = useState('');
   const isBusy = status === 'submitted' || status === 'streaming';
 
@@ -149,23 +90,12 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
     if (!text) return;
     sendMessage({ text });
     setInput('');
-    findCompanyInDatabase(text).then(setMatchedCompanyForLastUser);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
-    }
-  };
-
-  const handleViewCompanyDetails = async (companyName: string) => {
-    const company = await fetchCompanyByName(companyName);
-    if (company) {
-      setSelectedCompany(company);
-      setCompanyDialogOpen(true);
-    } else {
-      toast.error('Company not found');
     }
   };
 
@@ -185,10 +115,6 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
       </Button>
     );
   }
-
-  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const showViewDetailsOnLastAssistant =
-    lastMessage?.role === 'assistant' && matchedCompanyForLastUser;
 
   return (
     <>
@@ -256,8 +182,8 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
                   )}
                   {messages.map((msg) => {
                     const isUser = msg.role === 'user';
-                    const content = getTextFromUIMessage(msg);
-                    const isLastAssistant = msg.id === lastMessage?.id && msg.role === 'assistant';
+                    let content = getTextFromUIMessage(msg);
+                    if (!isUser) content = scrubThinkingMarkers(content);
                     return (
                       <div
                         key={msg.id}
@@ -286,20 +212,7 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
                           {isUser ? (
                             <p>{content}</p>
                           ) : (
-                            <>
-                              <MarkdownRenderer content={content || '…'} className="text-sm" />
-                              {isLastAssistant && matchedCompanyForLastUser && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="mt-3 gap-2 text-xs"
-                                  onClick={() => handleViewCompanyDetails(matchedCompanyForLastUser.name)}
-                                >
-                                  <Building2 className="h-3 w-3" />
-                                  View {matchedCompanyForLastUser.name} Details
-                                </Button>
-                              )}
-                            </>
+                            <MarkdownRenderer content={content || '…'} className="text-sm" />
                           )}
                         </div>
                       </div>
@@ -346,15 +259,6 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
           </>
         )}
       </Card>
-
-      {selectedCompany && (
-        <CompanyDetailDialog
-          company={selectedCompany}
-          open={companyDialogOpen}
-          onOpenChange={setCompanyDialogOpen}
-          onUpdate={() => {}}
-        />
-      )}
     </>
   );
 }
