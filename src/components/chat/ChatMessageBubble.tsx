@@ -118,24 +118,32 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
   );
   const textParts = parts.filter((part) => part.type === "text");
 
-  // Delimiter injected by the API route to mark the boundary between
-  // agent thinking (pre-tool reasoning) and the final response text.
+  // Delimiters: thinking is between THINKING_START and THINKING_END; response is after THINKING_END.
+  const THINKING_START_DELIMITER = "<!-- THINKING_START -->";
   const THINKING_END_DELIMITER = "<!-- THINKING_END -->";
 
-  // Concatenate all text content, then split on the delimiter.
-  // Everything before the delimiter = thinking, everything after = response.
   const fullText = textParts.map((part) => (part as any).text || "").join("");
-  const delimiterIndex = fullText.indexOf(THINKING_END_DELIMITER);
+  const startIndex = fullText.indexOf(THINKING_START_DELIMITER);
+  const endIndex = fullText.indexOf(THINKING_END_DELIMITER);
 
   let thinkingText = "";
   let responseText = "";
 
-  if (delimiterIndex === -1) {
-    // No delimiter found — all text is response (no tools were used, or still streaming thinking)
+  const hasEitherDelimiter = startIndex !== -1 || endIndex !== -1;
+
+  if (!hasEitherDelimiter) {
+    // No thinking delimiters — treat everything as the main response (e.g. simple reply, no tools).
     responseText = fullText;
   } else {
-    thinkingText = fullText.substring(0, delimiterIndex);
-    responseText = fullText.substring(delimiterIndex + THINKING_END_DELIMITER.length);
+    // Thinking: between THINKING_START and THINKING_END (or from start / to end if one delimiter missing).
+    const thinkingFrom = startIndex === -1 ? 0 : startIndex + THINKING_START_DELIMITER.length;
+    const thinkingTo = endIndex === -1 ? fullText.length : endIndex;
+    thinkingText = fullText.substring(thinkingFrom, thinkingTo).trim();
+
+    // Response: only content after THINKING_END.
+    if (endIndex !== -1) {
+      responseText = fullText.substring(endIndex + THINKING_END_DELIMITER.length);
+    }
   }
 
   const hasThinkingContent = thinkingText.trim().length > 0;
@@ -322,19 +330,31 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
         )}
 
         {/* Thinking Text - Agent reasoning about tools (collapsible, muted style) */}
-        {hasThinkingContent && (
+        {hasThinkingContent && (() => {
+          const tailLength = 120;
+          const plainTail = thinkingText.replace(/\s+/g, " ").trim();
+          const tailPreview =
+            plainTail.length > tailLength
+              ? "…" + plainTail.slice(-tailLength)
+              : plainTail;
+          return (
           <Collapsible
             open={!thinkingCollapsed}
             onOpenChange={(open) => setThinkingCollapsed(!open)}
             className="w-full"
           >
-            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 px-3 w-full bg-muted/30 rounded-lg border border-dashed hover:bg-muted/50">
-              <Brain className="h-4 w-4" />
-              <span className="font-medium">Thinking</span>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 px-3 w-full bg-muted/30 rounded-lg border border-dashed hover:bg-muted/50 text-left">
+              <Brain className="h-4 w-4 flex-shrink-0" />
+              <span className="font-medium flex-shrink-0">Thinking</span>
+              {thinkingCollapsed && tailPreview ? (
+                <span className="min-w-0 flex-1 truncate text-xs ml-1" title={tailPreview}>
+                  {tailPreview}
+                </span>
+              ) : null}
               {thinkingCollapsed ? (
-                <ChevronRight className="h-4 w-4 ml-auto" />
+                <ChevronRight className="h-4 w-4 flex-shrink-0 ml-auto" />
               ) : (
-                <ChevronDown className="h-4 w-4 ml-auto" />
+                <ChevronDown className="h-4 w-4 flex-shrink-0 ml-auto" />
               )}
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -348,7 +368,8 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
               </div>
             </CollapsibleContent>
           </Collapsible>
-        )}
+          );
+        })()}
 
         {/* Thinking Indicator - Shows when agent is still processing */}
         {showThinking && <ThinkingIndicator />}
