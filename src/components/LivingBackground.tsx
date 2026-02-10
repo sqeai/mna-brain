@@ -16,6 +16,8 @@ const GREY_TRACE = 'rgba(148, 163, 184, 0.25)';
 const GREY_GLOW = 'rgba(148, 163, 184, 0.35)';
 const GREY_CHIP = 'rgba(203, 213, 225, 0.5)';
 const GREY_CHIP_BORDER = 'rgba(148, 163, 184, 0.4)';
+const CHIP_GLOW_FILL = 'rgba(30, 58, 138, 0.75)';
+const CHIP_GLOW_NEIGHBOR_FILL = 'rgba(51, 65, 85, 0.55)';
 const ZAP_HEAD = 'rgba(255, 255, 255, 0.95)';
 const ZAP_TAIL = 'rgba(148, 163, 184, 0.2)';
 
@@ -309,11 +311,16 @@ export function LivingBackground() {
           ))}
         </g>
 
-        {/* Chips - square with 3 symmetrical lines per side; glow in random order with neighbor bleed */}
-        <g fill={GREY_CHIP} stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
+        {/* Chips - square with 3 symmetrical lines per side; dark blue glow in random order with neighbor bleed */}
+        <g stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
           {CHIPS.map(([x, y, w, h], i) => {
             const isPrimary = i === primaryIndex;
             const isNeighbor = neighborSet.has(i);
+            const fill = isPrimary
+              ? CHIP_GLOW_FILL
+              : isNeighbor
+                ? CHIP_GLOW_NEIGHBOR_FILL
+                : GREY_CHIP;
             const opacity = isPrimary
               ? CHIP_OPACITY_GLOW
               : isNeighbor
@@ -324,8 +331,8 @@ export function LivingBackground() {
                 key={`chip-${i}`}
                 d={chipShapePath(x, y, w, h)}
                 fillRule="evenodd"
-                initial={{ opacity: CHIP_OPACITY_BASE }}
-                animate={{ opacity }}
+                initial={{ fill: GREY_CHIP, opacity: CHIP_OPACITY_BASE }}
+                animate={{ fill, opacity }}
                 transition={{
                   duration: 0.4,
                   ease: 'easeInOut',
