@@ -519,6 +519,38 @@ export default function CompanyDetailPage() {
           </div>
 
           <TabsContent value="company-card" className="space-y-6 mt-6">
+            {/* AI Market Scanning Remarks */}
+            {company.remarks && (
+              <Card className="border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-violet-50/30 dark:from-purple-950/20 dark:to-violet-950/10">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                      <Sparkles className="h-5 w-5 text-purple-500" />
+                      AI Market Scanning Remarks
+                    </CardTitle>
+                    <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      AI Discovered
+                    </Badge>
+                  </div>
+                  {company.segment && (
+                    <p className="text-sm text-muted-foreground">
+                      Matched against: {company.segment}
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 bg-purple-50/80 dark:bg-purple-950/30">
+                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2">
+                      <Sparkles className="h-4 w-4" />
+                      Why This Company Matches Your Investment Thesis
+                    </p>
+                    <p className="text-sm leading-relaxed">{company.remarks}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Company Info Card */}
             <Card>
               <CardHeader>
@@ -573,13 +605,6 @@ export default function CompanyDetailPage() {
                   <div className="mt-4 pt-4 border-t">
                     <p className="text-sm text-muted-foreground mb-2">Comments</p>
                     <p className="text-sm">{company.comments}</p>
-                  </div>
-                )}
-                {/* AI Remarks */}
-                {company.remarks && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-1">AI Remarks (Thesis Cross-Match)</p>
-                    <p className="text-sm bg-muted/50 rounded-lg p-3">{company.remarks}</p>
                   </div>
                 )}
               </CardContent>
