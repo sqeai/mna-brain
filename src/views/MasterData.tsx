@@ -37,6 +37,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import type { DealStage } from '@/lib/types';
+import { STAGE_LABELS } from '@/lib/constants';
 
 interface MasterDataCompany {
   id: string;
@@ -52,17 +53,6 @@ interface MasterDataCompany {
   created_at: string;
   pipeline_stage: DealStage | null;
 }
-
-const stageLabels: Record<DealStage | 'Acquired', string> = {
-  market_screening: 'Market Scanning',
-  L0: 'Sourcing',
-  L1: 'Screening',
-  L2: 'Initial Review',
-  L3: 'Due Diligence',
-  L4: 'Negotiation',
-  L5: 'Closing',
-  Acquired: 'Acquired',
-};
 
 const stageColors: Record<DealStage | 'Acquired', string> = {
   market_screening: 'bg-purple-500',
@@ -419,7 +409,7 @@ export default function MasterData() {
                           <TableCell>
                             {displayStage ? (
                               <Badge className={`${stageColors[displayStage as DealStage]} text-white`}>
-                                {displayStage === 'market_screening' ? 'Market Screening' : `${displayStage} - ${stageLabels[displayStage as DealStage]}`}
+                                {displayStage === 'market_screening' ? 'Market Screening' : `${displayStage} - ${STAGE_LABELS[displayStage as DealStage]}`}
                               </Badge>
                             ) : (
                               <Badge variant="outline">Not in Pipeline</Badge>

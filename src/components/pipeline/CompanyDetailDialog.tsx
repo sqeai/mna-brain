@@ -42,7 +42,13 @@ import {
 } from 'lucide-react';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
 import { DealStage, L1Status } from '@/lib/types';
+import { STAGE_LABELS } from '@/lib/constants';
 import { formatDistanceToNow, format } from 'date-fns';
+
+const getStageLabel = (stage: string | null): string => {
+  const key = (stage || 'L0') as DealStage;
+  return STAGE_LABELS[key] ?? key;
+};
 import {
   BarChart,
   Bar,
@@ -476,7 +482,7 @@ export default function CompanyDetailDialog({
                   {company.watchlist_status}
                 </Badge>
               )}
-              <Badge variant="secondary">{company.pipeline_stage || 'L0'}</Badge>
+              <Badge variant="secondary">{getStageLabel(company.pipeline_stage)}</Badge>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -577,7 +583,7 @@ export default function CompanyDetailDialog({
                     <div>
                       <p className="text-sm text-muted-foreground">Pipeline Stage</p>
                       <Badge variant="outline" className="text-base px-3 py-1">
-                        {company.pipeline_stage || 'L0'}
+                        {getStageLabel(company.pipeline_stage)}
                       </Badge>
                     </div>
                     <div>

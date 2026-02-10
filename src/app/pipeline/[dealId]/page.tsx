@@ -36,7 +36,16 @@ import {
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
 import { FinancialCharts } from '@/components/pipeline/FinancialCharts';
 import { DealStage } from '@/lib/types';
+import { STAGE_LABELS } from '@/lib/constants';
 import { formatDistanceToNow, format } from 'date-fns';
+
+const websiteHref = (url: string) =>
+  /^https?:\/\//i.test(url) ? url : `https://${url}`;
+
+const getStageLabel = (stage: string | null): string => {
+  const key = (stage || 'L0') as DealStage;
+  return STAGE_LABELS[key] ?? key;
+};
 
 interface CompanyData {
   id: string;
@@ -473,7 +482,7 @@ export default function CompanyDetailPage() {
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="outline">{company.segment || 'N/A'}</Badge>
-                <Badge variant="secondary">{company.pipeline_stage || 'L0'}</Badge>
+                <Badge variant="secondary">{getStageLabel(company.pipeline_stage)}</Badge>
                 {company.l1_screening_result && (
                   <Badge variant={company.l1_screening_result === 'Pass' ? 'default' : 'destructive'}>
                     L1: {company.l1_screening_result}
@@ -568,7 +577,7 @@ export default function CompanyDetailPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Website</p>
                     {company.website ? (
-                      <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
+                      <a href={websiteHref(company.website)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
                         {company.website}
                       </a>
                     ) : (
@@ -593,7 +602,7 @@ export default function CompanyDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Stage</p>
-                    <Badge variant="outline">{company.pipeline_stage || 'L0'}</Badge>
+                    <Badge variant="outline">{getStageLabel(company.pipeline_stage)}</Badge>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">EV (2024)</p>
