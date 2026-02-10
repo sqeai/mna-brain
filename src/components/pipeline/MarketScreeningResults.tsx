@@ -202,7 +202,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                 <TableHead>Discovered</TableHead>
                 <TableHead className="max-w-[200px]">Remarks</TableHead>
                 <TableHead className="max-w-[150px]">Thesis</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
