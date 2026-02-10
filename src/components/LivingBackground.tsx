@@ -208,11 +208,18 @@ export function LivingBackground() {
     return () => clearInterval(id);
   }, []);
 
-  const primaryIndex = glowOrder[glowStep % CHIPS.length];
+  const n = CHIPS.length;
+  const primaryIndex = glowOrder[glowStep % n];
+  const primaryIndex2 = glowOrder[(glowStep + Math.max(1, Math.floor(n / 2))) % n];
   const neighborSet = useMemo(() => {
-    const set = new Set(getNeighborIndices(primaryIndex));
+    const set = new Set<number>([
+      ...getNeighborIndices(primaryIndex),
+      ...getNeighborIndices(primaryIndex2),
+    ]);
+    set.delete(primaryIndex);
+    set.delete(primaryIndex2);
     return set;
-  }, [primaryIndex]);
+  }, [primaryIndex, primaryIndex2]);
 
   return (
     <div
@@ -322,7 +329,7 @@ export function LivingBackground() {
         {/* Chips - square with 3 symmetrical lines per side; dark blue glow in random order with neighbor bleed */}
         <g stroke={GREY_CHIP_BORDER} strokeWidth="1.2">
           {CHIPS.map(([x, y, w, h], i) => {
-            const isPrimary = i === primaryIndex;
+            const isPrimary = i === primaryIndex || i === primaryIndex2;
             const isNeighbor = neighborSet.has(i);
             const fill = isPrimary
               ? CHIP_GLOW_FILL
