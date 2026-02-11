@@ -115,6 +115,7 @@ export type Database = {
           updated_at: string | null
           watchlist_id: number | null
           watchlist_status: string | null
+          source: string | null
           website: string | null
         }
         Insert: {
@@ -192,6 +193,7 @@ export type Database = {
           updated_at?: string | null
           watchlist_id?: number | null
           watchlist_status?: string | null
+          source?: string | null
           website?: string | null
         }
         Update: {
@@ -269,6 +271,7 @@ export type Database = {
           updated_at?: string | null
           watchlist_id?: number | null
           watchlist_status?: string | null
+          source?: string | null
           website?: string | null
         }
         Relationships: []
