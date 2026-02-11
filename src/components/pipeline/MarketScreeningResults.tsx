@@ -60,6 +60,7 @@ interface MarketScreeningResult {
   ebitda_margin_2022: number | null;
   ebitda_margin_2023: number | null;
   ebitda_margin_2024: number | null;
+  source: string | null;
 }
 
 interface MarketScreeningResultsProps {
@@ -482,6 +483,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                   remarks: selectedResult.remarks,
                   created_at: selectedResult.created_at,
                   updated_at: selectedResult.created_at,
+                  source: selectedResult.source,
                 }}
                 open={detailDialogOpen}
                 onOpenChange={setDetailDialogOpen}

@@ -82,6 +82,7 @@ interface PipelineCompany {
   remarks: string | null;
   created_at: string;
   updated_at: string;
+  source: string | null;
 }
 
 const STAGES: DealStage[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
@@ -253,6 +254,7 @@ export default function Pipeline() {
         remarks: company.remarks || null,
         created_at: company.created_at,
         updated_at: company.updated_at,
+        source: company.source || null,
       })) || [];
 
       setCompanies(formatted);
