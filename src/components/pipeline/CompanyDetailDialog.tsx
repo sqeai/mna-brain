@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -44,6 +44,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
+import { AICompanyCardLoading } from '@/components/pipeline/AICompanyCardLoading';
 import FilePreview from '@/components/MeetingNotes/FilePreview';
 import { DealStage, L1Status } from '@/lib/types';
 import { STAGE_LABELS } from '@/lib/constants';
@@ -53,6 +54,9 @@ const getStageLabel = (stage: string | null): string => {
   const key = (stage || 'L0') as DealStage;
   return STAGE_LABELS[key] ?? key;
 };
+
+const websiteHref = (url: string) =>
+  /^https?:\/\//i.test(url) ? url : `https://${url}`;
 import {
   BarChart,
   Bar,
@@ -68,6 +72,7 @@ export interface CompanyData {
   id: string;
   target: string | null;
   segment: string | null;
+  website?: string | null;
   watchlist_status: string | null;
   pipeline_stage: string | null;
   revenue_2021_usd_mn: number | null;
@@ -205,6 +210,10 @@ export default function CompanyDetailDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
+  // Scroll target for AI Company Card section in Overview
+  const aiCardSectionRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'filters' | 'attachments'>('overview');
+
   useEffect(() => {
     if (open) {
       fetchDetails();
@@ -337,6 +346,18 @@ export default function CompanyDetailDialog({
       // Continue even if delete fails
     }
     await generateAnalysis();
+  };
+
+  const scrollToAICardAndRun = (forceRegenerate = false) => {
+    setActiveTab('overview');
+    setTimeout(() => {
+      aiCardSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    if (forceRegenerate || analysis?.status === 'completed') {
+      regenerateAnalysis();
+    } else {
+      generateAnalysis();
+    }
   };
 
   const addNote = async () => {
@@ -576,20 +597,17 @@ export default function CompanyDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'filters' | 'attachments')} className="w-full">
           <div className="flex items-center justify-between gap-2">
-            <TabsList className="grid grid-cols-6 flex-1">
+            <TabsList className="grid grid-cols-3 flex-1">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="company-card">Company Card</TabsTrigger>
               <TabsTrigger value="filters">L1 Filters</TabsTrigger>
-              <TabsTrigger value="notes">Notes</TabsTrigger>
-              <TabsTrigger value="links">Links</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <Button
               size="sm"
               className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2 shrink-0"
-              onClick={analysis?.status === 'completed' ? regenerateAnalysis : generateAnalysis}
+              onClick={() => scrollToAICardAndRun()}
               disabled={analysisGenerating}
             >
               {analysisGenerating ? (
@@ -654,6 +672,22 @@ export default function CompanyDetailDialog({
                       <p className="font-semibold text-lg">{company.target || 'Unknown'}</p>
                     </div>
                     <div>
+                      <p className="text-sm text-muted-foreground">Website</p>
+                      {company.website ? (
+                        <a
+                          href={websiteHref(company.website)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-sm inline-flex items-center gap-1"
+                        >
+                          {company.website}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Not available</span>
+                      )}
+                    </div>
+                    <div>
                       <p className="text-sm text-muted-foreground">Segment</p>
                       <p className="font-medium">{company.segment || '-'}</p>
                     </div>
@@ -691,14 +725,6 @@ export default function CompanyDetailDialog({
                     </div>
                   </div>
                 </div>
-
-                {/* AI Remarks */}
-                {company.remarks && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-1">AI Remarks (Thesis Cross-Match)</p>
-                    <p className="text-sm bg-muted/50 rounded-lg p-3">{company.remarks}</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -793,16 +819,9 @@ export default function CompanyDetailDialog({
             </Card>
 
             {/* AI Company Card Summary in Overview */}
+            <div ref={aiCardSectionRef}>
             {analysisGenerating && !analysis?.business_overview ? (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-8 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="h-6 w-6 animate-spin text-accent" />
-                <div className="text-center">
-                  <h3 className="text-base font-semibold text-accent">Generating AI Company Card</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Researching company data from multiple sources. This may take 1-2 minutes...
-                  </p>
-                </div>
-              </div>
+              <AICompanyCardLoading />
             ) : analysis?.status === 'failed' ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 flex flex-col items-center justify-center gap-3">
                 <AlertCircle className="h-6 w-6 text-destructive" />
@@ -812,7 +831,7 @@ export default function CompanyDetailDialog({
                     {analysis.error_message || 'An error occurred while generating the analysis.'}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={regenerateAnalysis} disabled={analysisGenerating}>
+                <Button variant="outline" size="sm" onClick={() => scrollToAICardAndRun(true)} disabled={analysisGenerating}>
                   <Sparkles className="h-4 w-4 mr-2" />
                   Retry
                 </Button>
@@ -835,7 +854,7 @@ export default function CompanyDetailDialog({
                       variant="ghost"
                       size="sm"
                       className="text-accent hover:text-accent/80 text-xs h-7 px-2"
-                      onClick={regenerateAnalysis}
+                      onClick={() => scrollToAICardAndRun()}
                       disabled={analysisGenerating}
                     >
                       {analysisGenerating ? (
@@ -934,6 +953,7 @@ export default function CompanyDetailDialog({
                 />
               </div>
             ) : null}
+            </div>
 
             {/* Stage History */}
             <Card>
@@ -968,153 +988,6 @@ export default function CompanyDetailDialog({
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="company-card" className="space-y-4 mt-4">
-            {analysisGenerating && !analysis?.business_overview ? (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-accent">Generating AI Company Card</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Researching company data from multiple sources. This may take 1-2 minutes...
-                  </p>
-                </div>
-              </div>
-            ) : analysis?.status === 'failed' ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">
-                <AlertCircle className="h-8 w-8 text-destructive" />
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-destructive">Analysis Failed</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {analysis.error_message || 'An error occurred while generating the analysis.'}
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={regenerateAnalysis} disabled={analysisGenerating}>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Retry
-                </Button>
-              </div>
-            ) : analysis?.status === 'completed' ? (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-4">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" />
-                    <h3 className="text-lg font-semibold text-accent">AI Company Card</h3>
-                    <span className="text-xs text-muted-foreground ml-2">AI-generated analysis</span>
-                  </div>
-                  {analysis.updated_at && (
-                    <span className="text-xs text-muted-foreground">
-                      Last: {format(new Date(analysis.updated_at), 'MMM d, yyyy HH:mm')}
-                    </span>
-                  )}
-                </div>
-
-                {analysis.sources && Array.isArray(analysis.sources) && analysis.sources.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">Sources:</span>
-                    {(analysis.sources as AnalysisSource[]).map((source, idx) => (
-                      source.url ? (
-                        <a
-                          key={idx}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
-                        >
-                          <Globe className="h-3 w-3" />
-                          {source.title || new URL(source.url).hostname}
-                          <ExternalLink className="h-2.5 w-2.5" />
-                        </a>
-                      ) : (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 text-accent text-xs"
-                        >
-                          {source.type === 'database' ? (
-                            <FileText className="h-3 w-3" />
-                          ) : source.type === 'inven' ? (
-                            <Search className="h-3 w-3" />
-                          ) : source.type === 'meeting_notes' ? (
-                            <FileText className="h-3 w-3" />
-                          ) : (
-                            <Globe className="h-3 w-3" />
-                          )}
-                          {source.title || source.type}
-                        </span>
-                      )
-                    ))}
-                  </div>
-                )}
-
-                <CompanyAnalysisSection
-                  title="Business Overview"
-                  description="Products, end markets, customer types, and geographic footprint."
-                  icon={Building2}
-                  content={analysis.business_overview || ''}
-                  colorVariant="default"
-                />
-
-                <CompanyAnalysisSection
-                  title="Business Model & Value Chain Summary"
-                  description="How the company operates economically and its position in the value chain."
-                  icon={Briefcase}
-                  content={analysis.business_model_summary || ''}
-                  colorVariant="teal"
-                />
-
-                <CompanyAnalysisSection
-                  title="Key Takeaways"
-                  description="The most important implications from the analysis (3-5 synthesized insights)."
-                  icon={Lightbulb}
-                  content={analysis.key_takeaways || ''}
-                  colorVariant="blue"
-                />
-
-                <CompanyAnalysisSection
-                  title="Investment Highlights"
-                  description="Upside drivers linked to the company's business model and positioning."
-                  icon={TrendingUp}
-                  content={analysis.investment_highlights || ''}
-                  colorVariant="green"
-                />
-
-                <CompanyAnalysisSection
-                  title="Investment Risks"
-                  description="Risks inherent to the company's business model and value chain."
-                  icon={AlertTriangle}
-                  content={analysis.investment_risks || ''}
-                  colorVariant="amber"
-                />
-
-                <CompanyAnalysisSection
-                  title="Diligence Priorities"
-                  description="Critical unknowns to resolve before advancing investment (3-7 items)."
-                  icon={Search}
-                  content={analysis.diligence_priorities || ''}
-                  colorVariant="rose"
-                />
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
-                <Sparkles className="h-10 w-10 text-accent/50" />
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-muted-foreground">No AI Analysis Yet</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Click &quot;AI Company Card&quot; to generate a comprehensive analysis using AI.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
-                  onClick={generateAnalysis}
-                  disabled={analysisGenerating}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Generate AI Company Card
-                </Button>
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="filters" className="space-y-4 mt-4">
@@ -1175,174 +1048,165 @@ export default function CompanyDetailDialog({
             </Card>
           </TabsContent>
 
-          <TabsContent value="notes" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Notes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="Add a note..."
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button onClick={addNote} disabled={isSubmitting || !newNote.trim()}>
-                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  </Button>
-                </div>
-
-                {notes.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No notes yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {notes.map((note) => (
-                      <div key={note.id} className="p-3 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {format(new Date(note.created_at), 'MMM d, yyyy HH:mm')} • {note.stage}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="icon" onClick={() => deleteNote(note.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+          <TabsContent value="attachments" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Notes Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Notes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex gap-2">
+                    <Textarea
+                      placeholder="Add a note..."
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      className="flex-1 min-h-[60px]"
+                      rows={2}
+                    />
+                    <Button onClick={addNote} disabled={isSubmitting || !newNote.trim()} size="icon" className="shrink-0">
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {notes.length === 0 ? (
+                      <p className="text-muted-foreground text-xs">No notes yet</p>
+                    ) : (
+                      notes.map((note) => (
+                        <div key={note.id} className="p-2 border rounded-lg text-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs whitespace-pre-wrap flex-1">{note.content}</p>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => deleteNote(note.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(note.created_at), 'MMM d, yyyy')} • {note.stage}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-          <TabsContent value="links" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4" />
-                  Links
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <div className="flex-1 space-y-2">
+              {/* Links Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    Links
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
                     <Input
                       placeholder="URL"
                       value={newLinkUrl}
                       onChange={(e) => setNewLinkUrl(e.target.value)}
+                      className="h-8 text-sm"
                     />
-                    <Input
-                      placeholder="Title (optional)"
-                      value={newLinkTitle}
-                      onChange={(e) => setNewLinkTitle(e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Title (optional)"
+                        value={newLinkTitle}
+                        onChange={(e) => setNewLinkTitle(e.target.value)}
+                        className="h-8 text-sm flex-1"
+                      />
+                      <Button onClick={addLink} disabled={isSubmitting || !newLinkUrl.trim()} size="icon" className="h-8 w-8 shrink-0">
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
-                  <Button onClick={addLink} disabled={isSubmitting || !newLinkUrl.trim()} className="self-end">
-                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  </Button>
-                </div>
-
-                {links.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No links yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {links.map((link) => (
-                      <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {links.length === 0 ? (
+                      <p className="text-muted-foreground text-xs">No links yet</p>
+                    ) : (
+                      links.map((link) => (
+                        <div key={link.id} className="flex items-center justify-between p-2 border rounded-lg">
                           <a
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary hover:underline"
+                            className="text-xs text-primary hover:underline truncate flex-1 flex items-center gap-1"
                           >
+                            <ExternalLink className="h-3 w-3 shrink-0" />
                             {link.title || link.url}
                           </a>
-                          <Badge variant="outline" className="text-xs">{link.stage}</Badge>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => deleteLink(link.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => deleteLink(link.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
 
-          <TabsContent value="documents" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Documents
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="file-upload" className="cursor-pointer">
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        Click to upload a document
-                      </p>
-                    </div>
-                  </Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    disabled={isSubmitting}
-                  />
-                </div>
-
-                {documents.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No documents yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm truncate" title={doc.file_name}>
-                            {doc.file_name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => downloadDocument(doc)}
-                            title="Download"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenPreview(doc)}
-                            title="Preview"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => deleteDocument(doc)} title="Delete">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+              {/* Documents Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label htmlFor="file-upload" className="cursor-pointer">
+                      <div className="border-2 border-dashed rounded-lg p-3 text-center hover:border-primary transition-colors">
+                        <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Click to upload</p>
                       </div>
-                    ))}
+                    </Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={isSubmitting}
+                    />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {documents.length === 0 ? (
+                      <p className="text-muted-foreground text-xs">No documents yet</p>
+                    ) : (
+                      documents.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-2 border rounded-lg">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <button
+                              type="button"
+                              onClick={() => downloadDocument(doc)}
+                              className="text-xs text-primary hover:underline truncate text-left"
+                            >
+                              {doc.file_name}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleOpenPreview(doc)}
+                              title="Preview"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteDocument(doc)} title="Delete">
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

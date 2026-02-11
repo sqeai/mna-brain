@@ -65,6 +65,7 @@ interface PipelineCompany {
   id: string;
   target: string;
   segment: string;
+  website: string | null;
   watchlist_status: string | null;
   revenue_2021_usd_mn: number | null;
   revenue_2022_usd_mn: number | null;
@@ -209,6 +210,7 @@ export default function Pipeline() {
           id,
           target,
           segment,
+          website,
           watchlist_status,
           revenue_2021_usd_mn,
           revenue_2022_usd_mn,
@@ -234,6 +236,7 @@ export default function Pipeline() {
         id: company.id,
         target: company.target || '',
         segment: company.segment || '',
+        website: company.website ?? null,
         watchlist_status: company.watchlist_status,
         revenue_2021_usd_mn: company.revenue_2021_usd_mn,
         revenue_2022_usd_mn: company.revenue_2022_usd_mn,

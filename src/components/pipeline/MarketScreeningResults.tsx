@@ -466,6 +466,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                   id: selectedResult.id,
                   target: selectedResult.target,
                   segment: selectedResult.segment,
+                  website: selectedResult.website ?? null,
                   watchlist_status: null,
                   pipeline_stage: selectedResult.pipeline_stage as DealStage,
                   revenue_2021_usd_mn: selectedResult.revenue_2021_usd_mn,
