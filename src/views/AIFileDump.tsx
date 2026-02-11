@@ -619,7 +619,7 @@ export default function AIFileDump() {
                       Supports PPTX, PDF, DOC, DOCX, TXT, MD
                     </p>
                   </div>
-                  <div className="flex flex-col items-center gap-2 text-center">
+                  {/* <div className="flex flex-col items-center gap-2 text-center">
                     <FileSpreadsheet className="h-10 w-10 text-emerald-600" />
                     <p className="text-muted-foreground text-sm flex flex-col items-center justify-center gap-0.5">
                       <span>Upload bulk companies using</span><span>this template {' '}
@@ -632,7 +632,7 @@ export default function AIFileDump() {
                       </a>
                       </span>
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
