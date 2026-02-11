@@ -95,6 +95,7 @@ interface CompanyData {
   remarks?: string | null;
   created_at: string | null;
   updated_at: string | null;
+  source: string | null;
 }
 
 interface DealNote {
@@ -118,6 +119,15 @@ interface DealDocument {
   file_path: string;
   stage: string;
   created_at: string | null;
+}
+
+/** File from the "files" table (AI file dump) where matched_companies contains this company */
+interface MatchedFile {
+  id: string;
+  file_name: string;
+  file_link: string;
+  file_date: string | null;
+  created_at: string;
 }
 
 interface CompanyAnalysis {
@@ -163,6 +173,7 @@ export default function CompanyDetailPage() {
   const [notes, setNotes] = useState<DealNote[]>([]);
   const [links, setLinks] = useState<DealLink[]>([]);
   const [documents, setDocuments] = useState<DealDocument[]>([]);
+  const [matchedFiles, setMatchedFiles] = useState<MatchedFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
   const [analysisGenerating, setAnalysisGenerating] = useState(false);
@@ -173,6 +184,7 @@ export default function CompanyDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [previewDoc, setPreviewDoc] = useState<DealDocument | null>(null);
+  const [previewMatchedFile, setPreviewMatchedFile] = useState<MatchedFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
@@ -194,7 +206,7 @@ export default function CompanyDetailPage() {
       if (error) throw error;
       if (data) {
         setCompany(data as CompanyData);
-        fetchDetails();
+        fetchDetails((data as CompanyData).target?.trim() || null);
         fetchAnalysis();
       }
     } catch (error) {
@@ -205,10 +217,20 @@ export default function CompanyDetailPage() {
     }
   };
 
-  const fetchDetails = async () => {
+  const fetchDetails = async (companyTarget?: string | null) => {
     if (!companyId) return;
+    const companyName = companyTarget ?? company?.target?.trim() ?? '';
+    const filesQuery = companyName
+      ? supabase
+          .from('files')
+          .select('id, file_name, file_link, file_date, created_at')
+          .or(`matched_companies.ilike.%${companyName}%`)
+          .order('created_at', { ascending: false })
+          .limit(100)
+      : null;
+
     try {
-      const [notesRes, linksRes, docsRes] = await Promise.all([
+      const [notesRes, linksRes, docsRes, filesRes] = await Promise.all([
         supabase
           .from('deal_notes')
           .select('*')
@@ -224,11 +246,13 @@ export default function CompanyDetailPage() {
           .select('*')
           .eq('deal_id', companyId)
           .order('created_at', { ascending: false }),
+        filesQuery ?? Promise.resolve({ data: [] }),
       ]);
 
       if (notesRes.data) setNotes(notesRes.data);
       if (linksRes.data) setLinks(linksRes.data);
       if (docsRes.data) setDocuments(docsRes.data);
+      if (filesRes?.data) setMatchedFiles((filesRes.data as MatchedFile[]) ?? []);
     } catch (error) {
       console.error('Error fetching details:', error);
     }
@@ -503,8 +527,53 @@ export default function CompanyDetailPage() {
     }
   };
 
+  const handleClosePreview = () => {
+    setPreviewDoc(null);
+    setPreviewMatchedFile(null);
+    setPreviewUrl(null);
+  };
+
+  const downloadMatchedFile = async (file: MatchedFile) => {
+    try {
+      const res = await fetch(`/api/ai-file-dump/${encodeURIComponent(file.id)}/download-url`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get download URL');
+      }
+      const a = document.createElement('a');
+      a.href = data.url;
+      a.download = file.file_name;
+      a.rel = 'noopener noreferrer';
+      a.target = '_blank';
+      a.click();
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to download file');
+    }
+  };
+
+  const handleOpenMatchedFilePreview = async (file: MatchedFile) => {
+    setPreviewDoc(null);
+    setPreviewMatchedFile(file);
+    setLoadingPreview(true);
+    setPreviewUrl(null);
+    try {
+      const res = await fetch(`/api/ai-file-dump/${encodeURIComponent(file.id)}/download-url`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get preview URL');
+      }
+      setPreviewUrl(data.url);
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to load preview');
+      setPreviewMatchedFile(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
   const handleOpenPreview = async (doc: DealDocument) => {
     setPreviewDoc(doc);
+    setPreviewMatchedFile(null);
     setLoadingPreview(true);
     setPreviewUrl(null);
     try {
@@ -522,11 +591,6 @@ export default function CompanyDetailPage() {
     } finally {
       setLoadingPreview(false);
     }
-  };
-
-  const handleClosePreview = () => {
-    setPreviewDoc(null);
-    setPreviewUrl(null);
   };
 
   const getL1StatusIcon = (value: string | null) => {
@@ -621,8 +685,8 @@ export default function CompanyDetailPage() {
           </div>
 
           <TabsContent value="company-card" className="space-y-6 mt-6">
-            {/* AI Market Scanning Remarks */}
-            {company.remarks && (
+            {/* AI Market Scanning Remarks - only for outbound deals */}
+            {company.remarks && company.source?.toLowerCase() === 'outbound' && (
               <Card className="border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-violet-50/30 dark:from-purple-950/20 dark:to-violet-950/10">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -1066,6 +1130,51 @@ export default function CompanyDetailPage() {
                     ))}
                     {documents.length === 0 && <p className="text-muted-foreground text-sm">No documents yet</p>}
                   </div>
+                  {matchedFiles.length > 0 && (
+                    <>
+                      <Label className="text-muted-foreground text-sm font-medium mt-4 block">
+                        Files mentioning this company (from AI file dump)
+                      </Label>
+                      <div className="space-y-2 mt-2 max-h-[200px] overflow-y-auto">
+                        {matchedFiles.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-2 bg-muted/70 rounded-lg">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <span className="text-sm truncate" title={file.file_name}>
+                                {file.file_name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => downloadMatchedFile(file)}
+                                title="Download"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenMatchedFilePreview(file)}
+                                title="Preview"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => router.push(`/ai-file-dump?highlight=${encodeURIComponent(file.id)}`)}
+                                title="Open in AI File Dump"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1074,12 +1183,12 @@ export default function CompanyDetailPage() {
       </div>
 
       {/* Document preview dialog */}
-      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && handleClosePreview()}>
+      <Dialog open={!!(previewDoc || previewMatchedFile)} onOpenChange={(open) => !open && handleClosePreview()}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              <span className="truncate">{previewDoc?.file_name}</span>
+              <span className="truncate">{previewDoc?.file_name ?? previewMatchedFile?.file_name ?? 'Preview'}</span>
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-auto">
@@ -1087,11 +1196,15 @@ export default function CompanyDetailPage() {
               <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : previewUrl && previewDoc ? (
+            ) : previewUrl && (previewDoc || previewMatchedFile) ? (
               <FilePreview
                 url={previewUrl}
-                fileName={previewDoc.file_name}
-                onDownload={() => downloadDocument(previewDoc)}
+                fileName={previewDoc?.file_name ?? previewMatchedFile?.file_name ?? ''}
+                onDownload={() =>
+                  previewMatchedFile
+                    ? downloadMatchedFile(previewMatchedFile)
+                    : previewDoc && downloadDocument(previewDoc)
+                }
               />
             ) : (
               <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">

@@ -227,6 +227,7 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
       ebitda_margin_2024: company.ebitda_margin_2024,
       // AI-generated remarks cross-matched with thesis
       remarks: company.remarks || null,
+      source: 'outbound',
     }));
 
     const { error: insertError } = await supabase

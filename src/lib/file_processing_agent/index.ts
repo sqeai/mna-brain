@@ -278,6 +278,7 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
               ebitda_margin_2024: parsed?.prospectus_summary?.ebitda_margin_2024 || null,
               // AI-generated remarks cross-matched with thesis
               remarks: parsed?.prospectus_summary?.remarks || null,
+              source: 'inbound',
             }
             const { data: company, error: insertError } = await supabase
               .from('companies')

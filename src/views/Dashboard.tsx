@@ -37,6 +37,7 @@ interface CompanyData {
   target: string | null;
   segment: string | null;
   watchlist_status: string | null;
+  source: string | null;
   pipeline_stage: string | null;
   revenue_2021_usd_mn: number | null;
   revenue_2022_usd_mn: number | null;
@@ -78,6 +79,16 @@ const stageGradients: Record<string, string> = {
   L3: 'from-emerald-400/80 to-green-500/80',
   L4: 'from-cyan-400/80 to-teal-500/80',
   L5: 'from-pink-400/80 to-rose-500/80',
+};
+
+// Bar colors for inbound (lighter) / outbound (darker) per stage
+const stageBarColors: Record<string, { inbound: string; outbound: string }> = {
+  L0: { inbound: 'bg-blue-400/70', outbound: 'bg-blue-600/70' },
+  L1: { inbound: 'bg-violet-400/70', outbound: 'bg-violet-600/70' },
+  L2: { inbound: 'bg-amber-400/70', outbound: 'bg-amber-600/70' },
+  L3: { inbound: 'bg-emerald-400/70', outbound: 'bg-emerald-600/70' },
+  L4: { inbound: 'bg-cyan-400/70', outbound: 'bg-cyan-600/70' },
+  L5: { inbound: 'bg-pink-400/70', outbound: 'bg-pink-600/70' },
 };
 
 const statusColors: Record<string, string> = {
@@ -134,6 +145,7 @@ export default function Dashboard() {
           target,
           segment,
           watchlist_status,
+          source,
           pipeline_stage,
           revenue_2021_usd_mn,
           revenue_2022_usd_mn,
@@ -169,9 +181,14 @@ export default function Dashboard() {
           const stage = company.pipeline_stage || 'L0';
           const current = stageMap.get(stage) || { count: 0, inbound: 0, outbound: 0 };
           current.count += 1;
-          
-          // For L0, track inbound vs outbound based on watchlist_status
-          if (stage === 'L0') {
+
+          // Track inbound vs outbound for every stage (source column; fallback to watchlist_status)
+          const src = company.source?.toLowerCase();
+          const fromSource = src === 'inbound' || src === 'outbound';
+          if (fromSource) {
+            if (src === 'inbound') current.inbound += 1;
+            else current.outbound += 1;
+          } else {
             const status = company.watchlist_status?.toLowerCase() || '';
             if (status.includes('inbound') || status === 'active') {
               current.inbound += 1;
@@ -179,7 +196,7 @@ export default function Dashboard() {
               current.outbound += 1;
             }
           }
-          
+
           stageMap.set(stage, current);
         });
         
@@ -330,52 +347,15 @@ export default function Dashboard() {
                     const l0 = stageCounts[0]?.count || 1;
                     const conversionPercentStage = l0 > 0 ? Math.round((item.count / l0) * 100) : 0;
                     const barMaxHeight = 200;
-                    const barHeight = Math.max((item.count / maxCount) * barMaxHeight, 50);
-                    const stageConfig = PIPELINE_STAGES[index];
-
-                    if (item.stage === 'L0') {
-                      const inboundRatio = item.count > 0 ? (item.inbound || 0) / item.count : 0.5;
-                      const outboundRatio = item.count > 0 ? (item.outbound || 0) / item.count : 0.5;
-                      return (
-                        <div
-                          key={item.stage}
-                          className="flex-1 flex flex-col items-center cursor-pointer group"
-                        >
-                          <span className="text-xl font-semibold mb-2 transition-transform group-hover:scale-110">{item.count}</span>
-                          <Badge variant="secondary" className="mb-4 text-xs bg-blue-500/15 text-blue-600 border-0">
-                            100%
-                          </Badge>
-                          <div
-                            className="w-full rounded-xl overflow-hidden flex flex-col transition-all duration-200 group-hover:scale-[1.02]"
-                            style={{ height: `${barHeight}px` }}
-                          >
-                            <div
-                              className="w-full bg-blue-400/70 flex items-center justify-center"
-                              style={{ height: `${inboundRatio * 100}%` }}
-                            >
-                              <div className="text-white text-xs font-medium text-center px-1">
-                                <div className="opacity-80 text-[10px] uppercase tracking-wide">Inbound</div>
-                                <div className="font-semibold text-sm">{item.inbound || 0}</div>
-                              </div>
-                            </div>
-                            <div
-                              className="w-full bg-blue-600/70 flex items-center justify-center"
-                              style={{ height: `${outboundRatio * 100}%` }}
-                            >
-                              <div className="text-white text-xs font-medium text-center px-1">
-                                <div className="opacity-80 text-[10px] uppercase tracking-wide">Outbound</div>
-                                <div className="font-semibold text-sm">{item.outbound || 0}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-center mt-4">
-                            <div className="text-base font-bold">{item.stage}</div>
-                            <div className="text-xs text-muted-foreground">{item.label}</div>
-                          </div>
-                        </div>
-                      );
-                    }
-
+                    const minBarHeight = 80; // fits two segments with label + number (min 40px each)
+                    const barHeight = Math.max((item.count / maxCount) * barMaxHeight, minBarHeight);
+                    const colors = stageBarColors[item.stage] || { inbound: 'bg-gray-400/70', outbound: 'bg-gray-600/70' };
+                    const inboundRatio = item.count > 0 ? (item.inbound || 0) / item.count : 0.5;
+                    const outboundRatio = item.count > 0 ? (item.outbound || 0) / item.count : 0.5;
+                    const segmentMinPx = 40;
+                    const remainingHeight = Math.max(0, barHeight - 2 * segmentMinPx);
+                    const inboundHeightPx = segmentMinPx + inboundRatio * remainingHeight;
+                    const outboundHeightPx = segmentMinPx + outboundRatio * remainingHeight;
                     return (
                       <div
                         key={item.stage}
@@ -386,12 +366,27 @@ export default function Dashboard() {
                           {conversionPercentStage}%
                         </Badge>
                         <div
-                          className={`w-full rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-[1.02] bg-gradient-to-b ${stageGradients[item.stage] || stageConfig.color}`}
+                          className="w-full rounded-xl overflow-hidden flex flex-col transition-all duration-200 group-hover:scale-[1.02]"
                           style={{ height: `${barHeight}px` }}
                         >
-                          {item.count > 0 && (
-                            <span className="text-white font-semibold text-lg">{item.count}</span>
-                          )}
+                          <div
+                            className={`w-full ${colors.inbound} flex items-center justify-center shrink-0`}
+                            style={{ height: `${inboundHeightPx}px`, minHeight: segmentMinPx }}
+                          >
+                            <div className="text-white text-xs font-medium text-center px-1">
+                              <div className="opacity-80 text-[10px] uppercase tracking-wide">Inbound</div>
+                              <div className="font-semibold text-sm">{item.inbound || 0}</div>
+                            </div>
+                          </div>
+                          <div
+                            className={`w-full ${colors.outbound} flex items-center justify-center shrink-0`}
+                            style={{ height: `${outboundHeightPx}px`, minHeight: segmentMinPx }}
+                          >
+                            <div className="text-white text-xs font-medium text-center px-1">
+                              <div className="opacity-80 text-[10px] uppercase tracking-wide">Outbound</div>
+                              <div className="font-semibold text-sm">{item.outbound || 0}</div>
+                            </div>
+                          </div>
                         </div>
                         <div className="text-center mt-4">
                           <div className="text-base font-bold">{item.stage}</div>
@@ -437,6 +432,7 @@ export default function Dashboard() {
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
                             <TableHead className="font-semibold">Company</TableHead>
                             <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="font-semibold">Source</TableHead>
                             <TableHead className="text-right font-semibold">Rev 2022</TableHead>
                             <TableHead className="text-right font-semibold">Rev 2023</TableHead>
                             <TableHead className="text-right font-semibold">Rev 2024</TableHead>
@@ -473,6 +469,22 @@ export default function Dashboard() {
                                     <Badge variant="secondary" className="text-xs">
                                       Pending
                                     </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {company.source ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className={`text-xs border-0 ${
+                                        company.source.toLowerCase() === 'inbound'
+                                          ? 'bg-emerald-500/15 text-emerald-600'
+                                          : 'bg-violet-500/15 text-violet-600'
+                                      }`}
+                                    >
+                                      {company.source}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">—</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm font-semibold">
