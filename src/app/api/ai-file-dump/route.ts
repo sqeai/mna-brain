@@ -69,15 +69,14 @@ export async function POST(request: NextRequest) {
     let matched_companies: any[] = [];
 
     try {
-      // 1. Use user-provided raw notes if present, otherwise extract from file
-      if (userRawNotes != null && String(userRawNotes).trim() !== '') {
-        rawText = String(userRawNotes).trim();
-      } else {
+      // 1. Extract raw text from supported formats (skip for PDFs)
+      const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
         rawText = await extractTextFromFile(buffer, fileType, fileName);
       }
 
       // 2. Invoke the agent to structure the text
-      structuredResult = await processFileContent(rawText);
+      structuredResult = await processFileContent(rawText, buffer, fileType);
 
       if (structuredResult) {
         tags = structuredResult.tags || [];
