@@ -40,6 +40,7 @@ import {
   Trash2,
   Download,
   FileUp,
+  FileSpreadsheet,
   X,
   CheckCircle2,
   AlertCircle,
@@ -598,23 +599,41 @@ export default function AIFileDump() {
               `}
             >
               <div className="space-y-2">
-                <FileUp className="h-10 w-10 mx-auto text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  Drag and drop files here, or{' '}
-                  <label className="text-primary cursor-pointer hover:underline">
-                    browse
-                    <Input
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      accept=".pdf,.doc,.docx,.txt,.md"
-                      multiple
-                    />
-                  </label>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Supports PPTX, PDF, DOC, DOCX, TXT, MD
-                </p>
+                <div className="flex flex-wrap items-start justify-center gap-x-8 gap-y-4">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <FileUp className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-muted-foreground text-sm">
+                      Drag and drop files here, or{' '}
+                      <label className="text-primary cursor-pointer hover:underline">
+                        browse
+                        <Input
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileSelect}
+                          accept=".pdf,.doc,.docx,.txt,.md"
+                          multiple
+                        />
+                      </label>
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Supports PPTX, PDF, DOC, DOCX, TXT, MD
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <FileSpreadsheet className="h-10 w-10 text-emerald-600" />
+                    <p className="text-muted-foreground text-sm flex flex-col items-center justify-center gap-0.5">
+                      <span>Upload bulk companies using</span><span>this template {' '}
+                      <a
+                        href="/File Upload Template.xlsx"
+                        download="File Upload Template.xlsx"
+                        className="text-primary font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
+                      >
+                        here
+                      </a>
+                      </span>
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 

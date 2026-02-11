@@ -15,6 +15,10 @@ import {
   Sparkles,
   ArrowRight,
   HelpCircle,
+  Eye,
+  EyeOff,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
 import { DealStage } from '@/lib/types';
@@ -54,12 +58,16 @@ interface ScreeningProgressPanelProps {
   refreshTrigger?: number;
   onScreeningComplete?: () => void;
   onCompanyClick?: (companyId: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function ScreeningProgressPanel({
   refreshTrigger = 0,
   onScreeningComplete,
   onCompanyClick,
+  collapsed = false,
+  onToggleCollapse,
 }: ScreeningProgressPanelProps) {
   const [screenings, setScreenings] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,172 +257,188 @@ export default function ScreeningProgressPanel({
               </CardDescription>
             </div>
           </div>
-          {passedCount > 0 && (
-            <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              {passedCount} ready for L1
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* In Progress Section */}
-        {inProgress.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
-              In Progress ({inProgress.length})
-            </h4>
-            <div className="grid gap-2">
-              {inProgress.map((summary) => (
-                <div
-                  key={summary.company_id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
-                    <div>
-                      <button
-                        onClick={() => onCompanyClick?.(summary.company_id)}
-                        className="font-medium hover:text-primary hover:underline transition-colors text-left"
-                      >
-                        {summary.company_name}
-                      </button>
-                      <div className="text-xs text-muted-foreground">
-                        {summary.completed_criteria} / {summary.total_criteria} criteria evaluated
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <span className="text-green-600 dark:text-green-400">{summary.passed_criteria}✓</span>
-                      <span className="text-red-600 dark:text-red-400">{summary.failed_criteria}✗</span>
-                      {summary.inconclusive_criteria > 0 && (
-                        <span className="text-amber-600 flex items-center">
-                          {summary.inconclusive_criteria}<HelpCircle className="h-3 w-3 ml-0.5" />
-                        </span>
-                      )}
-                    </span>
-                    <Badge variant="secondary">
-                      In Progress
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                      onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
-                    >
-                      <ArrowRight className="h-3 w-3 mr-1" />
-                      Promote to L1
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Completed Section */}
-        {completed.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              Completed ({completed.length})
-            </h4>
-            <div className="grid gap-2">
-              {paginatedCompleted.map((summary) => (
-                <div
-                  key={summary.company_id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${summary.all_passed
-                    ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50'
-                    : 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {summary.all_passed ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    )}
-                    <div>
-                      <button
-                        onClick={() => onCompanyClick?.(summary.company_id)}
-                        className="font-medium hover:text-primary hover:underline transition-colors text-left"
-                      >
-                        {summary.company_name}
-                      </button>
-                      <div className="text-xs text-muted-foreground">
-                        {summary.total_criteria} criteria evaluated
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <span className="text-green-600 dark:text-green-400">{summary.passed_criteria}✓</span>
-                      <span className="text-red-600 dark:text-red-400">{summary.failed_criteria}✗</span>
-                      {summary.inconclusive_criteria > 0 && (
-                        <span className="text-amber-600 flex items-center">
-                          {summary.inconclusive_criteria}<HelpCircle className="h-3 w-3 ml-0.5" />
-                        </span>
-                      )}
-                    </span>
-                    {summary.all_passed ? (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
-                      >
-                        Move to L1
-                        <ArrowRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    ) : (
-                      <>
-                        <Badge variant="destructive">
-                          Failed
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                          onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
-                        >
-                          <ArrowRight className="h-3 w-3 mr-1" />
-                          Promote to L1
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalCompletedPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCompletedPage((p) => Math.max(0, p - 1))}
-                  disabled={completedPage === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {completedPage + 1} of {totalCompletedPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCompletedPage((p) => Math.min(totalCompletedPages - 1, p + 1))}
-                  disabled={completedPage >= totalCompletedPages - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+          <div className="flex items-center gap-2">
+            {onToggleCollapse && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleCollapse}
+                className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                {collapsed ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                {collapsed ? 'Show' : 'Hide'}
+                {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+              </Button>
+            )}
+            {passedCount > 0 && (
+              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                {passedCount} ready for L1
+              </Badge>
             )}
           </div>
-        )}
-      </CardContent>
+        </div>
+      </CardHeader>
+      {!collapsed && (
+        <CardContent className="space-y-4">
+          {/* In Progress Section */}
+          {inProgress.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
+                In Progress ({inProgress.length})
+              </h4>
+              <div className="grid gap-2">
+                {inProgress.map((summary) => (
+                  <div
+                    key={summary.company_id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
+                      <div>
+                        <button
+                          onClick={() => onCompanyClick?.(summary.company_id)}
+                          className="font-medium hover:text-primary hover:underline transition-colors text-left"
+                        >
+                          {summary.company_name}
+                        </button>
+                        <div className="text-xs text-muted-foreground">
+                          {summary.completed_criteria} / {summary.total_criteria} criteria evaluated
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="text-green-600 dark:text-green-400">{summary.passed_criteria}✓</span>
+                        <span className="text-red-600 dark:text-red-400">{summary.failed_criteria}✗</span>
+                        {summary.inconclusive_criteria > 0 && (
+                          <span className="text-amber-600 flex items-center">
+                            {summary.inconclusive_criteria}<HelpCircle className="h-3 w-3 ml-0.5" />
+                          </span>
+                        )}
+                      </span>
+                      <Badge variant="secondary">
+                        In Progress
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                        onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Promote to L1
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Section */}
+          {completed.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Completed ({completed.length})
+              </h4>
+              <div className="grid gap-2">
+                {paginatedCompleted.map((summary) => (
+                  <div
+                    key={summary.company_id}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${summary.all_passed
+                      ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50'
+                      : 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {summary.all_passed ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      )}
+                      <div>
+                        <button
+                          onClick={() => onCompanyClick?.(summary.company_id)}
+                          className="font-medium hover:text-primary hover:underline transition-colors text-left"
+                        >
+                          {summary.company_name}
+                        </button>
+                        <div className="text-xs text-muted-foreground">
+                          {summary.total_criteria} criteria evaluated
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="text-green-600 dark:text-green-400">{summary.passed_criteria}✓</span>
+                        <span className="text-red-600 dark:text-red-400">{summary.failed_criteria}✗</span>
+                        {summary.inconclusive_criteria > 0 && (
+                          <span className="text-amber-600 flex items-center">
+                            {summary.inconclusive_criteria}<HelpCircle className="h-3 w-3 ml-0.5" />
+                          </span>
+                        )}
+                      </span>
+                      {summary.all_passed ? (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
+                        >
+                          Move to L1
+                          <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      ) : (
+                        <>
+                          <Badge variant="destructive">
+                            Failed
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                            onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
+                          >
+                            <ArrowRight className="h-3 w-3 mr-1" />
+                            Promote to L1
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalCompletedPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletedPage((p) => Math.max(0, p - 1))}
+                    disabled={completedPage === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {completedPage + 1} of {totalCompletedPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletedPage((p) => Math.min(totalCompletedPages - 1, p + 1))}
+                    disabled={completedPage >= totalCompletedPages - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      )}
 
       {promotingCompany && (
         <PromoteDialog
