@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LivingBackground } from '@/components/LivingBackground';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Briefcase, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,7 +19,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, user, loading } = useAuth();
+  const { resolvedTheme } = useTheme();
   const router = useRouter();
+  const logoSrc = '/logo-light.png';
 
   useEffect(() => {
     if (!loading && user) {
@@ -45,7 +49,7 @@ export default function LoginPage() {
   if (loading) {
     return (
       <div className="relative flex min-h-screen items-center justify-center">
-        <LivingBackground />
+        <LivingBackground variant="default" />
         <div className="relative z-10">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -59,20 +63,29 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4 overflow-hidden">
-      <LivingBackground />
+      <LivingBackground variant="default" />
       <div className="relative z-10 w-full flex justify-center">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md min-h-[480px] flex flex-col rounded-md border-white/20 bg-white/10 backdrop-blur-xl shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
-            <Briefcase className="h-7 w-7 text-primary-foreground" />
+          <div className="mx-auto mb-4 flex h-14 items-center justify-center">
+            <Image
+              src={logoSrc}
+              alt="Brain 2.0"
+              width={120}
+              height={56}
+              className="h-14 w-auto object-contain rounded-2xl"
+              priority
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">M&A Tracker</CardTitle>
-          <CardDescription>Deal Pipeline Management System</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight text-black dark:text-white">BRAIN 2.0</CardTitle>
+          <CardDescription className="text-xs font-medium uppercase tracking-[0.2em] text-black/70 dark:text-white/70">
+            ENTERPRISE DEAL INTELLIGENCE
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 text-black dark:text-white">
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="signin-email">Email</Label>
+              <Label htmlFor="signin-email" className="text-sm text-black/80 dark:text-white/80">Email</Label>
               <Input
                 id="signin-email"
                 type="email"
@@ -81,10 +94,11 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 focus-visible:ring-black/30 dark:focus-visible:ring-white/30"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signin-password">Password</Label>
+              <Label htmlFor="signin-password" className="text-sm text-black/80 dark:text-white/80">Password</Label>
               <Input
                 id="signin-password"
                 type="password"
@@ -93,6 +107,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 focus-visible:ring-black/30 dark:focus-visible:ring-white/30"
               />
             </div>
 
@@ -115,6 +130,9 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
+        <CardFooter className="flex justify-center w-full text-center text-xs font-medium uppercase tracking-[0.15em] text-black/60 dark:text-white/60">
+          SECURED BY NEURAL CORE LOGIC
+        </CardFooter>
       </Card>
       </div>
     </div>

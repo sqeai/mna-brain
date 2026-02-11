@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
-  title: 'M&A Tracker',
+  title: 'Brain 2.0',
   description: 'Deal Pipeline Management',
 };
 
