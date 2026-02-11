@@ -68,7 +68,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <ProtectedRoute>
-      <LivingBackground />
+      <LivingBackground variant="grid" />
       <SidebarProvider>
         <div className="relative z-10 flex min-h-screen w-full">
           <Sidebar collapsible="icon" className="border-r border-sidebar-border">

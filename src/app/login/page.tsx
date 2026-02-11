@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LivingBackground } from '@/components/LivingBackground';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Brain, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,7 +19,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, user, loading } = useAuth();
+  const { resolvedTheme } = useTheme();
   const router = useRouter();
+  const logoSrc = resolvedTheme === 'light' ? '/logo-light.png' : '/logo-dark.png';
 
   useEffect(() => {
     if (!loading && user) {
@@ -63,8 +67,15 @@ export default function LoginPage() {
       <div className="relative z-10 w-full flex justify-center">
       <Card className="w-full max-w-md min-h-[480px] flex flex-col rounded-md border-white/20 bg-white/10 backdrop-blur-xl shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-gradient-to-b from-violet-400 to-purple-800 shadow-md">
-            <Brain className="h-7 w-7 text-white" />
+          <div className="mx-auto mb-4 flex h-14 items-center justify-center">
+            <Image
+              src={logoSrc}
+              alt="Brain 2.0"
+              width={120}
+              height={56}
+              className="h-14 w-auto object-contain rounded-2xl"
+              priority
+            />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white">BRAIN 2.0</CardTitle>
           <CardDescription className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
