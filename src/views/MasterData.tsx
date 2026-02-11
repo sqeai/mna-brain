@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import CompanyDetailDialog, { type CompanyData } from '@/components/pipeline/CompanyDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -32,27 +30,40 @@ import {
   TrendingDown,
   Minus,
   CheckCircle2,
-  Bot,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import type { DealStage } from '@/lib/types';
-import { STAGE_LABELS } from '@/lib/constants';
+import { Button } from '@/components/ui/button';
 
-interface MasterDataCompany {
+interface CompanyWithDeal {
   id: string;
-  target: string;
-  segment: string;
-  revenue_2022_usd_mn: number | null;
-  revenue_2023_usd_mn: number | null;
-  revenue_2024_usd_mn: number | null;
-  ebitda_2022_usd_mn: number | null;
-  ebitda_2023_usd_mn: number | null;
-  ebitda_2024_usd_mn: number | null;
-  ev_2024: number | null;
+  name: string;
+  sector: string;
+  source: string;
+  revenue_year1: number | null;
+  revenue_year2: number | null;
+  revenue_year3: number | null;
+  ebitda_year1: number | null;
+  ebitda_year2: number | null;
+  ebitda_year3: number | null;
+  valuation: number | null;
+  pic: string | null;
   created_at: string;
-  pipeline_stage: DealStage | null;
+  current_stage: DealStage | null;
+  is_active: boolean;
 }
+
+const stageLabels: Record<DealStage | 'Acquired', string> = {
+  market_screening: 'Market Screening',
+  L0: 'Sourcing',
+  L1: 'Screening',
+  L2: 'Initial Review',
+  L3: 'Due Diligence',
+  L4: 'Negotiation',
+  L5: 'Closing',
+  Acquired: 'Acquired',
+};
 
 const stageColors: Record<DealStage | 'Acquired', string> = {
   market_screening: 'bg-purple-500',
@@ -82,13 +93,12 @@ const getRevenueChange = (year2: number | null, year3: number | null): { directi
 };
 
 export default function MasterData() {
-  const [companies, setCompanies] = useState<MasterDataCompany[]>([]);
+  const [companies, setCompanies] = useState<CompanyWithDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [sectorFilter, setSectorFilter] = useState<string>('all');
-  const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(null);
-  const [dialogLoading, setDialogLoading] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -98,7 +108,7 @@ export default function MasterData() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, stageFilter, sectorFilter]);
+  }, [searchQuery, stageFilter, sectorFilter, sourceFilter]);
 
   const fetchCompanies = async () => {
     try {
@@ -108,6 +118,7 @@ export default function MasterData() {
           id,
           target,
           segment,
+          watchlist_status,
           revenue_2022_usd_mn,
           revenue_2023_usd_mn,
           revenue_2024_usd_mn,
@@ -118,25 +129,30 @@ export default function MasterData() {
           pipeline_stage,
           created_at
         `)
+        .in('pipeline_stage', ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data) {
-        const formatted: MasterDataCompany[] = data.map((company: any) => ({
-          id: company.id,
-          target: company.target || 'Unknown',
-          segment: company.segment || '',
-          revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-          revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-          revenue_2024_usd_mn: company.revenue_2024_usd_mn,
-          ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-          ev_2024: company.ev_2024,
-          created_at: company.created_at,
-          pipeline_stage: company.pipeline_stage as DealStage | null,
-        }));
+        const formatted = data
+          .map((company: any) => ({
+            id: company.id,
+            name: company.target || 'Unknown',
+            sector: company.segment || '',
+            source: company.watchlist_status === 'Active' ? 'inbound' : 'outbound',
+            revenue_year1: company.revenue_2022_usd_mn,
+            revenue_year2: company.revenue_2023_usd_mn,
+            revenue_year3: company.revenue_2024_usd_mn,
+            ebitda_year1: company.ebitda_2022_usd_mn,
+            ebitda_year2: company.ebitda_2023_usd_mn,
+            ebitda_year3: company.ebitda_2024_usd_mn,
+            valuation: company.ev_2024,
+            pic: null,
+            created_at: company.created_at,
+            current_stage: company.pipeline_stage as DealStage | null,
+            is_active: company.pipeline_stage !== null && company.pipeline_stage !== 'Acquired',
+          }));
         setCompanies(formatted);
       }
     } catch (error) {
@@ -146,101 +162,51 @@ export default function MasterData() {
     }
   };
 
-  const getDisplayStage = (company: MasterDataCompany): DealStage | 'Acquired' | null => {
-    return company.pipeline_stage;
-  };
-
-  const openCompanyDialog = async (companyId: string) => {
-    setDialogLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          id,
-          target,
-          segment,
-          watchlist_status,
-          revenue_2021_usd_mn,
-          revenue_2022_usd_mn,
-          revenue_2023_usd_mn,
-          revenue_2024_usd_mn,
-          ebitda_2021_usd_mn,
-          ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          pipeline_stage,
-          l1_screening_result,
-          created_at,
-          updated_at,
-          remarks
-        `)
-        .eq('id', companyId)
-        .single();
-
-      if (error) throw error;
-      if (!data) return;
-
-      const companyData: CompanyData = {
-        id: data.id,
-        target: data.target ?? null,
-        segment: data.segment ?? null,
-        watchlist_status: data.watchlist_status ?? null,
-        pipeline_stage: data.pipeline_stage ?? null,
-        revenue_2021_usd_mn: data.revenue_2021_usd_mn ?? null,
-        revenue_2022_usd_mn: data.revenue_2022_usd_mn ?? null,
-        revenue_2023_usd_mn: data.revenue_2023_usd_mn ?? null,
-        revenue_2024_usd_mn: data.revenue_2024_usd_mn ?? null,
-        ebitda_2021_usd_mn: data.ebitda_2021_usd_mn ?? null,
-        ebitda_2022_usd_mn: data.ebitda_2022_usd_mn ?? null,
-        ebitda_2023_usd_mn: data.ebitda_2023_usd_mn ?? null,
-        ebitda_2024_usd_mn: data.ebitda_2024_usd_mn ?? null,
-        ev_2024: data.ev_2024 ?? null,
-        l1_screening_result: data.l1_screening_result ?? null,
-        created_at: data.created_at ?? '',
-        updated_at: data.updated_at ?? '',
-        remarks: data.remarks ?? null,
-      };
-      setSelectedCompany(companyData);
-    } catch (error) {
-      console.error('Error fetching company:', error);
-    } finally {
-      setDialogLoading(false);
+  const getDisplayStage = (company: CompanyWithDeal): DealStage | 'Acquired' | null => {
+    if (!company.current_stage) return null;
+    if (!company.is_active && company.current_stage === 'L5') {
+      return 'Acquired';
     }
+    return company.current_stage as DealStage;
   };
 
-  const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))];
+  const uniqueSectors = [...new Set(companies.map(c => c.sector).filter(Boolean))];
 
   const filteredCompanies = companies.filter(company => {
-    const matchesSearch = company.target.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (company.segment || '').toLowerCase().includes(searchQuery.toLowerCase());
-
+    const matchesSearch = company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      company.sector.toLowerCase().includes(searchQuery.toLowerCase());
+    
     const displayStage = getDisplayStage(company);
     const matchesStage = stageFilter === 'all' || displayStage === stageFilter;
-    const matchesSector = sectorFilter === 'all' || company.segment === sectorFilter;
-
-    return matchesSearch && matchesStage && matchesSector;
+    const matchesSector = sectorFilter === 'all' || company.sector === sectorFilter;
+    const matchesSource = sourceFilter === 'all' || company.source === sourceFilter;
+    
+    return matchesSearch && matchesStage && matchesSector && matchesSource;
   });
+
+  const activeCompanies = companies.filter(c => 
+    ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'].includes(c.current_stage as string)
+  );
+
+  const stats = {
+    total: activeCompanies.length + 0,
+    active: activeCompanies.length,
+    drop: 0,
+    byStage: {
+      L0: companies.filter(c => c.current_stage === 'L0').length,
+      L1: companies.filter(c => c.current_stage === 'L1').length,
+      L2: companies.filter(c => c.current_stage === 'L2').length,
+      L3: companies.filter(c => c.current_stage === 'L3').length,
+      L4: companies.filter(c => c.current_stage === 'L4').length,
+      L5: companies.filter(c => c.current_stage === 'L5').length,
+    },
+  };
 
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / itemsPerPage));
   const paginatedCompanies = filteredCompanies.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  const stats = {
-    total: companies.length,
-    inPipeline: companies.filter(c => c.pipeline_stage !== null).length,
-    notInPipeline: companies.filter(c => c.pipeline_stage === null).length,
-    byStage: {
-      L0: companies.filter(c => c.pipeline_stage === 'L0').length,
-      L1: companies.filter(c => c.pipeline_stage === 'L1').length,
-      L2: companies.filter(c => c.pipeline_stage === 'L2').length,
-      L3: companies.filter(c => c.pipeline_stage === 'L3').length,
-      L4: companies.filter(c => c.pipeline_stage === 'L4').length,
-      L5: companies.filter(c => c.pipeline_stage === 'L5').length,
-    },
-  };
 
   if (loading) {
     return (
@@ -278,18 +244,18 @@ export default function MasterData() {
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-blue-500" />
-                <span className="text-sm text-muted-foreground">In Pipeline</span>
+                <span className="text-sm text-muted-foreground">Active</span>
               </div>
-              <p className="text-2xl font-bold mt-1">{stats.inPipeline}</p>
+              <p className="text-2xl font-bold mt-1">{stats.active}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-sm text-muted-foreground">Not in Pipeline</span>
+                <span className="text-sm text-muted-foreground">Drop</span>
               </div>
-              <p className="text-2xl font-bold mt-1">{stats.notInPipeline}</p>
+              <p className="text-2xl font-bold mt-1">{stats.drop}</p>
             </CardContent>
           </Card>
           <Card className="col-span-2">
@@ -327,7 +293,6 @@ export default function MasterData() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Stages</SelectItem>
-                  <SelectItem value="market_screening">Market Screening</SelectItem>
                   <SelectItem value="L0">L0 - Sourcing</SelectItem>
                   <SelectItem value="L1">L1 - Screening</SelectItem>
                   <SelectItem value="L2">L2 - Initial Review</SelectItem>
@@ -346,6 +311,16 @@ export default function MasterData() {
                   {uniqueSectors.map(sector => (
                     <SelectItem key={sector} value={sector}>{sector}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="inbound">Inbound</SelectItem>
+                  <SelectItem value="outbound">Outbound</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -367,62 +342,71 @@ export default function MasterData() {
                 <p>No companies found matching your filters.</p>
               </div>
             ) : (
-              <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Company</TableHead>
-                      <TableHead>Segment</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead className="text-right">Rev 2022</TableHead>
-                      <TableHead className="text-right">Rev 2023</TableHead>
-                      <TableHead className="text-right">Rev 2024</TableHead>
+                      <TableHead>Sector</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>PIC</TableHead>
+                      <TableHead className="text-right">Rev Y1</TableHead>
+                      <TableHead className="text-right">Rev Y2</TableHead>
+                      <TableHead className="text-right">Rev Y3</TableHead>
                       <TableHead className="text-center">Trend</TableHead>
-                      <TableHead className="text-right">EBITDA 2022</TableHead>
-                      <TableHead className="text-right">EBITDA 2023</TableHead>
-                      <TableHead className="text-right">EBITDA 2024</TableHead>
-                      <TableHead className="text-right">EV 2024</TableHead>
+                      <TableHead className="text-right">EBITDA Y1</TableHead>
+                      <TableHead className="text-right">EBITDA Y2</TableHead>
+                      <TableHead className="text-right">EBITDA Y3</TableHead>
+                      <TableHead className="text-right">Valuation</TableHead>
                       <TableHead>Added</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedCompanies.map((company) => {
                       const displayStage = getDisplayStage(company);
-                      const revenueChange = getRevenueChange(company.revenue_2023_usd_mn, company.revenue_2024_usd_mn);
-
+                      const revenueChange = getRevenueChange(company.revenue_year2, company.revenue_year3);
+                      
                       return (
                         <TableRow key={company.id}>
-                          <TableCell className="font-medium">
-                            <button
-                              type="button"
-                              onClick={() => openCompanyDialog(company.id)}
-                              disabled={dialogLoading}
-                              className="text-left hover:text-primary hover:underline transition-colors disabled:opacity-50"
-                            >
-                              {company.target}
-                            </button>
+                          <TableCell className="font-medium">{company.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{company.sector || '-'}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{company.segment}</Badge>
+                            <Badge variant="secondary" className="capitalize">
+                              {company.source}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             {displayStage ? (
-                              <Badge className={`${stageColors[displayStage as DealStage]} text-white`}>
-                                {displayStage === 'market_screening' ? 'Market Screening' : `${displayStage} - ${STAGE_LABELS[displayStage as DealStage]}`}
+                              <Badge className={`${stageColors[displayStage as DealStage | 'Acquired']} text-white`}>
+                                {displayStage === 'Acquired' ? (
+                                  <span className="flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Acquired
+                                  </span>
+                                ) : (
+                                  `${displayStage} - ${stageLabels[displayStage as DealStage]}`
+                                )}
                               </Badge>
                             ) : (
                               <Badge variant="outline">Not in Pipeline</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatCurrency(company.revenue_2022_usd_mn)}
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {company.pic || '-'}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.revenue_2023_usd_mn)}
+                            {formatCurrency(company.revenue_year1)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.revenue_2024_usd_mn)}
+                            {formatCurrency(company.revenue_year2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(company.revenue_year3)}
                           </TableCell>
                           <TableCell className="text-center">
                             {revenueChange.direction === 'up' && (
@@ -442,16 +426,16 @@ export default function MasterData() {
                             )}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.ebitda_2022_usd_mn)}
+                            {formatCurrency(company.ebitda_year1)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.ebitda_2023_usd_mn)}
+                            {formatCurrency(company.ebitda_year2)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.ebitda_2024_usd_mn)}
+                            {formatCurrency(company.ebitda_year3)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(company.ev_2024)}
+                            {formatCurrency(company.valuation)}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {new Date(company.created_at).toLocaleDateString()}
@@ -462,44 +446,34 @@ export default function MasterData() {
                   </TableBody>
                 </Table>
               </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages} ({filteredCompanies.length} companies)
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+            )}
+            {filteredCompanies.length > 0 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages} ({filteredCompanies.length} companies)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
-              </>
+              </div>
             )}
           </CardContent>
         </Card>
-
-        {selectedCompany && (
-          <CompanyDetailDialog
-            company={selectedCompany}
-            open={!!selectedCompany}
-            onOpenChange={(open) => !open && setSelectedCompany(null)}
-            onUpdate={fetchCompanies}
-          />
-        )}
       </div>
     </DashboardLayout>
   );
