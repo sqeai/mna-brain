@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,14 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -61,7 +54,6 @@ import {
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
 import { DealStage, L1Status } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
-import L0AddCompany from '@/components/pipeline/L0AddCompany';
 import CompanyDetailDialog from '@/components/pipeline/CompanyDetailDialog';
 import AIScreeningDialog from '@/components/pipeline/AIScreeningDialog';
 import MarketScreeningStatus from '@/components/pipeline/MarketScreeningStatus';
@@ -175,7 +167,6 @@ export default function Pipeline() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sectorFilterValue, setSectorFilterValue] = useState<string>('all');
   const [selectedCompany, setSelectedCompany] = useState<PipelineCompany | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showScreeningDialog, setShowScreeningDialog] = useState(false);
   const [marketScreeningRefresh, setMarketScreeningRefresh] = useState(0);
@@ -586,26 +577,12 @@ export default function Pipeline() {
                                   AI Screening ({selectedIds.size} selected)
                                 </Button>
                               )}
-                              <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                                <DialogTrigger asChild>
+                              <Link href="/ai-file-dump">
                                   <Button>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Add Company
                                   </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                                  <DialogHeader>
-                                    <DialogTitle>Add New Company</DialogTitle>
-                                    <DialogDescription>
-                                      Import companies from CSV/Excel or add manually
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <L0AddCompany onSuccess={() => {
-                                    setShowAddDialog(false);
-                                    fetchCompanies();
-                                  }} />
-                                </DialogContent>
-                              </Dialog>
+                                </Link>
                             </div>
                           </div>
                         </CardHeader>
