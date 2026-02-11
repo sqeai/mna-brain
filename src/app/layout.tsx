@@ -3,11 +3,8 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
-  title: 'Brain 2.0',
+  title: 'BRAIN 2.0',
   description: 'Deal Pipeline Management',
-  icons: {
-    icon: '/favicon.ico',
-  },
 };
 
 export default function RootLayout({
