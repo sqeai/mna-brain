@@ -61,12 +61,14 @@ import {
   FileStack,
   Loader2,
   Search,
+  Sparkles,
   Tag,
   Trash2,
   Upload,
   X,
   Zap,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -517,6 +519,7 @@ function FileTable({
 }
 
 export default function AIFileDump() {
+  const router = useRouter();
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
   const [prospectus, setProspectus] = useState<Prospectus[]>([]);
   const [otherFiles, setOtherFiles] = useState<OtherFile[]>([]);
@@ -971,18 +974,18 @@ export default function AIFileDump() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6 animate-fade-in">
+      <div className="flex flex-col h-full p-6 space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="relative mb-6 flex-shrink-0">
+        <div className="relative flex-shrink-0">
           <div className="absolute -inset-2 rounded-2xl opacity-20 blur-xl transition-colors duration-500 bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500" />
           <div className="relative flex items-center gap-5">
             <div className="relative group">
               <div className="absolute inset-0 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity bg-gradient-to-br from-teal-400 to-emerald-600" />
               <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-300 group-hover:scale-105 bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-600">
                 <FileStack className="h-7 w-7 text-white drop-shadow-lg" />
-                <div 
-                  className="absolute inset-0 rounded-2xl animate-ping opacity-20 bg-teal-400" 
-                  style={{ animationDuration: '3s' }} 
+                <div
+                  className="absolute inset-0 rounded-2xl animate-ping opacity-20 bg-teal-400"
+                  style={{ animationDuration: '3s' }}
                 />
               </div>
             </div>
@@ -991,8 +994,8 @@ export default function AIFileDump() {
                 <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
                   AI File Dump
                 </h1>
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="text-xs font-medium px-2 py-0.5 border-0 bg-teal-500/10 text-teal-600 hover:bg-teal-500/20"
                 >
                   <Zap className="h-3 w-3 mr-1" />
@@ -1004,6 +1007,26 @@ export default function AIFileDump() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="inline-flex h-10 items-center justify-center rounded-md text-muted-foreground w-fit bg-muted/50 p-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/ai-discovery')}
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 text-purple-400/70 hover:text-purple-600 transition-all"
+          >
+            <Sparkles className="h-4 w-4" />
+            AI CoPilot
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/ai-file-dump')}
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 bg-teal-500/15 text-teal-600 shadow-sm transition-all"
+          >
+            <FileStack className="h-4 w-4" />
+            AI File Dump
+          </button>
         </div>
 
         {/* Upload Section */}
