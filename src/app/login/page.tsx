@@ -49,7 +49,7 @@ export default function LoginPage() {
   if (loading) {
     return (
       <div className="relative flex min-h-screen items-center justify-center">
-        <LivingBackground variant="grid" />
+        <LivingBackground variant="default" />
         <div className="relative z-10">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -63,7 +63,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4 overflow-hidden">
-      <LivingBackground variant="grid" />
+      <LivingBackground variant="default" />
       <div className="relative z-10 w-full flex justify-center">
       <Card className="w-full max-w-md min-h-[480px] flex flex-col rounded-md border-white/20 bg-white/10 backdrop-blur-xl shadow-lg">
         <CardHeader className="text-center">
@@ -77,15 +77,15 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">BRAIN 2.0</CardTitle>
-          <CardDescription className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
+          <CardTitle className="text-2xl font-bold tracking-tight text-black dark:text-white">BRAIN 2.0</CardTitle>
+          <CardDescription className="text-xs font-medium uppercase tracking-[0.2em] text-black/70 dark:text-white/70">
             ENTERPRISE DEAL INTELLIGENCE
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 text-white">
+        <CardContent className="flex-1 text-black dark:text-white">
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="signin-email" className="text-sm text-white/80">Email</Label>
+              <Label htmlFor="signin-email" className="text-sm text-black/80 dark:text-white/80">Email</Label>
               <Input
                 id="signin-email"
                 type="email"
@@ -94,11 +94,11 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
-                className="border-white/20 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/30"
+                className="border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 focus-visible:ring-black/30 dark:focus-visible:ring-white/30"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signin-password" className="text-sm text-white/80">Password</Label>
+              <Label htmlFor="signin-password" className="text-sm text-black/80 dark:text-white/80">Password</Label>
               <Input
                 id="signin-password"
                 type="password"
@@ -107,7 +107,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
-                className="border-white/20 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/30"
+                className="border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 focus-visible:ring-black/30 dark:focus-visible:ring-white/30"
               />
             </div>
 
@@ -130,7 +130,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center w-full text-center text-xs font-medium uppercase tracking-[0.15em] text-white/60">
+        <CardFooter className="flex justify-center w-full text-center text-xs font-medium uppercase tracking-[0.15em] text-black/60 dark:text-white/60">
           SECURED BY NEURAL CORE LOGIC
         </CardFooter>
       </Card>
