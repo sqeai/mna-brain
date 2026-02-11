@@ -19,11 +19,11 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import {
-  Briefcase,
+  Brain,
   LayoutDashboard,
   GitBranch,
   Database,
-  Bot,
+  Sparkles,
   LogOut,
   PanelLeftOpen,
   Inbox,
@@ -31,7 +31,7 @@ import {
   Search,
   FileSliders,
   Users,
-  FileText,
+  FileStack,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatbotWidget } from '@/components/chat/ChatbotWidget';
@@ -46,11 +46,11 @@ interface DashboardLayoutProps {
 }
 
 const navigation = [
-  { name: 'AI Discovery', href: '/ai-discovery', icon: Bot },
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Pipeline', href: '/pipeline', icon: GitBranch },
-  { name: 'Master Data', href: '/master-data', icon: Database },
-  { name: 'AI File Dump', href: '/ai-file-dump', icon: FileText },
+  { name: 'AI CoPilot', href: '/ai-discovery', icon: Sparkles, color: 'purple' as const },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, color: 'default' as const },
+  { name: 'Pipeline', href: '/pipeline', icon: GitBranch, color: 'default' as const },
+  { name: 'Master Data', href: '/master-data', icon: Database, color: 'default' as const },
+  { name: 'AI File Dump', href: '/ai-file-dump', icon: FileStack, color: 'teal' as const },
   // { name: 'Inbound Deal Sourcing', href: '#', icon: Inbox, disabled: true },
   // { name: 'Outbound Deal Sourcing', href: '#', icon: Send, disabled: true },
   // { name: 'Company Deep Dive', href: '#', icon: Search, disabled: true },
@@ -71,16 +71,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <LivingBackground />
       <SidebarProvider>
         <div className="relative z-10 flex min-h-screen w-full">
-          <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+          <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-white/70 dark:bg-[hsl(220,20%,8%)]/70 backdrop-blur-xl">
             <SidebarHeader className="border-b border-sidebar-border p-2 group-data-[state=expanded]:p-4">
               <div className="flex items-center justify-between group-data-[state=collapsed]:flex-col group-data-[state=collapsed]:gap-2">
-                <Link href="/dashboard" className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary shrink-0">
-                    <Briefcase className="h-4 w-4 text-sidebar-primary-foreground" />
+                <Link href="/dashboard" className="flex items-center gap-3 group">
+                  <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 via-violet-500 to-indigo-600 shadow-lg shadow-purple-500/25 transition-all duration-300 group-hover:shadow-purple-500/40 group-hover:scale-105 shrink-0">
+                    <Brain className="h-5 w-5 text-white" />
+                    <div className="absolute inset-0 rounded-xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="flex flex-col group-data-[state=collapsed]:hidden">
-                    <span className="text-sm font-semibold text-sidebar-foreground">M&A Tracker</span>
-                    <span className="text-xs text-sidebar-foreground/60">Deal Pipeline</span>
+                    <span className="text-sm font-bold bg-gradient-to-r from-purple-400 via-violet-400 to-indigo-400 bg-clip-text text-transparent">Brain 2.0</span>
+                    <span className="text-xs text-sidebar-foreground/50 font-medium">M&A Intelligence</span>
                   </div>
                 </Link>
                 <SidebarTrigger className="h-8 w-8 shrink-0" />
@@ -95,7 +96,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     {navigation.map((item) => {
                       const isActive = pathname === item.href ||
                         (item.href !== '/dashboard' && item.href !== '#' && pathname.startsWith(item.href));
-                      const isAIDiscovery = item.href === '/ai-discovery';
+                      const isColored = item.color !== 'default';
+                      const isPurple = item.color === 'purple';
+                      const isTeal = item.color === 'teal';
                       const isDisabled = 'disabled' in item && item.disabled;
 
                       return (
@@ -106,19 +109,29 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             className={cn(
                               'transition-colors',
                               isDisabled && 'opacity-50 cursor-not-allowed',
-                              isAIDiscovery && !isDisabled && 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10',
-                              isActive && !isAIDiscovery && 'bg-sidebar-accent text-sidebar-accent-foreground',
-                              isActive && isAIDiscovery && 'bg-purple-500/20 text-purple-300'
+                              isPurple && !isDisabled && 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10',
+                              isTeal && !isDisabled && 'text-teal-400 hover:text-teal-300 hover:bg-teal-500/10',
+                              isActive && !isColored && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                              isActive && isPurple && 'bg-purple-500/20 text-purple-300',
+                              isActive && isTeal && 'bg-teal-500/20 text-teal-300'
                             )}
                           >
                             {isDisabled ? (
                               <div className="flex items-center gap-2">
-                                <item.icon className="h-4 w-4" />
+                                <item.icon className={cn(
+                                  'h-4 w-4',
+                                  isPurple && 'text-purple-400',
+                                  isTeal && 'text-teal-400'
+                                )} />
                                 <span>{item.name}</span>
                               </div>
                             ) : (
                               <Link href={item.href}>
-                                <item.icon className={cn("h-4 w-4", isAIDiscovery && "text-purple-400")} />
+                                <item.icon className={cn(
+                                  'h-4 w-4',
+                                  isPurple && 'text-purple-400',
+                                  isTeal && 'text-teal-400'
+                                )} />
                                 <span>{item.name}</span>
                               </Link>
                             )}
