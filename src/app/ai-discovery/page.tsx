@@ -1,7 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import AIDiscovery from '@/views/AIDiscovery';
 
 export default function AIDiscoveryPage() {
-  return <AIDiscovery />;
+  return (
+    <Suspense fallback={null}>
+      <AIDiscovery />
+    </Suspense>
+  );
 }
