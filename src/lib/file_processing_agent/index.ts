@@ -327,7 +327,7 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
       // OR just return the data structure and let the caller handle DB updates.
       // Based on previous flow, the API endpoint handles DB updates using the returned 'matched_companies'.
       // We should ensure 'company_notes' are also passed or handled.
-      // For now, minimal regression: The API uses 'matched_companies' to update the meeting note record.
+      // For now, minimal regression: The API uses 'matched_companies' to update the file record.
       // If we want to persist notes to the company record, we should loop through company_notes here.
 
       if (parsed.company_notes && Array.isArray(parsed.company_notes)) {

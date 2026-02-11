@@ -1593,7 +1593,7 @@ Returns:
 );
 
 /**
- * Query meeting notes based on matched companies, tags, or search terms.
+ * Query files based on matched companies, tags, or search terms.
  */
 export const queryMeetingNotes = tool(
   async ({
@@ -1643,7 +1643,7 @@ export const queryMeetingNotes = tool(
       }
 
       if (!notes || notes.length === 0) {
-        return "No meeting notes found matching your criteria.";
+        return "No files found matching your criteria.";
       }
 
       return formatNotesResults(notes);
@@ -1654,7 +1654,7 @@ export const queryMeetingNotes = tool(
   },
   {
     name: "query_meeting_notes",
-    description: `Search and retrieve meeting notes.
+    description: `Search and retrieve files.
     
 Use this tool to find meeting records, summaries, and key points related to specific companies, tags, or topics.
 You can filter by company name, tag, or use a general search term.
@@ -1666,7 +1666,7 @@ Args:
     limit: Maximum number of results (default: 10, max: 20)
 
 Returns:
-    A summary of matching meeting notes.`,
+    A summary of matching files.`,
     schema: z.object({
       company_name: z.string().optional().describe("Filter by company name"),
       tag: z.string().optional().describe("Filter by tag"),
@@ -1677,9 +1677,9 @@ Returns:
 );
 
 function formatNotesResults(notes: any[]): string {
-  let result = `**Meeting Notes Results (${notes.length} records):**\n\n`;
+  let result = `**Files Results (${notes.length} records):**\n\n`;
 
-  // Collect note references for frontend - matching MeetingNote type structure
+  // Collect note references for frontend - matching File type structure
   const noteRefs: {
     id: string;
     file_name: string;
@@ -1772,7 +1772,7 @@ export function getToolDescriptions(): string {
     { name: "get_past_acquisition_details", description: "Get detailed information about a specific past acquisition" },
     { name: "inven_paid_data_source_search", description: "Search for companies using Inven's AI-powered search for Screening and Sourcing" },
     { name: "inven_paid_data_source_enrichment", description: "Get detailed company data from Inven by company IDs and cache results" },
-    { name: "query_meeting_notes", description: "Search and retrieve meeting notes related to companies, tags, or topics" },
+    { name: "query_meeting_notes", description: "Search and retrieve files related to companies, tags, or topics" },
   ];
 
   return toolInfo.map((t, i) => `${i + 1}. **${t.name}** - ${t.description}`).join("\n");

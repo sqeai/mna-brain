@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
 import { AICompanyCardLoading } from '@/components/pipeline/AICompanyCardLoading';
-import FilePreview from '@/components/MeetingNotes/FilePreview';
+import FilePreview from '@/components/Files/FilePreview';
 import { DealStage, L1Status } from '@/lib/types';
 import { STAGE_LABELS } from '@/lib/constants';
 import { formatDistanceToNow, format } from 'date-fns';

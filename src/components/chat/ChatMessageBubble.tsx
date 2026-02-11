@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import FilePreview from "@/components/MeetingNotes/FilePreview";
+import FilePreview from "@/components/Files/FilePreview";
 import { toast } from "sonner";
 
 interface ChatMessageBubbleProps {
@@ -160,7 +160,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
 
   // Extract citations from all web_search tool results
   const allCitations: { title: string; url: string }[] = [];
-  // Extract meeting notes from query_meeting_notes tool results - matches MeetingNote type
+  // Extract files from query_files tool results - matches MeetingNote type
   interface MeetingNoteRef {
     id: string;
     file_name: string;
@@ -198,7 +198,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
       }
     }
 
-    if (toolName === "query_meeting_notes") {
+    if (toolName === "query_files") {
       const notesMatch = content.match(/<!-- MEETING_NOTES_JSON:(.*?) -->/);
       if (notesMatch) {
         try {
@@ -215,7 +215,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
     }
   }
 
-  // State for meeting notes preview modal
+  // State for files preview modal
   const [previewNote, setPreviewNote] = useState<MeetingNoteRef | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -418,10 +418,10 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
           </div>
         )}
 
-        {/* Meeting Notes - Below chat bubble */}
+        {/* Files - Below chat bubble */}
         {allMeetingNotes.length > 0 && (
           <div className="mt-2">
-            <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">📄 Meeting Notes</p>
+            <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">📄 Files</p>
             <div className="flex flex-wrap gap-1.5">
               {allMeetingNotes.slice(0, 6).map((note, i) => (
                 <button
@@ -438,7 +438,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
         )}
       </div>
 
-      {/* Meeting Notes Preview Dialog */}
+      {/* Files Preview Dialog */}
       <Dialog open={!!previewNote} onOpenChange={(open) => !open && handleClosePreview()}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
           <DialogHeader>

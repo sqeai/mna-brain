@@ -1,7 +1,7 @@
 'use client';
 
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import FilePreview from '@/components/MeetingNotes/FilePreview';
+import FilePreview from '@/components/Files/FilePreview';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -576,8 +576,8 @@ export default function AIFileDump() {
         toast.error('Failed to load MoM');
       }
     } catch (error) {
-      console.error('Error fetching meeting notes:', error);
-      toast.error('Failed to load meeting notes');
+      console.error('Error fetching MoM:', error);
+      toast.error('Failed to load MoM');
     } finally {
       setLoading(false);
     }
@@ -752,7 +752,7 @@ export default function AIFileDump() {
     if (results.success > 0) {
       toast.success(
         filesToUpload.length === 1
-          ? 'Meeting note uploaded successfully'
+          ? 'File uploaded successfully'
           : `Successfully uploaded ${results.success} of ${filesToUpload.length} files`
       );
 
@@ -774,7 +774,7 @@ export default function AIFileDump() {
         toast.warning(`${duplicates.length} duplicate ${duplicates.length === 1 ? 'file was' : 'files were'} skipped.`);
       }
       if (results.failed > 0) {
-        toast.error('Failed to upload meeting notes');
+        toast.error('Failed to upload file');
       }
     }
 
@@ -793,16 +793,16 @@ export default function AIFileDump() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Meeting note deleted successfully');
+        toast.success('File deleted successfully');
         fetchMeetingNotes();
         fetchProspectus();
         fetchOtherFiles();
       } else {
-        toast.error(result.error || 'Failed to delete meeting note');
+        toast.error(result.error || 'Failed to delete file');
       }
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Failed to delete meeting note');
+      toast.error('Failed to delete file');
     } finally {
       setDeletingId(null);
     }
@@ -1249,8 +1249,8 @@ export default function AIFileDump() {
           onDelete={handleDelete}
           downloadingId={downloadingId}
           deletingId={deletingId}
-          emptyMessage="No meeting notes uploaded yet."
-          emptySubMessage="Upload your first meeting note using the form above."
+          emptyMessage="No MoM uploaded yet."
+          emptySubMessage="Upload your first MoM using the form above."
           currentPage={momPage}
           onPageChange={setMomPage}
         />
