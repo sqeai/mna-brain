@@ -1,7 +1,7 @@
 /**
  * API Route for AI Company Card Analysis.
  * Generates a comprehensive company analysis using the LangGraph agent,
- * collecting data from the database, web search, Inven API, and meeting notes.
+ * collecting data from the database, web search, Inven API, and files.
  * Results are cached in the company_analyses table.
  */
 import { NextRequest, NextResponse } from "next/server";
@@ -48,7 +48,7 @@ You have access to these tools — USE THEM ALL to gather comprehensive informat
 1. Use \`get_company_details\` to retrieve internal database information about "{companyName}"
 2. Use \`inven_paid_data_source_search\` to find the company on Inven, then \`inven_paid_data_source_enrichment\` for detailed data
 3. Use \`web_search\` to research the company's website, products, market position, recent news, and competitive landscape (e.g., "{companyName} company overview products services", "{companyName} revenue market position competitors")
-4. Use \`query_meeting_notes\` to check if there are any internal meeting notes about this company
+4. Use \`query_meeting_notes\` to check if there are any internal files about this company
 5. Use \`compare_with_past_acquisitions\` if relevant to check how it compares to past deals
 
 ## Company Context
