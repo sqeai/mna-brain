@@ -14,13 +14,14 @@ function getSupabaseClient() {
 }
 
 /**
- * GET - Get a signed URL for downloading a deal document from S3
- * Query: id (deal_document id)
+ * GET - Get a signed URL for downloading or previewing a deal document from S3
+ * Query: id (deal_document id), preview (optional, "true" for inline viewing)
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
+    const preview = searchParams.get("preview") === "true";
 
     if (!id) {
       return NextResponse.json(
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     const url = await getSignedUrl(
       row.file_path,
       3600,
-      row.file_name ?? undefined
+      preview ? undefined : (row.file_name ?? undefined)
     );
 
     return NextResponse.json({

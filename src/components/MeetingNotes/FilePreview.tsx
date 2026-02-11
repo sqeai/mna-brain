@@ -28,6 +28,7 @@ export default function FilePreview({ url, onDownload, fileName }: FilePreviewPr
       if (extension === 'docx' || extension === 'doc') return 'docx';
       if (extension === 'txt') return 'text';
       if (extension === 'md') return 'markdown';
+      if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') return 'image';
       return 'unknown';
     };
 
@@ -56,10 +57,10 @@ export default function FilePreview({ url, onDownload, fileName }: FilePreviewPr
       }
     };
 
-    if (type !== 'pdf' && type !== 'unknown') {
-      fetchContent();
-    } else {
+    if (type === 'image' || type === 'pdf' || type === 'unknown') {
       setLoading(false);
+    } else {
+      fetchContent();
     }
   }, [url, fileName]);
 
@@ -105,6 +106,18 @@ export default function FilePreview({ url, onDownload, fileName }: FilePreviewPr
     );
   }
 
+  if (fileType === 'image') {
+    return (
+      <div className="h-[400px] w-full rounded-md border overflow-auto bg-muted/20 flex items-center justify-center p-4">
+        <img
+          src={url}
+          alt={fileName}
+          className="max-w-full max-h-full object-contain"
+        />
+      </div>
+    );
+  }
+
   if (fileType === 'docx') {
     return (
       <ScrollArea className="h-[400px] w-full rounded-md border p-6 bg-white">
@@ -143,7 +156,7 @@ export default function FilePreview({ url, onDownload, fileName }: FilePreviewPr
       <FileText className="h-12 w-12 text-muted-foreground opacity-50" />
       <div className="text-center">
         <p className="font-medium">No preview available</p>
-        <p className="text-sm text-muted-foreground">Supported previews: PDF, DOCX, TXT, MD</p>
+        <p className="text-sm text-muted-foreground">Supported previews: PDF, DOCX, TXT, MD, PNG, JPG, JPEG</p>
       </div>
       <Button
         variant="outline"
