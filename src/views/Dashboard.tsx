@@ -352,6 +352,10 @@ export default function Dashboard() {
                     const colors = stageBarColors[item.stage] || { inbound: 'bg-gray-400/70', outbound: 'bg-gray-600/70' };
                     const inboundRatio = item.count > 0 ? (item.inbound || 0) / item.count : 0.5;
                     const outboundRatio = item.count > 0 ? (item.outbound || 0) / item.count : 0.5;
+                    const segmentMinPx = 40;
+                    const remainingHeight = Math.max(0, barHeight - 2 * segmentMinPx);
+                    const inboundHeightPx = segmentMinPx + inboundRatio * remainingHeight;
+                    const outboundHeightPx = segmentMinPx + outboundRatio * remainingHeight;
                     return (
                       <div
                         key={item.stage}
@@ -366,8 +370,8 @@ export default function Dashboard() {
                           style={{ height: `${barHeight}px` }}
                         >
                           <div
-                            className={`w-full ${colors.inbound} flex items-center justify-center min-h-0 shrink-0`}
-                            style={{ height: `${inboundRatio * 100}%`, minHeight: item.inbound ? 40 : 0 }}
+                            className={`w-full ${colors.inbound} flex items-center justify-center shrink-0`}
+                            style={{ height: `${inboundHeightPx}px`, minHeight: segmentMinPx }}
                           >
                             <div className="text-white text-xs font-medium text-center px-1">
                               <div className="opacity-80 text-[10px] uppercase tracking-wide">Inbound</div>
@@ -375,8 +379,8 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div
-                            className={`w-full ${colors.outbound} flex items-center justify-center min-h-0 shrink-0`}
-                            style={{ height: `${outboundRatio * 100}%`, minHeight: item.outbound ? 40 : 0 }}
+                            className={`w-full ${colors.outbound} flex items-center justify-center shrink-0`}
+                            style={{ height: `${outboundHeightPx}px`, minHeight: segmentMinPx }}
                           >
                             <div className="text-white text-xs font-medium text-center px-1">
                               <div className="opacity-80 text-[10px] uppercase tracking-wide">Outbound</div>
