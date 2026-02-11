@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:push": "supabase db push",
-    "db:types-generate": "supabase gen types typescript --local > src/integrations/supabase/types.ts"
+    "db:push": "npx supabase db push",
+    "db:types-generate": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public,auth,storage > src/integrations/supabase/types.ts"
   },
   "dependencies": {
     "@ai-sdk/langchain": "^2.0.72",

@@ -88,6 +88,7 @@ export interface CompanyData {
   remarks: string | null;
   created_at: string;
   updated_at: string;
+  source: string | null;
 }
 
 interface StageHistory {
