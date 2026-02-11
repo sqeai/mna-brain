@@ -5,6 +5,9 @@ import { Providers } from '@/components/providers';
 export const metadata: Metadata = {
   title: 'Brain 2.0',
   description: 'Deal Pipeline Management',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
