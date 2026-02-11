@@ -67,10 +67,11 @@ export default function PromoteDialog({
       if (linkUrl.trim()) logDetails.push(`Link: ${linkTitle || linkUrl}`);
       if (selectedFile) logDetails.push(`Document: ${selectedFile.name}`);
 
-      await supabase.from('company_logs').insert({
+      const { error: logError } = await supabase.from('company_logs').insert({
         company_id: dealId,
         action: `PROMOTED_FROM_${currentStage}_TO_${nextStage}`,
       });
+      if (logError) console.error('Error creating log:', logError);
 
       // Auto-trigger AI Company Card when promoting to L1
       if (nextStage === 'L1') {
@@ -78,7 +79,105 @@ export default function PromoteDialog({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ companyId: dealId }),
-        }).catch(() => {}); // Silent — don't block promotion on analysis
+        }).catch(() => { }); // Silent — don't block promotion on analysis
+      }
+
+      // 1. Save Note
+      if (note.trim()) {
+        const { error: noteError } = await supabase.from('deal_notes').insert({
+          deal_id: dealId,
+          content: note,
+          stage: currentStage,
+        });
+        if (noteError) {
+          console.error('Error saving note:', noteError);
+          toast.error(`Failed to save note: ${noteError.message}`);
+        }
+      }
+
+      // 2. Save Link
+      if (linkUrl.trim()) {
+        const { error: linkError } = await supabase.from('deal_links').insert({
+          deal_id: dealId,
+          url: linkUrl,
+          title: linkTitle || null,
+          stage: currentStage,
+        });
+        if (linkError) {
+          console.error('Error saving link:', linkError);
+          toast.error(`Failed to save link: ${linkError.message}`);
+        }
+      }
+
+      // 3. Upload and Save Document
+      if (selectedFile) {
+        try {
+          const contentType = selectedFile.type || 'application/octet-stream';
+
+          // 1. Get presigned URL
+          let uploadUrlRes: Response;
+          try {
+            uploadUrlRes = await fetch(
+              `/api/deal-documents/upload-url?dealId=${encodeURIComponent(dealId)}&fileName=${encodeURIComponent(selectedFile.name)}&contentType=${encodeURIComponent(contentType)}`
+            );
+          } catch (netErr) {
+            throw new Error('Could not reach server to get upload URL.');
+          }
+
+          if (!uploadUrlRes.ok) throw new Error(`Get upload URL failed: ${uploadUrlRes.status}`);
+
+          const uploadUrlData = await uploadUrlRes.json();
+          if (!uploadUrlData.success || !uploadUrlData.data) {
+            throw new Error(uploadUrlData.error || 'Failed to get upload URL');
+          }
+
+          const { uploadUrl, key } = uploadUrlData.data;
+
+          // 2. Upload to S3
+          let s3Res: Response;
+          try {
+            s3Res = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: selectedFile,
+              headers: { 'Content-Type': contentType },
+            });
+          } catch (netErr) {
+            throw new Error('Upload to storage failed (network error).');
+          }
+
+          if (!s3Res.ok) throw new Error('Failed to upload file to storage');
+
+          // 3. Register document in database
+          let registerRes: Response;
+          try {
+            registerRes = await fetch('/api/deal-documents', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                dealId: dealId,
+                key,
+                fileName: selectedFile.name,
+                fileSize: selectedFile.size,
+                mimeType: selectedFile.type || null,
+                stage: currentStage,
+              }),
+            });
+          } catch (netErr) {
+            throw new Error('Could not register document in database.');
+          }
+
+          if (!registerRes.ok) throw new Error(`Register document failed: ${registerRes.status}`);
+
+          const registerData = await registerRes.json();
+          if (!registerData.success) {
+            throw new Error(registerData.error || 'Failed to register document');
+          }
+
+        } catch (docError: any) {
+          console.error('Error handling document upload:', docError);
+          toast.error(`Document upload failed: ${docError.message}`);
+          // We don't re-throw here so the promotion itself (which likely succeeded) isn't rolled back in UI terms
+        }
       }
 
       toast.success(`Promoted to ${nextStage}`);
@@ -87,7 +186,7 @@ export default function PromoteDialog({
       onSuccess();
     } catch (error: any) {
       console.error('Error promoting company:', error);
-      toast.error('Failed to promote company');
+      toast.error(`Failed to promote company: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
