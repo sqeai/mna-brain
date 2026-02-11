@@ -51,6 +51,8 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronsUpDown,
   CalendarIcon,
 } from 'lucide-react';
@@ -106,6 +108,9 @@ interface FileTableProps {
   deletingId: string | null;
   emptyMessage: string;
   emptySubMessage: string;
+  currentPage: number;
+  onPageChange: (page: number) => void;
+  itemsPerPage?: number;
 }
 
 function FileTable({
@@ -128,7 +133,15 @@ function FileTable({
   deletingId,
   emptyMessage,
   emptySubMessage,
+  currentPage,
+  onPageChange,
+  itemsPerPage = 10,
 }: FileTableProps) {
+  const totalPages = Math.max(1, Math.ceil(filteredFiles.length / itemsPerPage));
+  const paginatedFiles = filteredFiles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
   const SortIcon = ({ field }: { field: keyof FileRecord }) => {
     if (sortField !== field) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-50" />;
     return sortDirection === 'asc' ?
@@ -289,185 +302,212 @@ function FileTable({
             <Button variant="link" onClick={() => onSearchChange('')}>Clear search</Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => onSort('file_name')}
-                  >
-                    <div className="flex items-center">
-                      File Name
-                      <SortIcon field="file_name" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => onSort('processing_status')}
-                  >
-                    <div className="flex items-center">
-                      Status
-                      <SortIcon field="processing_status" />
-                    </div>
-                  </TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Matched Companies</TableHead>
-                  <TableHead
-                    className="cursor-pointer hover:text-primary transition-colors text-right"
-                    onClick={() => onSort('file_date')}
-                  >
-                    <div className="flex items-center justify-end">
-                      Meeting Date & Actions
-                      <SortIcon field="file_date" />
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFiles.map((note) => (
-                  <TableRow key={note.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        {note.file_name}
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => onSort('file_name')}
+                    >
+                      <div className="flex items-center">
+                        File Name
+                        <SortIcon field="file_name" />
                       </div>
-                    </TableCell>
-                    <TableCell>{renderStatusBadge(note.processing_status)}</TableCell>
-                    <TableCell className="max-w-[200px]">{renderTags(note)}</TableCell>
-                    <TableCell>{renderCompanies(note)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col items-end gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className={cn(
-                                "h-8 w-auto justify-end text-right font-normal px-2",
-                                !note.file_date && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-3 w-3" />
-                              {note.file_date ? format(new Date(note.file_date), 'PPP') : (
-                                <span className="text-xs italic text-muted-foreground">Set meeting date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar
-                              mode="single"
-                              selected={note.file_date ? new Date(note.file_date) : undefined}
-                              onSelect={(date) => onUpdateDate(note.id, date)}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-
-                        <div className="flex items-center justify-end gap-1">
-                          <Dialog>
-                            <DialogTrigger asChild>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => onSort('processing_status')}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon field="processing_status" />
+                      </div>
+                    </TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead>Matched Companies</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-primary transition-colors text-right"
+                      onClick={() => onSort('file_date')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Meeting Date & Actions
+                        <SortIcon field="file_date" />
+                      </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedFiles.map((note) => (
+                    <TableRow key={note.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          {note.file_name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{renderStatusBadge(note.processing_status)}</TableCell>
+                      <TableCell className="max-w-[200px]">{renderTags(note)}</TableCell>
+                      <TableCell>{renderCompanies(note)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                title="View details"
-                                className="h-8 w-8"
+                                className={cn(
+                                  "h-8 w-auto justify-end text-right font-normal px-2",
+                                  !note.file_date && "text-muted-foreground"
+                                )}
                               >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                              <DialogHeader>
-                                <DialogTitle>{note.file_name} - Details</DialogTitle>
-                              </DialogHeader>
-                              <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
-                                <div className="flex flex-col gap-2">
-                                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    File Preview
-                                  </h3>
-                                  {note.signed_url ? (
-                                    <FilePreview
-                                      url={note.signed_url}
-                                      onDownload={() => onDownload(note.id, note.file_name)}
-                                      fileName={note.file_name}
-                                    />
-                                  ) : (
-                                    <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
-                                      Preview not available (Link missing)
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <Bot className="h-4 w-4" />
-                                    AI Structured Notes
-                                  </h3>
-                                  <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
-                                    <div className="space-y-4 text-sm">
-                                      {renderStructuredNotes(note)}
-                                    </div>
-                                  </ScrollArea>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onDownload(note.id, note.file_name)}
-                            disabled={downloadingId === note.id}
-                            title="Download file"
-                            className="h-8 w-8"
-                          >
-                            {downloadingId === note.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Download className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive h-8 w-8"
-                                disabled={deletingId === note.id}
-                              >
-                                {deletingId === note.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
+                                <CalendarIcon className="mr-2 h-3 w-3" />
+                                {note.file_date ? format(new Date(note.file_date), 'PPP') : (
+                                  <span className="text-xs italic text-muted-foreground">Set meeting date</span>
                                 )}
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete File</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete &quot;{note.file_name}&quot;?
-                                  This will remove both the file from storage and the database record.
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => onDelete(note.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={note.file_date ? new Date(note.file_date) : undefined}
+                                onSelect={(date) => onUpdateDate(note.id, date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+
+                          <div className="flex items-center justify-end gap-1">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="View details"
+                                  className="h-8 w-8"
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                  <DialogTitle>{note.file_name} - Details</DialogTitle>
+                                </DialogHeader>
+                                <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
+                                  <div className="flex flex-col gap-2">
+                                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                                      <FileText className="h-4 w-4" />
+                                      File Preview
+                                    </h3>
+                                    {note.signed_url ? (
+                                      <FilePreview
+                                        url={note.signed_url}
+                                        onDownload={() => onDownload(note.id, note.file_name)}
+                                        fileName={note.file_name}
+                                      />
+                                    ) : (
+                                      <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
+                                        Preview not available (Link missing)
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                                      <Bot className="h-4 w-4" />
+                                      AI Structured Notes
+                                    </h3>
+                                    <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
+                                      <div className="space-y-4 text-sm">
+                                        {renderStructuredNotes(note)}
+                                      </div>
+                                    </ScrollArea>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onDownload(note.id, note.file_name)}
+                              disabled={downloadingId === note.id}
+                              title="Download file"
+                              className="h-8 w-8"
+                            >
+                              {downloadingId === note.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Download className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive h-8 w-8"
+                                  disabled={deletingId === note.id}
+                                >
+                                  {deletingId === note.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete File</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete &quot;{note.file_name}&quot;?
+                                    This will remove both the file from storage and the database record.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => onDelete(note.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages} ({filteredFiles.length} files)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
@@ -491,13 +531,27 @@ export default function AIFileDump() {
   const [expandedFileNotes, setExpandedFileNotes] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // Sorting and Filtering state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<keyof MeetingNote>('file_date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  // Sorting and Filtering state - separate for each table
+  const [momSearchQuery, setMomSearchQuery] = useState('');
+  const [momSortField, setMomSortField] = useState<keyof MeetingNote>('file_date');
+  const [momSortDirection, setMomSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [prospectusSearchQuery, setProspectusSearchQuery] = useState('');
+  const [prospectusSortField, setProspectusSortField] = useState<keyof MeetingNote>('file_date');
+  const [prospectusSortDirection, setProspectusSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [otherFilesSearchQuery, setOtherFilesSearchQuery] = useState('');
+  const [otherFilesSortField, setOtherFilesSortField] = useState<keyof MeetingNote>('file_date');
+  const [otherFilesSortDirection, setOtherFilesSortDirection] = useState<'asc' | 'desc'>('desc');
+
   const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
   const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Pagination state for each table
+  const [momPage, setMomPage] = useState(1);
+  const [prospectusPage, setProspectusPage] = useState(1);
+  const [otherFilesPage, setOtherFilesPage] = useState(1);
 
   const fetchMeetingNotes = useCallback(async () => {
     try {
@@ -753,13 +807,51 @@ export default function AIFileDump() {
     setExpandedFileNotes({});
   };
 
-  const handleSort = (field: keyof MeetingNote) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+  // Sort handlers for each table
+  const handleMomSort = (field: keyof MeetingNote) => {
+    if (momSortField === field) {
+      setMomSortDirection(momSortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      setSortField(field);
-      setSortDirection('asc');
+      setMomSortField(field);
+      setMomSortDirection('asc');
     }
+    setMomPage(1);
+  };
+
+  const handleProspectusSort = (field: keyof MeetingNote) => {
+    if (prospectusSortField === field) {
+      setProspectusSortDirection(prospectusSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setProspectusSortField(field);
+      setProspectusSortDirection('asc');
+    }
+    setProspectusPage(1);
+  };
+
+  const handleOtherFilesSort = (field: keyof MeetingNote) => {
+    if (otherFilesSortField === field) {
+      setOtherFilesSortDirection(otherFilesSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOtherFilesSortField(field);
+      setOtherFilesSortDirection('asc');
+    }
+    setOtherFilesPage(1);
+  };
+
+  // Search handlers for each table
+  const handleMomSearchChange = (query: string) => {
+    setMomSearchQuery(query);
+    setMomPage(1);
+  };
+
+  const handleProspectusSearchChange = (query: string) => {
+    setProspectusSearchQuery(query);
+    setProspectusPage(1);
+  };
+
+  const handleOtherFilesSearchChange = (query: string) => {
+    setOtherFilesSearchQuery(query);
+    setOtherFilesPage(1);
   };
 
   const toggleTags = (id: string) => {
@@ -825,7 +917,12 @@ export default function AIFileDump() {
   };
 
   // Reusable filter and sort function
-  const filterAndSortFiles = useCallback((files: FileRecord[]) => {
+  const filterAndSortFiles = useCallback((
+    files: FileRecord[],
+    searchQuery: string,
+    sortField: keyof FileRecord,
+    sortDirection: 'asc' | 'desc'
+  ) => {
     return files
       .filter((note) => {
         const searchLower = searchQuery.toLowerCase();
@@ -855,11 +952,11 @@ export default function AIFileDump() {
 
         return sortDirection === 'asc' ? comparison : -comparison;
       });
-  }, [searchQuery, sortField, sortDirection]);
+  }, []);
 
-  const filteredAndSortedNotes = filterAndSortFiles(meetingNotes);
-  const filteredAndSortedProspectus = filterAndSortFiles(prospectus);
-  const filteredAndSortedOtherFiles = filterAndSortFiles(otherFiles);
+  const filteredAndSortedNotes = filterAndSortFiles(meetingNotes, momSearchQuery, momSortField, momSortDirection);
+  const filteredAndSortedProspectus = filterAndSortFiles(prospectus, prospectusSearchQuery, prospectusSortField, prospectusSortDirection);
+  const filteredAndSortedOtherFiles = filterAndSortFiles(otherFiles, otherFilesSearchQuery, otherFilesSortField, otherFilesSortDirection);
 
   if (loading) {
     return (
@@ -929,13 +1026,13 @@ export default function AIFileDump() {
                     <FileSpreadsheet className="h-10 w-10 text-emerald-600" />
                     <p className="text-muted-foreground text-sm flex flex-col items-center justify-center gap-0.5">
                       <span>Upload bulk companies using</span><span>this template {' '}
-                      <a
-                        href="/File Upload Template.xlsx"
-                        download="File Upload Template.xlsx"
-                        className="text-primary font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
-                      >
-                        here
-                      </a>
+                        <a
+                          href="/File Upload Template.xlsx"
+                          download="File Upload Template.xlsx"
+                          className="text-primary font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
+                        >
+                          here
+                        </a>
                       </span>
                     </p>
                   </div> */}
@@ -1079,11 +1176,11 @@ export default function AIFileDump() {
           title="MoM"
           files={meetingNotes}
           filteredFiles={filteredAndSortedNotes}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
+          searchQuery={momSearchQuery}
+          onSearchChange={handleMomSearchChange}
+          sortField={momSortField}
+          sortDirection={momSortDirection}
+          onSort={handleMomSort}
           expandedTags={expandedTags}
           toggleTags={toggleTags}
           expandedCompanies={expandedCompanies}
@@ -1095,6 +1192,8 @@ export default function AIFileDump() {
           deletingId={deletingId}
           emptyMessage="No meeting notes uploaded yet."
           emptySubMessage="Upload your first meeting note using the form above."
+          currentPage={momPage}
+          onPageChange={setMomPage}
         />
 
         {/* Prospectus List */}
@@ -1102,11 +1201,11 @@ export default function AIFileDump() {
           title="Prospectus"
           files={prospectus}
           filteredFiles={filteredAndSortedProspectus}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
+          searchQuery={prospectusSearchQuery}
+          onSearchChange={handleProspectusSearchChange}
+          sortField={prospectusSortField}
+          sortDirection={prospectusSortDirection}
+          onSort={handleProspectusSort}
           expandedTags={expandedTags}
           toggleTags={toggleTags}
           expandedCompanies={expandedCompanies}
@@ -1118,6 +1217,8 @@ export default function AIFileDump() {
           deletingId={deletingId}
           emptyMessage="No prospectus uploaded yet."
           emptySubMessage="Upload your first prospectus using the form above."
+          currentPage={prospectusPage}
+          onPageChange={setProspectusPage}
         />
 
         {/* Other List */}
@@ -1125,11 +1226,11 @@ export default function AIFileDump() {
           title="Other"
           files={otherFiles}
           filteredFiles={filteredAndSortedOtherFiles}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
+          searchQuery={otherFilesSearchQuery}
+          onSearchChange={handleOtherFilesSearchChange}
+          sortField={otherFilesSortField}
+          sortDirection={otherFilesSortDirection}
+          onSort={handleOtherFilesSort}
           expandedTags={expandedTags}
           toggleTags={toggleTags}
           expandedCompanies={expandedCompanies}
@@ -1141,8 +1242,10 @@ export default function AIFileDump() {
           deletingId={deletingId}
           emptyMessage="No other files uploaded yet."
           emptySubMessage="Upload your files using the form above."
+          currentPage={otherFilesPage}
+          onPageChange={setOtherFilesPage}
         />
-        </div>
+      </div>
     </DashboardLayout >
   );
 }
