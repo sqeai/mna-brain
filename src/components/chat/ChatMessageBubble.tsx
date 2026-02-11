@@ -49,7 +49,7 @@ export function LoadingBubble() {
       </div>
 
       {/* Thinking Indicator */}
-      <div className="flex-1 max-w-[80%] flex flex-col items-start">
+      <div className="flex-1 min-w-0 max-w-[80%] flex flex-col items-start">
         <ThinkingIndicator />
       </div>
     </div>
@@ -96,12 +96,12 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
       .join("");
 
     return (
-      <div className="flex gap-4 mb-6 flex-row-reverse">
+      <div className="flex gap-4 mb-6 flex-row-reverse min-w-0">
         <div className="flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center bg-primary">
           <User className="h-5 w-5 text-primary-foreground" />
         </div>
-        <div className="flex-1 max-w-[80%] flex flex-col items-end">
-          <div className="rounded-2xl px-5 py-4 w-full bg-primary text-primary-foreground">
+        <div className="flex-1 min-w-0 max-w-[80%] flex flex-col items-end">
+          <div className="rounded-2xl px-5 py-4 w-full min-w-0 overflow-auto break-words bg-primary text-primary-foreground">
             <MarkdownRenderer
               content={textContent}
               className="prose-invert [&_*]:text-primary-foreground"
@@ -254,14 +254,14 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
 
   // For assistant messages, render parts with switch statement
   return (
-    <div className="flex gap-4 mb-6">
+    <div className="flex gap-4 mb-6 min-w-0">
       {/* Avatar */}
       <div className="flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg">
         <Bot className="h-5 w-5 text-white" />
       </div>
 
       {/* Message Content */}
-      <div className="flex-1 max-w-[80%] flex flex-col items-start gap-2">
+      <div className="flex-1 min-w-0 max-w-[80%] flex flex-col items-start gap-2">
         {/* Tool Results - All tools behind a single collapsible */}
         {toolParts.length > 0 && (
           <Collapsible
@@ -376,7 +376,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
 
         {/* Response Text - Final answer inside the chat bubble */}
         {hasResponseContent && (
-          <div className="rounded-2xl px-5 py-4 w-full bg-card border shadow-sm">
+          <div className="rounded-2xl px-5 py-4 w-full min-w-0 overflow-auto break-words bg-card border shadow-sm text-card-foreground">
             <MarkdownRenderer content={responseText} />
           </div>
         )}

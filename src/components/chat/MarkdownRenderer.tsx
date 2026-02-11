@@ -11,7 +11,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={cn("prose prose-sm max-w-none dark:prose-invert", className)}>
+    <div className={cn("prose prose-sm max-w-none break-words dark:prose-invert", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -77,19 +77,19 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
             const isInline = !className;
             if (isInline) {
               return (
-                <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs" {...props}>
+                <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs break-all" {...props}>
                   {children}
                 </code>
               );
             }
             return (
-              <code className={cn("block p-3 rounded-lg bg-muted text-foreground font-mono text-xs overflow-x-auto", className)} {...props}>
+              <code className={cn("block max-w-full p-3 rounded-lg bg-muted text-foreground font-mono text-xs overflow-x-auto", className)} {...props}>
                 {children}
               </code>
             );
           },
           pre: ({ children }) => (
-            <pre className="my-2 rounded-lg bg-muted overflow-x-auto">{children}</pre>
+            <pre className="my-2 max-w-full rounded-lg bg-muted overflow-x-auto">{children}</pre>
           ),
 
           // Blockquotes
@@ -102,13 +102,13 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
           // Horizontal rules
           hr: () => <hr className="my-4 border-border" />,
 
-          // Links
+          // Links - break long URLs so they don't overflow the bubble
           a: ({ href, children }) => (
             <a
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-primary hover:underline break-all"
             >
               {children}
             </a>
