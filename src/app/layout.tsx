@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Brain 2.0',
   description: 'Deal Pipeline Management',
   icons: {
-    icon: '/favicon.png',
+    icon: '/favicon.ico',
   },
 };
 
