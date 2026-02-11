@@ -21,7 +21,7 @@ export default function LoginPage() {
   const { signIn, user, loading } = useAuth();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
-  const logoSrc = resolvedTheme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+  const logoSrc = '/logo-light.png';
 
   useEffect(() => {
     if (!loading && user) {
