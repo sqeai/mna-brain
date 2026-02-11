@@ -72,12 +72,9 @@ interface MarketScreeningResultsProps {
 
 const formatCurrency = (value: number | null) => {
   if (value === null || value === undefined) return '-';
-  // Check if value is in Millions (since data is _usd_mn)
-  // If the value is stored as millions (e.g. 10.5 for $10.5M), we format directly
-  // Adjust logic if data is raw numbers. Based on field name `_usd_mn`, it's likely in millions.
-
-  if (value >= 1000) return `$${(value / 1000).toFixed(1)}B`;
-  return `$${value.toFixed(1)}M`;
+  // Values are stored in millions, convert to billions for display
+  const billions = value / 1000;
+  return `$${billions.toFixed(2)}B`;
 };
 
 export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeline, collapsed = false, onToggleCollapse }: MarketScreeningResultsProps) {

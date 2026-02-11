@@ -232,13 +232,10 @@ interface AnalysisSource {
 }
 
 const formatCurrency = (value: number | null) => {
-  if (value === null) return '-';
-  // Values in the DB are in USD Mn, so multiply by 1M for display
-  const actualValue = value * 1_000_000;
-  if (actualValue >= 1_000_000_000) return `$${(actualValue / 1_000_000_000).toFixed(2)}B`;
-  if (actualValue >= 1_000_000) return `$${(actualValue / 1_000_000).toFixed(2)}M`;
-  if (actualValue >= 1_000) return `$${(actualValue / 1_000).toFixed(2)}K`;
-  return `$${actualValue.toFixed(0)}`;
+  if (value === null || value === undefined) return '-';
+  // Values are stored in millions, convert to billions for display
+  const billions = value / 1000;
+  return `$${billions.toFixed(2)}B`;
 };
 
 export default function CompanyDetailPage() {

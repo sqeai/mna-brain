@@ -19,11 +19,10 @@ interface FinancialChartsProps {
 }
 
 const formatCurrency = (value: number | null) => {
-  if (value === null || value === 0) return '-';
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
+  if (value === null || value === undefined) return '-';
+  // Values are stored in millions, convert to billions for display
+  const billions = value / 1000;
+  return `$${billions.toFixed(2)}B`;
 };
 
 export function FinancialCharts({

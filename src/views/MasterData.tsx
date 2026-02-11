@@ -78,10 +78,9 @@ const stageColors: Record<DealStage | 'Acquired', string> = {
 
 const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return '-';
-  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
+  // Values are stored in millions, convert to billions for display
+  const billions = value / 1000;
+  return `$${billions.toFixed(2)}B`;
 };
 
 const getRevenueChange = (year2: number | null, year3: number | null): { direction: 'up' | 'down' | 'flat'; percent: number } => {
