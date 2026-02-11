@@ -7,7 +7,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
 
 interface FinancialChartsProps {
   revenue_year1: number | null;
@@ -75,6 +75,7 @@ export function FinancialCharts({
                   className="text-xs"
                   width={60}
                 />
+                <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -128,6 +129,7 @@ export function FinancialCharts({
                   className="text-xs"
                   width={60}
                 />
+                <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
