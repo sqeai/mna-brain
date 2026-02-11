@@ -175,16 +175,16 @@ export default function MasterData() {
   const filteredCompanies = companies.filter(company => {
     const matchesSearch = company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       company.sector.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const displayStage = getDisplayStage(company);
     const matchesStage = stageFilter === 'all' || displayStage === stageFilter;
     const matchesSector = sectorFilter === 'all' || company.sector === sectorFilter;
     const matchesSource = sourceFilter === 'all' || company.source === sourceFilter;
-    
+
     return matchesSearch && matchesStage && matchesSector && matchesSource;
   });
 
-  const activeCompanies = companies.filter(c => 
+  const activeCompanies = companies.filter(c =>
     ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'].includes(c.current_stage as string)
   );
 
@@ -366,7 +366,7 @@ export default function MasterData() {
                     {paginatedCompanies.map((company) => {
                       const displayStage = getDisplayStage(company);
                       const revenueChange = getRevenueChange(company.revenue_year2, company.revenue_year3);
-                      
+
                       return (
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">{company.name}</TableCell>

@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
+import { AICompanyCardLoading } from '@/components/pipeline/AICompanyCardLoading';
 import FilePreview from '@/components/MeetingNotes/FilePreview';
 import { FinancialCharts } from '@/components/pipeline/FinancialCharts';
 import { DealStage } from '@/lib/types';
@@ -723,15 +724,7 @@ export default function CompanyDetailPage() {
 
             {/* AI Company Card Section */}
             {analysisGenerating && !analysis?.business_overview ? (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-12 flex flex-col items-center justify-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-accent">Generating AI Company Card</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Researching company data from multiple sources. This may take 1-2 minutes...
-                  </p>
-                </div>
-              </div>
+              <AICompanyCardLoading />
             ) : analysis?.status === 'failed' ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">
                 <AlertCircle className="h-8 w-8 text-destructive" />
