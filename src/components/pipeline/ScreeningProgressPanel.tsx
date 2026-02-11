@@ -30,6 +30,7 @@ interface Screening {
   updated_at: string;
   company?: {
     target: string;
+    pipeline_stage: string;
   };
   criterias?: {
     name: string;
@@ -81,19 +82,21 @@ export default function ScreeningProgressPanel({
           remarks,
           created_at,
           updated_at,
-          company:companies(target),
+          company:companies(target, pipeline_stage),
           criterias(name)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Transform the data to flatten nested objects
-      const transformed = (data || []).map((s: any) => ({
-        ...s,
-        company: s.company,
-        criterias: s.criterias,
-      }));
+      // Transform the data to flatten nested objects and filter for L0 only
+      const transformed = (data || [])
+        .map((s: any) => ({
+          ...s,
+          company: s.company,
+          criterias: s.criterias,
+        }))
+        .filter((s: any) => s.company?.pipeline_stage === 'L0');
 
       setScreenings(transformed);
     } catch (error) {
@@ -220,6 +223,18 @@ export default function ScreeningProgressPanel({
   if (screenings.length === 0) {
     return null;
   }
+
+  const handlePromoteSuccess = async () => {
+    if (!promotingCompany) return;
+
+    // We no longer delete screening data, just refresh the list.
+    // The list filters out non-L0 companies, so this company will disappear.
+    toast.success(`${promotingCompany.name} promoted to L1`);
+
+    setPromotingCompany(null);
+    onScreeningComplete?.();
+    fetchScreenings();
+  };
 
   return (
     <Card className="border-purple-200 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 dark:border-purple-800">
@@ -409,11 +424,7 @@ export default function ScreeningProgressPanel({
           companyName={promotingCompany.name}
           currentStage="L0"
           nextStage="L1"
-          onSuccess={() => {
-            setPromotingCompany(null);
-            onScreeningComplete?.();
-            fetchScreenings();
-          }}
+          onSuccess={handlePromoteSuccess}
         />
       )}
     </Card>
