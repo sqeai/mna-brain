@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,12 +22,13 @@ import {
   Minus,
   Clock,
   ArrowUpRight,
-  Upload,
-  Bot,
   Loader2,
   ChevronLeft,
   ChevronRight,
   Database,
+  Layers,
+  Target,
+  Activity,
 } from 'lucide-react';
 import CompanyDetailDialog from '@/components/pipeline/CompanyDetailDialog';
 
@@ -70,6 +70,16 @@ const PIPELINE_STAGES: { stage: string; label: string; color: string }[] = [
   { stage: 'L5', label: 'Closing', color: 'bg-pink-500' },
 ];
 
+// Softer stage gradients (sqemnabrain style)
+const stageGradients: Record<string, string> = {
+  L0: 'from-blue-400/80 to-blue-500/80',
+  L1: 'from-violet-400/80 to-purple-500/80',
+  L2: 'from-amber-400/80 to-orange-500/80',
+  L3: 'from-emerald-400/80 to-green-500/80',
+  L4: 'from-cyan-400/80 to-teal-500/80',
+  L5: 'from-pink-400/80 to-rose-500/80',
+};
+
 const statusColors: Record<string, string> = {
   pass: 'bg-green-500',
   fail: 'bg-red-500',
@@ -101,7 +111,6 @@ const getRevenueChange = (year2023: number | null, year2024: number | null): { d
 
 
 export default function Dashboard() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [totalCompanies, setTotalCompanies] = useState(0);
@@ -204,11 +213,20 @@ export default function Dashboard() {
   // Get recent companies (last 5 updated)
   const recentCompanies = companies.slice(0, 5);
 
+  const totalInbound = stageCounts.reduce((s, x) => s + (x.inbound || 0), 0);
+  const totalOutbound = stageCounts.reduce((s, x) => s + (x.outbound || 0), 0);
+  const l0Count = stageCounts[0]?.count || 1;
+  const l5Count = stageCounts[5]?.count ?? stageCounts.find(s => s.stage === 'L5')?.count ?? 0;
+  const conversionPercent = l0Count > 0 ? Math.round((l5Count / l0Count) * 100) : 0;
+
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">Loading dashboard...</p>
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -216,305 +234,381 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Overview of your M&A deal pipeline</p>
-          </div>
-        </div>
-
-        {/* Pipeline Stages */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Pipeline Stages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {totalCompanies === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Building2 className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No companies in database yet.</p>
+      <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
+          {/* Header - clean professional style */}
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground/10">
+                <Layers className="h-5 w-5 text-foreground" />
               </div>
-            ) : (
-              <div className="flex items-end gap-4 justify-between" style={{ height: '320px' }}>
-                {stageCounts.map((item, index) => {
-                  const l0Count = stageCounts[0]?.count || 1;
-                  const percentage = l0Count > 0 ? Math.round((item.count / l0Count) * 100) : 0;
-                  const barMaxHeight = 200;
-                  const barHeight = Math.max((item.count / l0Count) * barMaxHeight, item.count > 0 ? 50 : 20);
-                  const stageConfig = PIPELINE_STAGES[index];
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                Dashboard
+              </h1>
+            </div>
+            <p className="text-muted-foreground ml-[52px]">
+              Real-time overview of your M&A deal pipeline
+            </p>
+          </div>
 
-                  // Special handling for L0 - show inbound/outbound split
-                  if (item.stage === 'L0') {
-                    const inboundHeight = item.inbound && item.count > 0 
-                      ? (item.inbound / item.count) * barHeight 
-                      : barHeight / 2;
-                    const outboundHeight = barHeight - inboundHeight;
+          {/* Stat cards - soft colored accents */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                    <Target className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Deals</p>
+                </div>
+                <p className="text-3xl font-semibold">{totalCompanies}</p>
+                <p className="text-xs text-muted-foreground mt-1">Active in pipeline</p>
+              </CardContent>
+            </Card>
+            <Card className="border bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Inbound</p>
+                </div>
+                <p className="text-3xl font-semibold">{totalInbound}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {totalCompanies > 0 ? Math.round((totalInbound / totalCompanies) * 100) : 0}% of total
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
+                    <Activity className="h-4 w-4 text-violet-500" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Outbound</p>
+                </div>
+                <p className="text-3xl font-semibold">{totalOutbound}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {totalCompanies > 0 ? Math.round((totalOutbound / totalCompanies) * 100) : 0}% of total
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                    <TrendingUp className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Conversion</p>
+                </div>
+                <p className="text-3xl font-semibold">{conversionPercent}%</p>
+                <p className="text-xs text-muted-foreground mt-1">L0 → L5</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Pipeline Stages */}
+          <Card className="border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                Pipeline Stages
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {totalCompanies === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Building2 className="mx-auto h-12 w-12 mb-4 opacity-40" />
+                  <p className="text-base font-medium">No companies in database yet.</p>
+                  <p className="text-sm">Import or add companies to see pipeline stages</p>
+                </div>
+              ) : (
+                <div className="flex items-end gap-4 justify-between" style={{ height: '300px' }}>
+                  {stageCounts.map((item, index) => {
+                    const maxCount = Math.max(...stageCounts.map(s => s.count), 1);
+                    const l0 = stageCounts[0]?.count || 1;
+                    const conversionPercentStage = l0 > 0 ? Math.round((item.count / l0) * 100) : 0;
+                    const barMaxHeight = 200;
+                    const barHeight = Math.max((item.count / maxCount) * barMaxHeight, 50);
+                    const stageConfig = PIPELINE_STAGES[index];
+
+                    if (item.stage === 'L0') {
+                      const inboundRatio = item.count > 0 ? (item.inbound || 0) / item.count : 0.5;
+                      const outboundRatio = item.count > 0 ? (item.outbound || 0) / item.count : 0.5;
+                      return (
+                        <div
+                          key={item.stage}
+                          className="flex-1 flex flex-col items-center cursor-pointer group"
+                        >
+                          <span className="text-xl font-semibold mb-2 transition-transform group-hover:scale-110">{item.count}</span>
+                          <Badge variant="secondary" className="mb-4 text-xs bg-blue-500/15 text-blue-600 border-0">
+                            100%
+                          </Badge>
+                          <div
+                            className="w-full rounded-xl overflow-hidden flex flex-col transition-all duration-200 group-hover:scale-[1.02]"
+                            style={{ height: `${barHeight}px` }}
+                          >
+                            <div
+                              className="w-full bg-blue-400/70 flex items-center justify-center"
+                              style={{ height: `${inboundRatio * 100}%` }}
+                            >
+                              <div className="text-white text-xs font-medium text-center px-1">
+                                <div className="opacity-80 text-[10px] uppercase tracking-wide">Inbound</div>
+                                <div className="font-semibold text-sm">{item.inbound || 0}</div>
+                              </div>
+                            </div>
+                            <div
+                              className="w-full bg-blue-600/70 flex items-center justify-center"
+                              style={{ height: `${outboundRatio * 100}%` }}
+                            >
+                              <div className="text-white text-xs font-medium text-center px-1">
+                                <div className="opacity-80 text-[10px] uppercase tracking-wide">Outbound</div>
+                                <div className="font-semibold text-sm">{item.outbound || 0}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-center mt-4">
+                            <div className="text-base font-bold">{item.stage}</div>
+                            <div className="text-xs text-muted-foreground">{item.label}</div>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div
                         key={item.stage}
-                        className="flex-1 flex flex-col items-center group"
+                        className="flex-1 flex flex-col items-center cursor-pointer group"
                       >
-                        <span className="text-2xl font-bold mb-1">{item.count}</span>
-                        <Badge variant="secondary" className="mb-3 text-xs bg-muted text-muted-foreground">
-                          100%
+                        <span className="text-xl font-semibold mb-2 transition-transform group-hover:scale-110">{item.count}</span>
+                        <Badge variant="secondary" className="mb-4 text-xs bg-muted/80 backdrop-blur-sm">
+                          {conversionPercentStage}%
                         </Badge>
                         <div
-                          className="w-full rounded-xl overflow-hidden transition-transform group-hover:scale-105 flex flex-col"
+                          className={`w-full rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-[1.02] bg-gradient-to-b ${stageGradients[item.stage] || stageConfig.color}`}
                           style={{ height: `${barHeight}px` }}
                         >
-                          {/* Inbound section */}
-                          <div
-                            className="w-full bg-blue-600 flex flex-col items-center justify-center"
-                            style={{ height: `${inboundHeight}px` }}
-                          >
-                            <span className="text-white text-[10px] font-medium uppercase tracking-wide">Inbound</span>
-                            <span className="text-white font-bold">{item.inbound || 0}</span>
-                          </div>
-                          {/* Outbound section */}
-                          <div
-                            className="w-full bg-blue-400 flex flex-col items-center justify-center"
-                            style={{ height: `${outboundHeight}px` }}
-                          >
-                            <span className="text-white text-[10px] font-medium uppercase tracking-wide">Outbound</span>
-                            <span className="text-white font-bold">{item.outbound || 0}</span>
-                          </div>
+                          {item.count > 0 && (
+                            <span className="text-white font-semibold text-lg">{item.count}</span>
+                          )}
                         </div>
-                        <div className="text-center mt-3">
-                          <div className="font-medium text-sm">{item.stage}</div>
+                        <div className="text-center mt-4">
+                          <div className="text-base font-bold">{item.stage}</div>
                           <div className="text-xs text-muted-foreground">{item.label}</div>
                         </div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div
-                      key={item.stage}
-                      className="flex-1 flex flex-col items-center group"
-                    >
-                      <span className="text-2xl font-bold mb-1">{item.count}</span>
-                      <Badge variant="secondary" className="mb-3 text-xs bg-muted text-muted-foreground">
-                        {percentage}%
-                      </Badge>
-                      <div
-                        className={`w-full rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${stageConfig.color}`}
-                        style={{ height: `${barHeight}px` }}
-                      >
-                        {item.count > 0 && (
-                          <span className="text-white font-bold text-lg">{item.count}</span>
-                        )}
-                      </div>
-                      <div className="text-center mt-3">
-                        <div className="font-medium text-sm">{item.stage}</div>
-                        <div className="text-xs text-muted-foreground">{item.label}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Two Column Layout: Company Overview + Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Company Overview Table */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Company Overview
-              </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/master-data">
-                  View All <ArrowUpRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {companies.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Building2 className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                  <p>No companies yet. Import data to get started.</p>
+                  })}
                 </div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Company</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Rev 2022</TableHead>
-                          <TableHead className="text-right">Rev 2023</TableHead>
-                          <TableHead className="text-right">Rev 2024</TableHead>
-                          <TableHead className="text-center">Trend</TableHead>
-                          <TableHead className="text-right">EBITDA 2024</TableHead>
-                          <TableHead className="text-right">EV 2024</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedCompanies.map((company) => {
-                          const revenueChange = getRevenueChange(company.revenue_2023_usd_mn, company.revenue_2024_usd_mn);
-                          return (
-                            <TableRow key={company.id}>
-                              <TableCell>
-                                <div>
-                                  <button
-                                    onClick={() => {
-                                      setSelectedCompany(company);
-                                      setDetailDialogOpen(true);
-                                    }}
-                                    className="font-medium text-left hover:text-primary hover:underline transition-colors"
-                                  >
-                                    {company.target || 'Unknown'}
-                                  </button>
-                                  <p className="text-xs text-muted-foreground">{company.segment || '-'}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {company.l1_screening_result ? (
-                                  <Badge className={`${getStatusColor(company.l1_screening_result)} text-white text-xs`}>
-                                    {company.l1_screening_result}
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Pending
-                                  </Badge>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatCurrency(company.revenue_2022_usd_mn)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatCurrency(company.revenue_2023_usd_mn)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatCurrency(company.revenue_2024_usd_mn)}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {revenueChange.direction === 'up' && (
-                                  <span className="flex items-center justify-center text-green-600">
-                                    <TrendingUp className="h-4 w-4" />
-                                  </span>
-                                )}
-                                {revenueChange.direction === 'down' && (
-                                  <span className="flex items-center justify-center text-red-600">
-                                    <TrendingDown className="h-4 w-4" />
-                                  </span>
-                                )}
-                                {revenueChange.direction === 'flat' && (
-                                  <Minus className="h-4 w-4 mx-auto text-muted-foreground" />
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatCurrency(company.ebitda_2024_usd_mn)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatCurrency(company.ev_2024)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages} ({companies.length} companies)
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {selectedCompany && (
-                <CompanyDetailDialog
-                  company={selectedCompany}
-                  open={detailDialogOpen}
-                  onOpenChange={setDetailDialogOpen}
-                  onUpdate={() => fetchDashboardData()}
-                />
               )}
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Recent Updates
-              </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/master-data">
-                  View All <ArrowUpRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {recentCompanies.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Building2 className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                  <p>No companies yet. Import data to get started.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentCompanies.map((company) => (
-                    <div
-                      key={company.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${getStatusColor(company.l1_screening_result)}`} />
-                        <div>
-                          <p className="font-medium text-sm">{company.target || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(company.updated_at).toLocaleDateString()}
-                          </p>
+          {/* Two Column Layout: Company Overview + Recent Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Company Overview Table */}
+            <Card className="lg:col-span-2 border bg-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Database className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  Company Overview
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/master-data" className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                    View All <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {companies.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Building2 className="mx-auto h-12 w-12 mb-4 opacity-40" />
+                    <p className="text-base font-medium">No companies yet</p>
+                    <p className="text-sm">Import data to get started</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto rounded-xl border border-border/50">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="font-semibold">Company</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="text-right font-semibold">Rev 2022</TableHead>
+                            <TableHead className="text-right font-semibold">Rev 2023</TableHead>
+                            <TableHead className="text-right font-semibold">Rev 2024</TableHead>
+                            <TableHead className="text-center font-semibold">Trend</TableHead>
+                            <TableHead className="text-right font-semibold">EBITDA 2024</TableHead>
+                            <TableHead className="text-right font-semibold">EV 2024</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedCompanies.map((company) => {
+                            const revenueChange = getRevenueChange(company.revenue_2023_usd_mn, company.revenue_2024_usd_mn);
+                            return (
+                              <TableRow key={company.id} className="hover:bg-muted/50 transition-colors">
+                                <TableCell>
+                                  <div>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedCompany(company);
+                                        setDetailDialogOpen(true);
+                                      }}
+                                      className="font-semibold text-left hover:text-primary transition-colors"
+                                    >
+                                      {company.target || 'Unknown'}
+                                    </button>
+                                    <p className="text-xs text-muted-foreground">{company.segment || '-'}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {company.l1_screening_result ? (
+                                    <Badge className={`${getStatusColor(company.l1_screening_result)} text-white text-xs border-0`}>
+                                      {company.l1_screening_result}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Pending
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  {formatCurrency(company.revenue_2022_usd_mn)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  {formatCurrency(company.revenue_2023_usd_mn)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  {formatCurrency(company.revenue_2024_usd_mn)}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {revenueChange.direction === 'up' && (
+                                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/10">
+                                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+                                    </span>
+                                  )}
+                                  {revenueChange.direction === 'down' && (
+                                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500/10">
+                                      <TrendingDown className="h-4 w-4 text-red-500" />
+                                    </span>
+                                  )}
+                                  {revenueChange.direction === 'flat' && (
+                                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted">
+                                      <Minus className="h-4 w-4 text-muted-foreground" />
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-medium">
+                                  {formatCurrency(company.ebitda_2024_usd_mn)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-medium">
+                                  {formatCurrency(company.ev_2024)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+                        <p className="text-sm text-muted-foreground">
+                          Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                          <span className="ml-2 text-muted-foreground/60">({companies.length} companies)</span>
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="h-9 w-9 p-0"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="h-9 w-9 p-0"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      {company.l1_screening_result ? (
-                        <Badge className={`${getStatusColor(company.l1_screening_result)} text-white text-xs`}>
-                          {company.l1_screening_result}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          Pending
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    )}
+                  </>
+                )}
+
+                {selectedCompany && (
+                  <CompanyDetailDialog
+                    company={selectedCompany}
+                    open={detailDialogOpen}
+                    onOpenChange={setDetailDialogOpen}
+                    onUpdate={() => fetchDashboardData()}
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity */}
+            <Card className="border bg-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10">
+                    <Clock className="h-4 w-4 text-cyan-500" />
+                  </div>
+                  Recent Updates
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/master-data" className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                    View All <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {recentCompanies.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Building2 className="mx-auto h-12 w-12 mb-4 opacity-40" />
+                    <p className="text-base font-medium">No companies yet</p>
+                    <p className="text-sm">Import data to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentCompanies.map((company) => (
+                      <div
+                        key={company.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${getStatusColor(company.l1_screening_result)}`} />
+                          <div>
+                            <p className="font-medium text-sm">{company.target || 'Unknown'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(company.updated_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        {company.l1_screening_result ? (
+                          <Badge className={`${getStatusColor(company.l1_screening_result)} text-white text-xs border-0`}>
+                            {company.l1_screening_result}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
       </div>
     </DashboardLayout>
   );
