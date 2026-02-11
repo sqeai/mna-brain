@@ -6,7 +6,7 @@ import { logger } from "../agent/logger";
 import { getAllCompanyReferences } from "../fuzzySearch";
 import { splitPdf } from "../pdf";
 
-const generateSystemPrompt = (companies_list) => `You are a specialized M&A File Processing Assistant. Your task is to analyze raw text extracted from meeting documents (like PPTX slides) and transform it into a highly structured format.
+const generateSystemPrompt = (companies_list, userRawNotes) => `You are a specialized M&A File Processing Assistant. Your task is to analyze raw text extracted from meeting documents (like PPTX slides) and transform it into a highly structured format.
 
 ## Objectives:
 1. **Understand Unstructured Data**: Read the provided raw text carefully.
@@ -20,6 +20,10 @@ const generateSystemPrompt = (companies_list) => `You are a specialized M&A File
 
 ## Known Companies:
 ${companies_list}
+
+## Additional Notes:
+These are additional notes from the user about the document that might be relevant to the analysis. Please use this to understand the context of the document better.
+${userRawNotes}
 
 ## Process:
 1. Review the "Known Companies" list.
@@ -133,7 +137,7 @@ Always prioritize accuracy. Only list a company in 'companies_detected' if you a
 /**
  * Invoke the file processing agent.
  */
-export async function processFileContent(rawText: string, buffer: Buffer, contentType: string) {
+export async function processFileContent(rawText: string, buffer: Buffer, contentType: string, userRawNotes: string) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
@@ -154,7 +158,7 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
   const agent = createReactAgent({
     llm,
     tools: [], // No tools needed for this phase logic
-    prompt: generateSystemPrompt(allNames),
+    prompt: generateSystemPrompt(allNames, userRawNotes),
   });
 
   // 2. Implement Anthropic Files API for PDF processing

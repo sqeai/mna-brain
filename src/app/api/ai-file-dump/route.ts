@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Invoke the agent to structure the text
-      structuredResult = await processFileContent(rawText, buffer, fileType);
+      structuredResult = await processFileContent(rawText, buffer, fileType, userRawNotes);
 
       if (structuredResult) {
         tags = structuredResult.tags || [];
