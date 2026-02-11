@@ -1,27 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import FilePreview from '@/components/MeetingNotes/FilePreview';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,31 +13,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  FileText,
-  Upload,
-  Loader2,
-  Trash2,
-  Download,
-  FileUp,
-  FileSpreadsheet,
-  X,
-  CheckCircle2,
-  AlertCircle,
-  Tag,
-  Building,
-  Eye,
-  Bot,
-  Search,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsUpDown,
-  CalendarIcon,
-} from 'lucide-react';
-import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -65,8 +24,51 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import FilePreview from '@/components/MeetingNotes/FilePreview';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import {
+  AlertCircle,
+  Bot,
+  Building,
+  CalendarIcon,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  ChevronUp,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  FileUp,
+  FileStack,
+  Loader2,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+  X,
+  Zap,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface FileRecord {
   id: string;
@@ -577,7 +579,6 @@ export default function AIFileDump() {
       const result = await response.json();
 
       if (result.success) {
-        console.log('Prospectus:', result.data);
         setProspectus(result.data);
       } else {
         toast.error('Failed to load prospectus');
@@ -972,10 +973,36 @@ export default function AIFileDump() {
     <DashboardLayout>
       <div className="p-6 space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Minutes of Meeting</h1>
-            <p className="text-muted-foreground">Upload and manage meeting notes</p>
+        <div className="relative mb-6 flex-shrink-0">
+          <div className="absolute -inset-2 rounded-2xl opacity-20 blur-xl transition-colors duration-500 bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500" />
+          <div className="relative flex items-center gap-5">
+            <div className="relative group">
+              <div className="absolute inset-0 rounded-2xl blur-md opacity-60 group-hover:opacity-80 transition-opacity bg-gradient-to-br from-teal-400 to-emerald-600" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-300 group-hover:scale-105 bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-600">
+                <FileStack className="h-7 w-7 text-white drop-shadow-lg" />
+                <div 
+                  className="absolute inset-0 rounded-2xl animate-ping opacity-20 bg-teal-400" 
+                  style={{ animationDuration: '3s' }} 
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  AI File Dump
+                </h1>
+                <Badge 
+                  variant="outline" 
+                  className="text-xs font-medium px-2 py-0.5 border-0 bg-teal-500/10 text-teal-600 hover:bg-teal-500/20"
+                >
+                  <Zap className="h-3 w-3 mr-1" />
+                  AI Powered
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Drop your files and let AI automatically organize and categorize them
+              </p>
+            </div>
           </div>
         </div>
 
