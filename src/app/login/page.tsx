@@ -66,8 +66,8 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
             <Briefcase className="h-7 w-7 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">M&A Tracker</CardTitle>
-          <CardDescription>Deal Pipeline Management System</CardDescription>
+          <CardTitle className="text-2xl font-bold">BRAIN 2.0</CardTitle>
+          <CardDescription>ENTERPRISE DEAL INTELLIGENCE</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
@@ -115,6 +115,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
+        <CardFooter>SECURED BY NEURAL CORE LOGIC</CardFooter>
       </Card>
       </div>
     </div>

@@ -268,7 +268,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                         size="sm"
                         onClick={() => addToL0(result)}
                         disabled={addingId === result.id}
-                        className="bg-stage-l0 hover:bg-stage-l0/90"
+                        className="bg-stage-l0 hover:bg-stage-l0/90 dark:text-primary-foreground"
                       >
                         {addingId === result.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
