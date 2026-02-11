@@ -243,7 +243,7 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
           if (parsed.file_type === 'prospectus') {
             const insertData = {
               // Pipeline stage for market screening
-              pipeline_stage: 'L1',
+              pipeline_stage: 'L0',
               // Core fields
               target: parsed?.prospectus_summary?.target || null,
               thesis_content: null,
