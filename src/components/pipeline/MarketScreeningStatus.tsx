@@ -22,7 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Settings, Radar, Play } from 'lucide-react';
+import { Loader2, Settings, Radar, Play, Sparkles, EyeOff, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface InvestmentThesis {
   id: string;
@@ -38,9 +38,11 @@ interface InvestmentThesis {
 interface MarketScreeningStatusProps {
   onScanComplete: () => void;
   newCandidatesCount: number;
+  isVisible: boolean;
+  onToggle: () => void;
 }
 
-export default function MarketScreeningStatus({ onScanComplete, newCandidatesCount }: MarketScreeningStatusProps) {
+export default function MarketScreeningStatus({ onScanComplete, newCandidatesCount, isVisible, onToggle }: MarketScreeningStatusProps) {
   const [thesis, setThesis] = useState<InvestmentThesis | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -190,142 +192,199 @@ export default function MarketScreeningStatus({ onScanComplete, newCandidatesCou
   const isActive = thesis?.is_active && thesis?.content;
 
   return (
-    <div className="border border-purple-200 dark:border-purple-800/50 rounded-lg px-4 py-3 bg-gradient-to-r from-purple-50/80 to-violet-50/50 dark:from-purple-950/30 dark:to-violet-950/20">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Status indicator */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className={`w-2.5 h-2.5 rounded-full ${isActive ? 'bg-purple-500 animate-pulse' : 'bg-muted-foreground'}`} />
-          <span className="font-semibold text-sm uppercase tracking-wide whitespace-nowrap">
-            Market Scanning {isActive ? '(Live)' : '(Inactive)'}
-          </span>
+    <div className="border border-purple-100 dark:border-purple-900/20 rounded-xl p-3 bg-purple-50/50 dark:bg-purple-950/10 backdrop-blur-sm w-full">
+      <div className="flex items-center justify-between gap-4 w-full min-w-0">
+
+        {/* Left Section: Icon & Title */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative h-10 w-10 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center shadow-md shadow-purple-500/20 shrink-0">
+            <Sparkles className="h-5 w-5 text-white" />
+            {isActive && (
+              <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-white dark:border-gray-900" />
+            )}
+          </div>
+
+          <div className="flex flex-col justify-center min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-purple-600 dark:text-purple-400 whitespace-nowrap truncate">
+                AI Market Scanning
+              </h3>
+              {isActive && (
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-[10px] font-semibold text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 whitespace-nowrap shrink-0">
+                  <Radar className="h-2.5 w-2.5" />
+                  Live
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground whitespace-nowrap truncate">
+              Powered by AI thesis matching
+            </p>
+          </div>
+
+          {isVisible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="hidden xl:flex text-muted-foreground hover:text-foreground ml-1 h-6 px-2 shrink-0 gap-1"
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              <span className="text-[10px]">Hide</span>
+              <ChevronUp className="h-3 w-3 opacity-50" />
+            </Button>
+          )}
         </div>
 
-        {/* Last Scan */}
-        {thesis?.last_scan_at && (
-          <div className="text-sm shrink-0">
-            <span className="text-muted-foreground uppercase text-xs tracking-wide block">Last Scan Completed</span>
-            <span className="font-medium whitespace-nowrap">{format(new Date(thesis.last_scan_at), 'MMM d, yyyy, hh:mm a')}</span>
+        {/* Middle Section: Stats */}
+        {isVisible && (
+          <div className="hidden lg:flex items-center gap-4 xl:gap-8 shrink">
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider whitespace-nowrap">
+                LAST SCAN COMPLETED
+              </span>
+              <span className="text-xs font-semibold text-foreground/90 whitespace-nowrap">
+                {thesis?.last_scan_at ? format(new Date(thesis.last_scan_at), 'MMM d, yyyy, hh:mm a') : '-'}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider whitespace-nowrap">
+                NEXT SCAN
+              </span>
+              <span className="text-xs font-semibold text-foreground/90 whitespace-nowrap">
+                {thesis?.next_scan_at ? format(new Date(thesis.next_scan_at), 'MMM d, yyyy, hh:mm a') : '-'}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider whitespace-nowrap">
+                NEW CANDIDATES (LAST 7D)
+              </span>
+              <span className="text-xs font-semibold text-foreground/90 whitespace-nowrap">
+                {newCandidatesCount}
+              </span>
+            </div>
           </div>
         )}
 
-        {/* Next Scan */}
-        {thesis?.next_scan_at && (
-          <div className="text-sm shrink-0">
-            <span className="text-muted-foreground uppercase text-xs tracking-wide block">Next Scan</span>
-            <span className="font-medium whitespace-nowrap">{format(new Date(thesis.next_scan_at), 'MMM d, yyyy, hh:mm a')}</span>
-          </div>
-        )}
+        {/* Right Section: Actions */}
+        {isVisible && (
+          <div className="flex flex-col gap-2 shrink-0 ml-auto">
+            <Dialog open={showThesisDialog} onOpenChange={setShowThesisDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configure
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Investment Thesis Configuration</DialogTitle>
+                  <DialogDescription>
+                    Define your investment criteria. AI will search for companies matching this thesis.
+                  </DialogDescription>
+                </DialogHeader>
 
-
-        {/* New Candidates */}
-        <div className="text-sm shrink-0">
-          <span className="text-muted-foreground uppercase text-xs tracking-wide block">New Candidates (Last 7D)</span>
-          <span className="font-medium">{newCandidatesCount}</span>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
-          <Dialog open={showThesisDialog} onOpenChange={setShowThesisDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Configure
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Investment Thesis Configuration</DialogTitle>
-                <DialogDescription>
-                  Define your investment criteria. AI will search for companies matching this thesis.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="thesis-title">Thesis Name</Label>
-                  <Input
-                    id="thesis-title"
-                    value={thesisTitle}
-                    onChange={(e) => setThesisTitle(e.target.value)}
-                    placeholder="e.g., Healthcare SaaS Mid-Market"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="thesis-content">Investment Thesis</Label>
-                  <Textarea
-                    id="thesis-content"
-                    value={thesisContent}
-                    onChange={(e) => setThesisContent(e.target.value)}
-                    placeholder="Describe your ideal investment target in detail. Include:
-- Target sectors and industries
-- Revenue range and growth requirements
-- EBITDA margins expectations
-- Geographic focus
-- Business model characteristics
-- Value creation opportunities"
-                    rows={8}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4 mt-4">
                   <div>
-                    <Label htmlFor="scan-frequency">Scan Frequency</Label>
-                    <Select value={scanFrequency} onValueChange={setScanFrequency}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="sources-count">Companies per Scan</Label>
+                    <Label htmlFor="thesis-title">Thesis Name</Label>
                     <Input
-                      id="sources-count"
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={sourcesCount}
-                      onChange={(e) => setSourcesCount(parseInt(e.target.value) || 5)}
+                      id="thesis-title"
+                      value={thesisTitle}
+                      onChange={(e) => setThesisTitle(e.target.value)}
+                      placeholder="e.g., Healthcare SaaS Mid-Market"
                     />
                   </div>
-                </div>
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setShowThesisDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={saveThesis}>
-                    Save Thesis
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+                  <div>
+                    <Label htmlFor="thesis-content">Investment Thesis</Label>
+                    <Textarea
+                      id="thesis-content"
+                      value={thesisContent}
+                      onChange={(e) => setThesisContent(e.target.value)}
+                      placeholder="Describe your ideal investment target in detail. Include:
+    - Target sectors and industries
+    - Revenue range and growth requirements
+    - EBITDA margins expectations
+    - Geographic focus
+    - Business model characteristics
+    - Value creation opportunities"
+                      rows={8}
+                    />
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="scan-frequency">Scan Frequency</Label>
+                      <Select value={scanFrequency} onValueChange={setScanFrequency}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="sources-count">Companies per Scan</Label>
+                      <Input
+                        id="sources-count"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={sourcesCount}
+                        onChange={(e) => setSourcesCount(parseInt(e.target.value) || 5)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setShowThesisDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={saveThesis}>
+                      Save Thesis
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              onClick={runScan}
+              disabled={scanning}
+              className="bg-[#059669] hover:bg-[#047857] text-white shadow-sm font-medium h-7 px-3 text-xs w-full justify-start"
+            >
+              {scanning ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5 mr-2 fill-current" />
+                  Run Scan Now
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {!isVisible && (
           <Button
-            onClick={runScan}
-            disabled={scanning}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="ml-auto flex text-muted-foreground hover:text-foreground h-7 px-3 shrink-0 gap-1.5"
           >
-            {scanning ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Scanning...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Run Scan Now
-              </>
-            )}
+            <Eye className="h-3.5 w-3.5" />
+            <span className="text-xs font-medium">Show</span>
+            <ChevronDown className="h-3 w-3 opacity-50" />
           </Button>
-        </div>
+        )}
       </div>
     </div>
   );
