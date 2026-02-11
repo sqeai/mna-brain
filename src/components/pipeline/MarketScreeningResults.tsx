@@ -144,7 +144,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     try {
       const { error } = await supabase
         .from('companies')
-        .update({ pipeline_stage: 'L0' })
+        .update({ pipeline_stage: 'L0', status: 'active' })
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
