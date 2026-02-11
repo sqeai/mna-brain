@@ -16,6 +16,8 @@ import {
   ArrowRight,
   HelpCircle,
 } from 'lucide-react';
+import PromoteDialog from '@/components/pipeline/PromoteDialog';
+import { DealStage } from '@/lib/types';
 
 interface Screening {
   id: string;
@@ -28,6 +30,7 @@ interface Screening {
   updated_at: string;
   company?: {
     target: string;
+    pipeline_stage: string;
   };
   criterias?: {
     name: string;
@@ -61,7 +64,8 @@ export default function ScreeningProgressPanel({
   const [screenings, setScreenings] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedPage, setCompletedPage] = useState(0);
-  const [movingCompanyId, setMovingCompanyId] = useState<string | null>(null);
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [promotingCompany, setPromotingCompany] = useState<{ id: string; name: string; stage?: string } | null>(null);
   const ITEMS_PER_PAGE = 5;
 
   const fetchScreenings = async () => {
@@ -78,19 +82,21 @@ export default function ScreeningProgressPanel({
           remarks,
           created_at,
           updated_at,
-          company:companies(target),
+          company:companies(target, pipeline_stage),
           criterias(name)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Transform the data to flatten nested objects
-      const transformed = (data || []).map((s: any) => ({
-        ...s,
-        company: s.company,
-        criterias: s.criterias,
-      }));
+      // Transform the data to flatten nested objects and filter for L0 only
+      const transformed = (data || [])
+        .map((s: any) => ({
+          ...s,
+          company: s.company,
+          criterias: s.criterias,
+        }))
+        .filter((s: any) => s.company?.pipeline_stage === 'L0');
 
       setScreenings(transformed);
     } catch (error) {
@@ -185,41 +191,9 @@ export default function ScreeningProgressPanel({
     return Array.from(grouped.values());
   };
 
-  const moveToL2 = async (companyId: string, companyName: string) => {
-    setMovingCompanyId(companyId);
-    try {
-      // Update the company's pipeline stage to L2
-      const { error: updateError } = await supabase
-        .from('companies')
-        .update({
-          pipeline_stage: 'L2',
-          l1_screening_result: 'Pass',
-        })
-        .eq('id', companyId);
-
-      if (updateError) throw updateError;
-
-      // Log the screening action
-      await supabase.from('company_logs').insert({
-        company_id: companyId,
-        action: 'PROMOTED_TO_L2',
-      });
-
-      // Delete the screening records for this company (they've been applied)
-      await supabase
-        .from('screenings')
-        .delete()
-        .eq('company_id', companyId);
-
-      toast.success(`${companyName} moved to L2`);
-      onScreeningComplete?.();
-      fetchScreenings();
-    } catch (error: any) {
-      console.error('Error moving company to L2:', error);
-      toast.error('Failed to move company to L2');
-    } finally {
-      setMovingCompanyId(null);
-    }
+  const handlePromoteClick = (companyId: string, companyName: string) => {
+    setPromotingCompany({ id: companyId, name: companyName, stage: 'L0' });
+    setPromoteDialogOpen(true);
   };
 
   const companySummaries = groupByCompany(screenings);
@@ -250,6 +224,18 @@ export default function ScreeningProgressPanel({
     return null;
   }
 
+  const handlePromoteSuccess = async () => {
+    if (!promotingCompany) return;
+
+    // We no longer delete screening data, just refresh the list.
+    // The list filters out non-L0 companies, so this company will disappear.
+    toast.success(`${promotingCompany.name} promoted to L1`);
+
+    setPromotingCompany(null);
+    onScreeningComplete?.();
+    fetchScreenings();
+  };
+
   return (
     <Card className="border-purple-200 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 dark:border-purple-800">
       <CardHeader className="pb-3">
@@ -265,7 +251,7 @@ export default function ScreeningProgressPanel({
           </div>
           {passedCount > 0 && (
             <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              {passedCount} ready for L2
+              {passedCount} ready for L1
             </Badge>
           )}
         </div>
@@ -315,17 +301,10 @@ export default function ScreeningProgressPanel({
                       size="sm"
                       variant="outline"
                       className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                      onClick={() => moveToL2(summary.company_id, summary.company_name)}
-                      disabled={movingCompanyId === summary.company_id}
+                      onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
                     >
-                      {movingCompanyId === summary.company_id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          <ArrowRight className="h-3 w-3 mr-1" />
-                          Promote to L2
-                        </>
-                      )}
+                      <ArrowRight className="h-3 w-3 mr-1" />
+                      Promote to L1
                     </Button>
                   </div>
                 </div>
@@ -383,17 +362,10 @@ export default function ScreeningProgressPanel({
                         size="sm"
                         variant="default"
                         className="bg-green-600 hover:bg-green-700"
-                        onClick={() => moveToL2(summary.company_id, summary.company_name)}
-                        disabled={movingCompanyId === summary.company_id}
+                        onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
                       >
-                        {movingCompanyId === summary.company_id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <>
-                            Move to L2
-                            <ArrowRight className="h-3 w-3 ml-1" />
-                          </>
-                        )}
+                        Move to L1
+                        <ArrowRight className="h-3 w-3 ml-1" />
                       </Button>
                     ) : (
                       <>
@@ -404,17 +376,10 @@ export default function ScreeningProgressPanel({
                           size="sm"
                           variant="outline"
                           className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                          onClick={() => moveToL2(summary.company_id, summary.company_name)}
-                          disabled={movingCompanyId === summary.company_id}
+                          onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
                         >
-                          {movingCompanyId === summary.company_id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <>
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              Promote to L2
-                            </>
-                          )}
+                          <ArrowRight className="h-3 w-3 mr-1" />
+                          Promote to L1
                         </Button>
                       </>
                     )}
@@ -450,6 +415,18 @@ export default function ScreeningProgressPanel({
           </div>
         )}
       </CardContent>
+
+      {promotingCompany && (
+        <PromoteDialog
+          open={promoteDialogOpen}
+          onOpenChange={setPromoteDialogOpen}
+          dealId={promotingCompany.id}
+          companyName={promotingCompany.name}
+          currentStage="L0"
+          nextStage="L1"
+          onSuccess={handlePromoteSuccess}
+        />
+      )}
     </Card>
   );
 }
