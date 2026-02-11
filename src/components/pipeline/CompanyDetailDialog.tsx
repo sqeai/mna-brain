@@ -121,6 +121,15 @@ interface DealDocument {
   created_at: string;
 }
 
+/** File from the "files" table (AI file dump) where matched_companies contains this company */
+interface MatchedFile {
+  id: string;
+  file_name: string;
+  file_link: string;
+  file_date: string | null;
+  created_at: string;
+}
+
 interface Screening {
   id: string;
   company_id: string;
@@ -192,6 +201,7 @@ export default function CompanyDetailDialog({
   const [notes, setNotes] = useState<DealNote[]>([]);
   const [links, setLinks] = useState<DealLink[]>([]);
   const [documents, setDocuments] = useState<DealDocument[]>([]);
+  const [matchedFiles, setMatchedFiles] = useState<MatchedFile[]>([]);
   const [screenings, setScreenings] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -205,8 +215,9 @@ export default function CompanyDetailDialog({
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Document preview
+  // Document preview (deal doc or matched file from files table)
   const [previewDoc, setPreviewDoc] = useState<DealDocument | null>(null);
+  const [previewMatchedFile, setPreviewMatchedFile] = useState<MatchedFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
@@ -224,7 +235,17 @@ export default function CompanyDetailDialog({
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      const [historyRes, notesRes, linksRes, docsRes, screeningsRes] = await Promise.all([
+      const companyId = company.id?.trim() || '';
+      const filesQuery = companyId
+        ? supabase
+            .from('files')
+            .select('id, file_name, file_link, file_date, created_at')
+            .or(`matched_companies.ilike.%${companyId}%`)
+            .order('created_at', { ascending: false })
+            .limit(100)
+        : null;
+
+      const [historyRes, notesRes, linksRes, docsRes, screeningsRes, filesRes] = await Promise.all([
         supabase
           .from('deal_stage_history')
           .select('*')
@@ -257,6 +278,7 @@ export default function CompanyDetailDialog({
           `)
           .eq('company_id', company.id)
           .order('created_at', { ascending: false }),
+        filesQuery ?? Promise.resolve({ data: [] }),
       ]);
 
       if (historyRes.data) setStageHistory(historyRes.data);
@@ -264,6 +286,8 @@ export default function CompanyDetailDialog({
       if (linksRes.data) setLinks(linksRes.data);
       if (docsRes.data) setDocuments(docsRes.data);
       if (screeningsRes.data) setScreenings(screeningsRes.data as Screening[]);
+      console.log(filesRes?.data)
+      if (filesRes?.data) setMatchedFiles(filesRes.data as MatchedFile[]);
     } catch (error) {
       console.error('Error fetching details:', error);
     } finally {
@@ -561,7 +585,46 @@ export default function CompanyDetailDialog({
 
   const handleClosePreview = () => {
     setPreviewDoc(null);
+    setPreviewMatchedFile(null);
     setPreviewUrl(null);
+  };
+
+  const downloadMatchedFile = async (file: MatchedFile) => {
+    try {
+      const res = await fetch(`/api/ai-file-dump/${encodeURIComponent(file.id)}/download-url`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get download URL');
+      }
+      const a = document.createElement('a');
+      a.href = data.url;
+      a.download = file.file_name;
+      a.rel = 'noopener noreferrer';
+      a.target = '_blank';
+      a.click();
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to download file');
+    }
+  };
+
+  const handleOpenMatchedFilePreview = async (file: MatchedFile) => {
+    setPreviewDoc(null);
+    setPreviewMatchedFile(file);
+    setLoadingPreview(true);
+    setPreviewUrl(null);
+    try {
+      const res = await fetch(`/api/ai-file-dump/${encodeURIComponent(file.id)}/download-url`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get preview URL');
+      }
+      setPreviewUrl(data.url);
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to load preview');
+      setPreviewMatchedFile(null);
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   return (
@@ -1186,22 +1249,54 @@ export default function CompanyDetailDialog({
                               {doc.file_name}
                             </button>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleOpenPreview(doc)}
-                              title="Preview"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteDocument(doc)} title="Delete">
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                          </div>
                         </div>
                       ))
+                    )}
+
+                    {matchedFiles.length > 0 && (
+                      <>
+                        <Label className="text-muted-foreground text-sm font-medium mt-6 block">
+                          Files mentioning this company (from AI file dump)
+                        </Label>
+                        <div className="space-y-2 mt-2">
+                          {matchedFiles.map((file) => (
+                            <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="text-sm truncate" title={file.file_name}>
+                                  {file.file_name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => downloadMatchedFile(file)}
+                                  title="Download"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenMatchedFilePreview(file)}
+                                  title="Preview"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => router.push(`/ai-file-dump?highlight=${encodeURIComponent(file.id)}`)}
+                                  title="Open in AI File Dump"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -1213,12 +1308,12 @@ export default function CompanyDetailDialog({
     </Dialog>
 
     {/* Document preview dialog */}
-    <Dialog open={!!previewDoc} onOpenChange={(open) => !open && handleClosePreview()}>
+    <Dialog open={!!(previewDoc || previewMatchedFile)} onOpenChange={(open) => !open && handleClosePreview()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            <span className="truncate">{previewDoc?.file_name}</span>
+            <span className="truncate">{previewDoc?.file_name ?? previewMatchedFile?.file_name ?? 'Preview'}</span>
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-auto">
@@ -1226,11 +1321,15 @@ export default function CompanyDetailDialog({
             <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : previewUrl && previewDoc ? (
+          ) : previewUrl && (previewDoc || previewMatchedFile) ? (
             <FilePreview
               url={previewUrl}
-              fileName={previewDoc.file_name}
-              onDownload={() => downloadDocument(previewDoc)}
+              fileName={previewDoc?.file_name ?? previewMatchedFile?.file_name ?? ''}
+              onDownload={() =>
+                previewMatchedFile
+                  ? downloadMatchedFile(previewMatchedFile)
+                  : previewDoc && downloadDocument(previewDoc)
+              }
             />
           ) : (
             <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
