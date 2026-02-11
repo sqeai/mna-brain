@@ -66,7 +66,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import FilePreview from '@/components/MeetingNotes/FilePreview';
 
-interface MeetingNote {
+interface FileRecord {
   id: string;
   file_name: string;
   raw_notes: string | null;
@@ -80,32 +80,398 @@ interface MeetingNote {
   updated_at: string;
 }
 
-interface Prospectus {
-  id: string;
-  file_name: string;
-  raw_notes: string | null;
-  structured_notes: string | null;
-  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
-  tags: string[];
-  matched_companies: any[];
-  signed_url?: string;
-  file_date: string | null;
-  created_at: string;
-  updated_at: string;
+// Keep these for backward compatibility
+type MeetingNote = FileRecord;
+type Prospectus = FileRecord;
+type OtherFile = FileRecord;
+
+// Reusable FileTable component props
+interface FileTableProps {
+  title: string;
+  files: FileRecord[];
+  filteredFiles: FileRecord[];
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  sortField: keyof FileRecord;
+  sortDirection: 'asc' | 'desc';
+  onSort: (field: keyof FileRecord) => void;
+  expandedTags: Record<string, boolean>;
+  toggleTags: (id: string) => void;
+  expandedCompanies: Record<string, boolean>;
+  toggleCompanies: (id: string) => void;
+  onUpdateDate: (id: string, date: Date | undefined) => void;
+  onDownload: (id: string, fileName: string) => Promise<void>;
+  onDelete: (id: string) => void;
+  downloadingId: string | null;
+  deletingId: string | null;
+  emptyMessage: string;
+  emptySubMessage: string;
 }
 
-interface OtherFile {
-  id: string;
-  file_name: string;
-  raw_notes: string | null;
-  structured_notes: string | null;
-  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
-  tags: string[];
-  matched_companies: any[];
-  signed_url?: string;
-  file_date: string | null;
-  created_at: string;
-  updated_at: string;
+function FileTable({
+  title,
+  files,
+  filteredFiles,
+  searchQuery,
+  onSearchChange,
+  sortField,
+  sortDirection,
+  onSort,
+  expandedTags,
+  toggleTags,
+  expandedCompanies,
+  toggleCompanies,
+  onUpdateDate,
+  onDownload,
+  onDelete,
+  downloadingId,
+  deletingId,
+  emptyMessage,
+  emptySubMessage,
+}: FileTableProps) {
+  const SortIcon = ({ field }: { field: keyof FileRecord }) => {
+    if (sortField !== field) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    return sortDirection === 'asc' ?
+      <ChevronUp className="h-3 w-3 ml-1 text-primary" /> :
+      <ChevronDown className="h-3 w-3 ml-1 text-primary" />;
+  };
+
+  const renderStatusBadge = (status: FileRecord['processing_status']) => {
+    switch (status) {
+      case 'processing':
+        return (
+          <Badge variant="outline" className="flex items-center gap-1 text-blue-500 bg-blue-500/5 border-blue-200">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Processing
+          </Badge>
+        );
+      case 'completed':
+        return (
+          <Badge variant="outline" className="flex items-center gap-1 text-green-600 bg-green-500/5 border-green-200">
+            <CheckCircle2 className="h-3 w-3" />
+            Completed
+          </Badge>
+        );
+      case 'failed':
+        return (
+          <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-500/5 border-red-200">
+            <AlertCircle className="h-3 w-3" />
+            Failed
+          </Badge>
+        );
+      case 'pending':
+      default:
+        return (
+          <Badge variant="outline" className="flex items-center gap-1 text-gray-500 bg-gray-500/5 border-gray-200">
+            Pending
+          </Badge>
+        );
+    }
+  };
+
+  const renderTags = (note: FileRecord) => (
+    <div className="flex flex-wrap gap-1">
+      {note.tags && note.tags.length > 0 ? (
+        <>
+          {(expandedTags[note.id] ? note.tags : note.tags.slice(0, 3)).map((tag, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 flex items-center gap-1">
+              <Tag className="h-2.5 w-2.5" />
+              {tag}
+            </Badge>
+          ))}
+          {note.tags.length > 3 && (
+            <Badge
+              variant="outline"
+              className="text-[10px] py-0 px-1.5 cursor-pointer hover:bg-muted"
+              onClick={() => toggleTags(note.id)}
+            >
+              {expandedTags[note.id] ? 'Show less' : `+${note.tags.length - 3} more`}
+            </Badge>
+          )}
+        </>
+      ) : (
+        <span className="text-muted-foreground text-xs">-</span>
+      )}
+    </div>
+  );
+
+  const renderCompanies = (note: FileRecord) => (
+    <div className="flex flex-col gap-1">
+      {note.matched_companies && note.matched_companies.length > 0 ? (
+        <>
+          {(expandedCompanies[note.id] ? note.matched_companies : note.matched_companies.slice(0, 2)).map((company, i) => (
+            <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Building className="h-3 w-3" />
+              <span className="truncate max-w-[150px]">{company.name}</span>
+            </div>
+          ))}
+          {note.matched_companies.length > 2 && (
+            <button
+              className="text-[10px] text-primary hover:underline text-left"
+              onClick={() => toggleCompanies(note.id)}
+            >
+              {expandedCompanies[note.id] ? 'Show less' : `+${note.matched_companies.length - 2} more`}
+            </button>
+          )}
+        </>
+      ) : (
+        <span className="text-muted-foreground text-xs">-</span>
+      )}
+    </div>
+  );
+
+  const renderStructuredNotes = (note: FileRecord) => {
+    if (!note.structured_notes) {
+      return (
+        <p className="text-sm text-muted-foreground italic p-4">
+          Processing not complete or structure extraction failed.
+        </p>
+      );
+    }
+
+    try {
+      const structured = JSON.parse(note.structured_notes);
+      return (
+        <>
+          <div>
+            <h4 className="font-medium text-primary mb-1">Summary</h4>
+            <p>{structured.summary}</p>
+          </div>
+          <div>
+            <h4 className="font-medium text-primary mb-1">Key Points</h4>
+            <ul className="list-disc pl-4 space-y-1">
+              {structured.key_points?.map((p: string, i: number) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-primary mb-1">Action Items</h4>
+            <ul className="list-disc pl-4 space-y-1">
+              {structured.action_items?.map((p: string, i: number) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        </>
+      );
+    } catch {
+      return <pre className="text-xs whitespace-pre-wrap">{note.structured_notes}</pre>;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {title} ({filteredFiles.length})
+          </CardTitle>
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search notes, tags, companies..."
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {files.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <p>{emptyMessage}</p>
+            <p className="text-sm">{emptySubMessage}</p>
+          </div>
+        ) : filteredFiles.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <p>No results found for &quot;{searchQuery}&quot;</p>
+            <Button variant="link" onClick={() => onSearchChange('')}>Clear search</Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead
+                    className="cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => onSort('file_name')}
+                  >
+                    <div className="flex items-center">
+                      File Name
+                      <SortIcon field="file_name" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => onSort('processing_status')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      <SortIcon field="processing_status" />
+                    </div>
+                  </TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead>Matched Companies</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-primary transition-colors text-right"
+                    onClick={() => onSort('file_date')}
+                  >
+                    <div className="flex items-center justify-end">
+                      Meeting Date & Actions
+                      <SortIcon field="file_date" />
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredFiles.map((note) => (
+                  <TableRow key={note.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        {note.file_name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{renderStatusBadge(note.processing_status)}</TableCell>
+                    <TableCell className="max-w-[200px]">{renderTags(note)}</TableCell>
+                    <TableCell>{renderCompanies(note)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className={cn(
+                                "h-8 w-auto justify-end text-right font-normal px-2",
+                                !note.file_date && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-3 w-3" />
+                              {note.file_date ? format(new Date(note.file_date), 'PPP') : (
+                                <span className="text-xs italic text-muted-foreground">Set meeting date</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                              mode="single"
+                              selected={note.file_date ? new Date(note.file_date) : undefined}
+                              onSelect={(date) => onUpdateDate(note.id, date)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+
+                        <div className="flex items-center justify-end gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="View details"
+                                className="h-8 w-8"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                              <DialogHeader>
+                                <DialogTitle>{note.file_name} - Details</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
+                                <div className="flex flex-col gap-2">
+                                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    File Preview
+                                  </h3>
+                                  {note.signed_url ? (
+                                    <FilePreview
+                                      url={note.signed_url}
+                                      onDownload={() => onDownload(note.id, note.file_name)}
+                                      fileName={note.file_name}
+                                    />
+                                  ) : (
+                                    <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
+                                      Preview not available (Link missing)
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                                    <Bot className="h-4 w-4" />
+                                    AI Structured Notes
+                                  </h3>
+                                  <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
+                                    <div className="space-y-4 text-sm">
+                                      {renderStructuredNotes(note)}
+                                    </div>
+                                  </ScrollArea>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onDownload(note.id, note.file_name)}
+                            disabled={downloadingId === note.id}
+                            title="Download file"
+                            className="h-8 w-8"
+                          >
+                            {downloadingId === note.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive h-8 w-8"
+                                disabled={deletingId === note.id}
+                              >
+                                {deletingId === note.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete File</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete &quot;{note.file_name}&quot;?
+                                  This will remove both the file from storage and the database record.
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => onDelete(note.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function AIFileDump() {
@@ -458,102 +824,42 @@ export default function AIFileDump() {
     }
   };
 
-  const filteredAndSortedNotes = meetingNotes
-    .filter((note) => {
-      const searchLower = searchQuery.toLowerCase();
-      const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
-      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-      const companiesMatch = note.matched_companies?.some(company =>
-        company.name.toLowerCase().includes(searchLower)
-      );
-      return fileNameMatch || tagsMatch || companiesMatch;
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+  // Reusable filter and sort function
+  const filterAndSortFiles = useCallback((files: FileRecord[]) => {
+    return files
+      .filter((note) => {
+        const searchLower = searchQuery.toLowerCase();
+        const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
+        const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+        const companiesMatch = note.matched_companies?.some(company =>
+          company.name.toLowerCase().includes(searchLower)
+        );
+        return fileNameMatch || tagsMatch || companiesMatch;
+      })
+      .sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
 
-      if (aValue === bValue) return 0;
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
+        if (aValue === bValue) return 0;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
 
-      let comparison = 0;
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        comparison = aValue.localeCompare(bValue);
-      } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
-        comparison = aValue.length - bValue.length;
-      } else {
-        comparison = aValue < bValue ? -1 : 1;
-      }
+        let comparison = 0;
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
+          comparison = aValue.length - bValue.length;
+        } else {
+          comparison = aValue < bValue ? -1 : 1;
+        }
 
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+  }, [searchQuery, sortField, sortDirection]);
 
-    const filteredAndSortedProspectus = prospectus
-    .filter((note) => {
-      const searchLower = searchQuery.toLowerCase();
-      const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
-      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-      const companiesMatch = note.matched_companies?.some(company =>
-        company.name.toLowerCase().includes(searchLower)
-      );
-      return fileNameMatch || tagsMatch || companiesMatch;
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-
-      if (aValue === bValue) return 0;
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-
-      let comparison = 0;
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        comparison = aValue.localeCompare(bValue);
-      } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
-        comparison = aValue.length - bValue.length;
-      } else {
-        comparison = aValue < bValue ? -1 : 1;
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    const filteredAndSortedOtherFiles = otherFiles
-    .filter((note) => {
-      const searchLower = searchQuery.toLowerCase();
-      const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
-      const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-      const companiesMatch = note.matched_companies?.some(company =>
-        company.name.toLowerCase().includes(searchLower)
-      );
-      return fileNameMatch || tagsMatch || companiesMatch;
-    })
-    .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-
-      if (aValue === bValue) return 0;
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-
-      let comparison = 0;
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        comparison = aValue.localeCompare(bValue);
-      } else if (Array.isArray(aValue) && Array.isArray(bValue)) {
-        comparison = aValue.length - bValue.length;
-      } else {
-        comparison = aValue < bValue ? -1 : 1;
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-  const SortIcon = ({ field }: { field: keyof MeetingNote }) => {
-    if (sortField !== field) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-50" />;
-    return sortDirection === 'asc' ?
-      <ChevronUp className="h-3 w-3 ml-1 text-primary" /> :
-      <ChevronDown className="h-3 w-3 ml-1 text-primary" />;
-  };
+  const filteredAndSortedNotes = filterAndSortFiles(meetingNotes);
+  const filteredAndSortedProspectus = filterAndSortFiles(prospectus);
+  const filteredAndSortedOtherFiles = filterAndSortFiles(otherFiles);
 
   if (loading) {
     return (
@@ -769,961 +1075,73 @@ export default function AIFileDump() {
         </Card>
 
         {/* MoM List */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                MoM ({filteredAndSortedNotes.length})
-              </CardTitle>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search notes, tags, companies..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {meetingNotes.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No meeting notes uploaded yet.</p>
-                <p className="text-sm">Upload your first meeting note using the form above.</p>
-              </div>
-            ) : filteredAndSortedNotes.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No results found for &quot;{searchQuery}&quot;</p>
-                <Button variant="link" onClick={() => setSearchQuery('')}>Clear search</Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('file_name')}
-                      >
-                        <div className="flex items-center">
-                          File Name
-                          <SortIcon field="file_name" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('processing_status')}
-                      >
-                        <div className="flex items-center">
-                          Status
-                          <SortIcon field="processing_status" />
-                        </div>
-                      </TableHead>
-                      <TableHead>Tags</TableHead>
-                      <TableHead>Matched Companies</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors text-right"
-                        onClick={() => handleSort('file_date')}
-                      >
-                        <div className="flex items-center justify-end">
-                          Meeting Date & Actions
-                          <SortIcon field="file_date" />
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAndSortedNotes.map((note) => (
-                      <TableRow key={note.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            {note.file_name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {note.processing_status === 'processing' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-blue-500 bg-blue-500/5 border-blue-200">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Processing
-                            </Badge>
-                          )}
-                          {note.processing_status === 'completed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-green-600 bg-green-500/5 border-green-200">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Completed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'failed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-500/5 border-red-200">
-                              <AlertCircle className="h-3 w-3" />
-                              Failed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'pending' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-gray-500 bg-gray-500/5 border-gray-200">
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[200px]">
-                          <div className="flex flex-wrap gap-1">
-                            {note.tags && note.tags.length > 0 ? (
-                              <>
-                                {(expandedTags[note.id] ? note.tags : note.tags.slice(0, 3)).map((tag, i) => (
-                                  <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 flex items-center gap-1">
-                                    <Tag className="h-2.5 w-2.5" />
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {note.tags.length > 3 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] py-0 px-1.5 cursor-pointer hover:bg-muted"
-                                    onClick={() => toggleTags(note.id)}
-                                  >
-                                    {expandedTags[note.id] ? 'Show less' : `+${note.tags.length - 3} more`}
-                                  </Badge>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {note.matched_companies && note.matched_companies.length > 0 ? (
-                              <>
-                                {(expandedCompanies[note.id] ? note.matched_companies : note.matched_companies.slice(0, 2)).map((company, i) => (
-                                  <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Building className="h-3 w-3" />
-                                    <span className="truncate max-w-[150px]">{company.name}</span>
-                                  </div>
-                                ))}
-                                {note.matched_companies.length > 2 && (
-                                  <button
-                                    className="text-[10px] text-primary hover:underline text-left"
-                                    onClick={() => toggleCompanies(note.id)}
-                                  >
-                                    {expandedCompanies[note.id] ? 'Show less' : `+${note.matched_companies.length - 2} more`}
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end gap-2">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className={cn(
-                                    "h-8 w-auto justify-end text-right font-normal px-2",
-                                    !note.file_date && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-3 w-3" />
-                                  {note.file_date ? format(new Date(note.file_date), 'PPP') : (
-                                    <span className="text-xs italic text-muted-foreground">Set meeting date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={note.file_date ? new Date(note.file_date) : undefined}
-                                  onSelect={(date) => handleUpdateDate(note.id, date)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-
-                            <div className="flex items-center justify-end gap-1">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title="View details"
-                                    className="h-8 w-8"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                  <DialogHeader>
-                                    <DialogTitle>{note.file_name} - Details</DialogTitle>
-                                  </DialogHeader>
-                                  <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        File Preview
-                                      </h3>
-                                      {note.signed_url ? (
-                                        <FilePreview
-                                          url={note.signed_url}
-                                          onDownload={() => handleDownload(note.id, note.file_name)}
-                                          fileName={note.file_name}
-                                        />
-                                      ) : (
-                                        <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
-                                          Preview not available (Link missing)
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <Bot className="h-4 w-4" />
-                                        AI Structured Notes
-                                      </h3>
-                                      <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
-                                        {note.structured_notes ? (
-                                          <div className="space-y-4 text-sm">
-                                            {(() => {
-                                              try {
-                                                const structured = JSON.parse(note.structured_notes);
-                                                return (
-                                                  <>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Summary</h4>
-                                                      <p>{structured.summary}</p>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Key Points</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.key_points?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Action Items</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.action_items?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                  </>
-                                                );
-                                              } catch (e) {
-                                                return <pre className="text-xs whitespace-pre-wrap">{note.structured_notes}</pre>;
-                                              }
-                                            })()}
-                                          </div>
-                                        ) : (
-                                          <p className="text-sm text-muted-foreground italic p-4">
-                                            Processing not complete or structure extraction failed.
-                                          </p>
-                                        )}
-                                      </ScrollArea>
-                                    </div>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDownload(note.id, note.file_name)}
-                                disabled={downloadingId === note.id}
-                                title="Download file"
-                                className="h-8 w-8"
-                              >
-                                {downloadingId === note.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Download className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive h-8 w-8"
-                                    disabled={deletingId === note.id}
-                                  >
-                                    {deletingId === note.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Meeting Note</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete &quot;{note.file_name}&quot;?
-                                      This will remove both the file from storage and the database record.
-                                      This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(note.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <FileTable
+          title="MoM"
+          files={meetingNotes}
+          filteredFiles={filteredAndSortedNotes}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          expandedTags={expandedTags}
+          toggleTags={toggleTags}
+          expandedCompanies={expandedCompanies}
+          toggleCompanies={toggleCompanies}
+          onUpdateDate={handleUpdateDate}
+          onDownload={handleDownload}
+          onDelete={handleDelete}
+          downloadingId={downloadingId}
+          deletingId={deletingId}
+          emptyMessage="No meeting notes uploaded yet."
+          emptySubMessage="Upload your first meeting note using the form above."
+        />
 
         {/* Prospectus List */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Prospectus ({filteredAndSortedProspectus.length})
-              </CardTitle>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search notes, tags, companies..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {prospectus.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No prospectus uploaded yet.</p>
-                <p className="text-sm">Upload your first prospectus using the form above.</p>
-              </div>
-            ) : filteredAndSortedProspectus.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No results found for &quot;{searchQuery}&quot;</p>
-                <Button variant="link" onClick={() => setSearchQuery('')}>Clear search</Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('file_name')}
-                      >
-                        <div className="flex items-center">
-                          File Name
-                          <SortIcon field="file_name" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('processing_status')}
-                      >
-                        <div className="flex items-center">
-                          Status
-                          <SortIcon field="processing_status" />
-                        </div>
-                      </TableHead>
-                      <TableHead>Tags</TableHead>
-                      <TableHead>Matched Companies</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors text-right"
-                        onClick={() => handleSort('file_date')}
-                      >
-                        <div className="flex items-center justify-end">
-                          Meeting Date & Actions
-                          <SortIcon field="file_date" />
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAndSortedProspectus.map((note) => (
-                      <TableRow key={note.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            {note.file_name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {note.processing_status === 'processing' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-blue-500 bg-blue-500/5 border-blue-200">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Processing
-                            </Badge>
-                          )}
-                          {note.processing_status === 'completed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-green-600 bg-green-500/5 border-green-200">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Completed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'failed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-500/5 border-red-200">
-                              <AlertCircle className="h-3 w-3" />
-                              Failed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'pending' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-gray-500 bg-gray-500/5 border-gray-200">
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[200px]">
-                          <div className="flex flex-wrap gap-1">
-                            {note.tags && note.tags.length > 0 ? (
-                              <>
-                                {(expandedTags[note.id] ? note.tags : note.tags.slice(0, 3)).map((tag, i) => (
-                                  <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 flex items-center gap-1">
-                                    <Tag className="h-2.5 w-2.5" />
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {note.tags.length > 3 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] py-0 px-1.5 cursor-pointer hover:bg-muted"
-                                    onClick={() => toggleTags(note.id)}
-                                  >
-                                    {expandedTags[note.id] ? 'Show less' : `+${note.tags.length - 3} more`}
-                                  </Badge>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {note.matched_companies && note.matched_companies.length > 0 ? (
-                              <>
-                                {(expandedCompanies[note.id] ? note.matched_companies : note.matched_companies.slice(0, 2)).map((company, i) => (
-                                  <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Building className="h-3 w-3" />
-                                    <span className="truncate max-w-[150px]">{company.name}</span>
-                                  </div>
-                                ))}
-                                {note.matched_companies.length > 2 && (
-                                  <button
-                                    className="text-[10px] text-primary hover:underline text-left"
-                                    onClick={() => toggleCompanies(note.id)}
-                                  >
-                                    {expandedCompanies[note.id] ? 'Show less' : `+${note.matched_companies.length - 2} more`}
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end gap-2">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className={cn(
-                                    "h-8 w-auto justify-end text-right font-normal px-2",
-                                    !note.file_date && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-3 w-3" />
-                                  {note.file_date ? format(new Date(note.file_date), 'PPP') : (
-                                    <span className="text-xs italic text-muted-foreground">Set meeting date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={note.file_date ? new Date(note.file_date) : undefined}
-                                  onSelect={(date) => handleUpdateDate(note.id, date)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-
-                            <div className="flex items-center justify-end gap-1">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title="View details"
-                                    className="h-8 w-8"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                  <DialogHeader>
-                                    <DialogTitle>{note.file_name} - Details</DialogTitle>
-                                  </DialogHeader>
-                                  <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        File Preview
-                                      </h3>
-                                      {note.signed_url ? (
-                                        <FilePreview
-                                          url={note.signed_url}
-                                          onDownload={() => handleDownload(note.id, note.file_name)}
-                                          fileName={note.file_name}
-                                        />
-                                      ) : (
-                                        <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
-                                          Preview not available (Link missing)
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <Bot className="h-4 w-4" />
-                                        AI Structured Notes
-                                      </h3>
-                                      <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
-                                        {note.structured_notes ? (
-                                          <div className="space-y-4 text-sm">
-                                            {(() => {
-                                              try {
-                                                const structured = JSON.parse(note.structured_notes);
-                                                return (
-                                                  <>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Summary</h4>
-                                                      <p>{structured.summary}</p>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Key Points</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.key_points?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Action Items</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.action_items?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                  </>
-                                                );
-                                              } catch (e) {
-                                                return <pre className="text-xs whitespace-pre-wrap">{note.structured_notes}</pre>;
-                                              }
-                                            })()}
-                                          </div>
-                                        ) : (
-                                          <p className="text-sm text-muted-foreground italic p-4">
-                                            Processing not complete or structure extraction failed.
-                                          </p>
-                                        )}
-                                      </ScrollArea>
-                                    </div>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDownload(note.id, note.file_name)}
-                                disabled={downloadingId === note.id}
-                                title="Download file"
-                                className="h-8 w-8"
-                              >
-                                {downloadingId === note.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Download className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive h-8 w-8"
-                                    disabled={deletingId === note.id}
-                                  >
-                                    {deletingId === note.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Meeting Note</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete &quot;{note.file_name}&quot;?
-                                      This will remove both the file from storage and the database record.
-                                      This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(note.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <FileTable
+          title="Prospectus"
+          files={prospectus}
+          filteredFiles={filteredAndSortedProspectus}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          expandedTags={expandedTags}
+          toggleTags={toggleTags}
+          expandedCompanies={expandedCompanies}
+          toggleCompanies={toggleCompanies}
+          onUpdateDate={handleUpdateDate}
+          onDownload={handleDownload}
+          onDelete={handleDelete}
+          downloadingId={downloadingId}
+          deletingId={deletingId}
+          emptyMessage="No prospectus uploaded yet."
+          emptySubMessage="Upload your first prospectus using the form above."
+        />
 
         {/* Other List */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Other ({filteredAndSortedOtherFiles.length})
-              </CardTitle>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search notes, tags, companies..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {otherFiles.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No other files uploaded yet.</p>
-                <p className="text-sm">Upload your files using the form above.</p>
-              </div>
-            ) : filteredAndSortedOtherFiles.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Search className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No results found for &quot;{searchQuery}&quot;</p>
-                <Button variant="link" onClick={() => setSearchQuery('')}>Clear search</Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('file_name')}
-                      >
-                        <div className="flex items-center">
-                          File Name
-                          <SortIcon field="file_name" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleSort('processing_status')}
-                      >
-                        <div className="flex items-center">
-                          Status
-                          <SortIcon field="processing_status" />
-                        </div>
-                      </TableHead>
-                      <TableHead>Tags</TableHead>
-                      <TableHead>Matched Companies</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:text-primary transition-colors text-right"
-                        onClick={() => handleSort('file_date')}
-                      >
-                        <div className="flex items-center justify-end">
-                          Meeting Date & Actions
-                          <SortIcon field="file_date" />
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAndSortedOtherFiles.map((note) => (
-                      <TableRow key={note.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            {note.file_name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {note.processing_status === 'processing' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-blue-500 bg-blue-500/5 border-blue-200">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Processing
-                            </Badge>
-                          )}
-                          {note.processing_status === 'completed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-green-600 bg-green-500/5 border-green-200">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Completed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'failed' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-500/5 border-red-200">
-                              <AlertCircle className="h-3 w-3" />
-                              Failed
-                            </Badge>
-                          )}
-                          {note.processing_status === 'pending' && (
-                            <Badge variant="outline" className="flex items-center gap-1 text-gray-500 bg-gray-500/5 border-gray-200">
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[200px]">
-                          <div className="flex flex-wrap gap-1">
-                            {note.tags && note.tags.length > 0 ? (
-                              <>
-                                {(expandedTags[note.id] ? note.tags : note.tags.slice(0, 3)).map((tag, i) => (
-                                  <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 flex items-center gap-1">
-                                    <Tag className="h-2.5 w-2.5" />
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {note.tags.length > 3 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] py-0 px-1.5 cursor-pointer hover:bg-muted"
-                                    onClick={() => toggleTags(note.id)}
-                                  >
-                                    {expandedTags[note.id] ? 'Show less' : `+${note.tags.length - 3} more`}
-                                  </Badge>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {note.matched_companies && note.matched_companies.length > 0 ? (
-                              <>
-                                {(expandedCompanies[note.id] ? note.matched_companies : note.matched_companies.slice(0, 2)).map((company, i) => (
-                                  <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Building className="h-3 w-3" />
-                                    <span className="truncate max-w-[150px]">{company.name}</span>
-                                  </div>
-                                ))}
-                                {note.matched_companies.length > 2 && (
-                                  <button
-                                    className="text-[10px] text-primary hover:underline text-left"
-                                    onClick={() => toggleCompanies(note.id)}
-                                  >
-                                    {expandedCompanies[note.id] ? 'Show less' : `+${note.matched_companies.length - 2} more`}
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end gap-2">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className={cn(
-                                    "h-8 w-auto justify-end text-right font-normal px-2",
-                                    !note.file_date && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-3 w-3" />
-                                  {note.file_date ? format(new Date(note.file_date), 'PPP') : (
-                                    <span className="text-xs italic text-muted-foreground">Set meeting date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={note.file_date ? new Date(note.file_date) : undefined}
-                                  onSelect={(date) => handleUpdateDate(note.id, date)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-
-                            <div className="flex items-center justify-end gap-1">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title="View details"
-                                    className="h-8 w-8"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                  <DialogHeader>
-                                    <DialogTitle>{note.file_name} - Details</DialogTitle>
-                                  </DialogHeader>
-                                  <div className="grid md:grid-cols-2 gap-6 mt-4 overflow-hidden">
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        File Preview
-                                      </h3>
-                                      {note.signed_url ? (
-                                        <FilePreview
-                                          url={note.signed_url}
-                                          onDownload={() => handleDownload(note.id, note.file_name)}
-                                          fileName={note.file_name}
-                                        />
-                                      ) : (
-                                        <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
-                                          Preview not available (Link missing)
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <Bot className="h-4 w-4" />
-                                        AI Structured Notes
-                                      </h3>
-                                      <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-muted/30">
-                                        {note.structured_notes ? (
-                                          <div className="space-y-4 text-sm">
-                                            {(() => {
-                                              try {
-                                                const structured = JSON.parse(note.structured_notes);
-                                                return (
-                                                  <>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Summary</h4>
-                                                      <p>{structured.summary}</p>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Key Points</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.key_points?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                    <div>
-                                                      <h4 className="font-medium text-primary mb-1">Action Items</h4>
-                                                      <ul className="list-disc pl-4 space-y-1">
-                                                        {structured.action_items?.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                                                      </ul>
-                                                    </div>
-                                                  </>
-                                                );
-                                              } catch (e) {
-                                                return <pre className="text-xs whitespace-pre-wrap">{note.structured_notes}</pre>;
-                                              }
-                                            })()}
-                                          </div>
-                                        ) : (
-                                          <p className="text-sm text-muted-foreground italic p-4">
-                                            Processing not complete or structure extraction failed.
-                                          </p>
-                                        )}
-                                      </ScrollArea>
-                                    </div>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDownload(note.id, note.file_name)}
-                                disabled={downloadingId === note.id}
-                                title="Download file"
-                                className="h-8 w-8"
-                              >
-                                {downloadingId === note.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Download className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive h-8 w-8"
-                                    disabled={deletingId === note.id}
-                                  >
-                                    {deletingId === note.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Meeting Note</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete &quot;{note.file_name}&quot;?
-                                      This will remove both the file from storage and the database record.
-                                      This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(note.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <FileTable
+          title="Other"
+          files={otherFiles}
+          filteredFiles={filteredAndSortedOtherFiles}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          expandedTags={expandedTags}
+          toggleTags={toggleTags}
+          expandedCompanies={expandedCompanies}
+          toggleCompanies={toggleCompanies}
+          onUpdateDate={handleUpdateDate}
+          onDownload={handleDownload}
+          onDelete={handleDelete}
+          downloadingId={downloadingId}
+          deletingId={deletingId}
+          emptyMessage="No other files uploaded yet."
+          emptySubMessage="Upload your files using the form above."
+        />
         </div>
     </DashboardLayout >
   );
