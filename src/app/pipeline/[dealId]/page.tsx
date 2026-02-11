@@ -32,8 +32,17 @@ import {
   Briefcase,
   Globe,
   Sparkles,
+  Download,
+  Eye,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { CompanyAnalysisSection } from '@/components/pipeline/CompanyAnalysisSection';
+import FilePreview from '@/components/MeetingNotes/FilePreview';
 import { FinancialCharts } from '@/components/pipeline/FinancialCharts';
 import { DealStage } from '@/lib/types';
 import { STAGE_LABELS } from '@/lib/constants';
@@ -161,6 +170,10 @@ export default function CompanyDetailPage() {
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [previewDoc, setPreviewDoc] = useState<DealDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   useEffect(() => {
     if (companyId) {
@@ -487,6 +500,32 @@ export default function CompanyDetailPage() {
     } catch (error) {
       toast.error((error as Error)?.message || 'Failed to download document');
     }
+  };
+
+  const handleOpenPreview = async (doc: DealDocument) => {
+    setPreviewDoc(doc);
+    setLoadingPreview(true);
+    setPreviewUrl(null);
+    try {
+      const res = await fetch(
+        `/api/deal-documents/download-url?id=${encodeURIComponent(doc.id)}&preview=true`
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get preview URL');
+      }
+      setPreviewUrl(data.url);
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to load preview');
+      setPreviewDoc(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewDoc(null);
+    setPreviewUrl(null);
   };
 
   const getL1StatusIcon = (value: string | null) => {
@@ -1003,16 +1042,33 @@ export default function CompanyDetailPage() {
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
                     {documents.map((doc) => (
                       <div key={doc.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                        <button
-                          onClick={() => downloadDocument(doc)}
-                          className="flex items-center gap-2 text-primary hover:underline text-sm truncate flex-1 text-left"
-                        >
-                          <FileText className="h-4 w-4 shrink-0" />
-                          {doc.file_name}
-                        </button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteDocument(doc)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="text-sm truncate" title={doc.file_name}>
+                            {doc.file_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => downloadDocument(doc)}
+                            title="Download"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenPreview(doc)}
+                            title="Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => deleteDocument(doc)} title="Delete">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {documents.length === 0 && <p className="text-muted-foreground text-sm">No documents yet</p>}
@@ -1023,6 +1079,35 @@ export default function CompanyDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Document preview dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && handleClosePreview()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              <span className="truncate">{previewDoc?.file_name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto">
+            {loadingPreview ? (
+              <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : previewUrl && previewDoc ? (
+              <FilePreview
+                url={previewUrl}
+                fileName={previewDoc.file_name}
+                onDownload={() => downloadDocument(previewDoc)}
+              />
+            ) : (
+              <div className="flex h-[400px] w-full items-center justify-center bg-muted/30 rounded-md border text-muted-foreground">
+                Preview not available
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
