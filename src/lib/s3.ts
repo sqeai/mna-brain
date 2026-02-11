@@ -3,10 +3,10 @@ import { Readable } from 'stream';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // S3 Configuration
-const AWS_REGION = process.env.AWS_REGION || 'ap-southeast-1';
+const AWS_REGION = process.env.AWS_REGION || 'ap-southeast-3';
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
-const S3_BUCKET = process.env.AWS_S3_BUCKET || 'mna-meeting-notes';
+const S3_BUCKET = process.env.AWS_S3_BUCKET || 'mna-files';
 
 // Create S3 client
 function createS3Client(): S3Client {
@@ -144,4 +144,17 @@ export function generateMeetingNoteKey(fileName: string): string {
   // Sanitize file name and create key
   const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
   return `meeting-notes/${uuid}_${timestamp}_${sanitizedFileName}`;
+}
+
+/**
+ * Generate a unique S3 key for a deal document
+ * @param dealId - The deal (company) id
+ * @param fileName - The original file name
+ * @returns A unique S3 key under deal-documents/{dealId}/...
+ */
+export function generateDealDocumentKey(dealId: string, fileName: string): string {
+  const timestamp = Date.now();
+  const uuid = crypto.randomUUID();
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `deal-documents/${dealId}/${uuid}_${timestamp}_${sanitizedFileName}`;
 }

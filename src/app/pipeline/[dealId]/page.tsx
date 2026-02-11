@@ -359,26 +359,73 @@ export default function CompanyDetailPage() {
 
     setIsSubmitting(true);
     try {
-      const filePath = `${company.id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('deal-documents')
-        .upload(filePath, file);
+      const contentType = file.type || 'application/octet-stream';
 
-      if (uploadError) throw uploadError;
+      let uploadUrlRes: Response;
+      try {
+        uploadUrlRes = await fetch(
+          `/api/deal-documents/upload-url?dealId=${encodeURIComponent(company.id)}&fileName=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`
+        );
+      } catch (netErr) {
+        throw new Error('Could not reach server. Check your connection and that the app is running.');
+      }
+      const uploadUrlText = await uploadUrlRes.text();
+      let uploadUrlData: { success?: boolean; error?: string; data?: { uploadUrl: string; key: string } };
+      try {
+        uploadUrlData = JSON.parse(uploadUrlText);
+      } catch {
+        throw new Error(uploadUrlRes.ok ? 'Invalid server response' : `Get upload URL failed: ${uploadUrlRes.status}`);
+      }
+      if (!uploadUrlData.success || !uploadUrlData.data) {
+        throw new Error(uploadUrlData.error || 'Failed to get upload URL');
+      }
+      const { uploadUrl, key } = uploadUrlData.data;
 
-      const { error: dbError } = await supabase.from('deal_documents').insert({
-        deal_id: company.id,
-        file_name: file.name,
-        file_path: filePath,
-        file_size: file.size,
-        mime_type: file.type,
-        stage: company.pipeline_stage || 'L0',
-      });
+      let s3Res: Response;
+      try {
+        s3Res = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': contentType },
+        });
+      } catch (netErr) {
+        throw new Error(
+          'Upload to storage failed (network error). Ensure AWS_S3_BUCKET matches your bucket and the bucket has CORS enabled for this origin.'
+        );
+      }
+      if (!s3Res.ok) throw new Error('Failed to upload file to storage');
 
-      if (dbError) throw dbError;
+      let registerRes: Response;
+      try {
+        registerRes = await fetch('/api/deal-documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dealId: company.id,
+            key,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type || null,
+            stage: company.pipeline_stage || 'L0',
+          }),
+        });
+      } catch (netErr) {
+        throw new Error('Could not register document. Check your connection.');
+      }
+      const registerText = await registerRes.text();
+      let registerData: { success?: boolean; error?: string };
+      try {
+        registerData = registerText ? JSON.parse(registerText) : {};
+      } catch {
+        throw new Error(registerRes.ok ? 'Invalid server response' : `Register failed: ${registerRes.status}`);
+      }
+      if (!registerData.success) {
+        throw new Error(registerData.error || 'Failed to register document');
+      }
 
       await fetchDetails();
       toast.success('Document uploaded');
+      e.target.value = '';
     } catch (error: unknown) {
       console.error('Upload error:', error);
       toast.error((error as Error)?.message || 'Failed to upload document');
@@ -409,30 +456,36 @@ export default function CompanyDetailPage() {
 
   const deleteDocument = async (doc: DealDocument) => {
     try {
-      await supabase.storage.from('deal-documents').remove([doc.file_path]);
-      await supabase.from('deal_documents').delete().eq('id', doc.id);
+      const res = await fetch(`/api/deal-documents?id=${encodeURIComponent(doc.id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to delete document');
+      }
       fetchDetails();
       toast.success('Document deleted');
     } catch (error) {
-      toast.error('Failed to delete document');
+      toast.error((error as Error)?.message || 'Failed to delete document');
     }
   };
 
   const downloadDocument = async (doc: DealDocument) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('deal-documents')
-        .download(doc.file_path);
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
+      const res = await fetch(`/api/deal-documents/download-url?id=${encodeURIComponent(doc.id)}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to get download URL');
+      }
+      const url = data.url;
       const a = document.createElement('a');
       a.href = url;
       a.download = doc.file_name;
+      a.rel = 'noopener noreferrer';
+      a.target = '_blank';
       a.click();
-      URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Failed to download document');
+      toast.error((error as Error)?.message || 'Failed to download document');
     }
   };
 
