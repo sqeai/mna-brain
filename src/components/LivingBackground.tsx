@@ -270,12 +270,12 @@ export function LivingBackground({ variant = 'default' }: LivingBackgroundProps)
           opacity: isGridVariant ? 0 : undefined,
         }}
       />
-      {/* Base gradient - dark (deep blue/teal; grid variant = circuit-board teal with subtle purple) */}
+      {/* Base gradient - dark (lighter purple for grid; deep blue/teal for non-grid) */}
       <div
         className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-300"
         style={{
           background: isGridVariant
-            ? 'linear-gradient(160deg, #0f0d18 0%, #14122e 35%, #1d1a3d 65%, #120f24 100%)'
+            ? 'linear-gradient(160deg, #1e1c2e 0%, #2a2748 35%, #3d3865 65%, #25223a 100%)'
             : 'linear-gradient(160deg, #0F1A28 0%, #1E2A3B 35%, #2A4B7D 65%, #1E2A3B 100%)',
           opacity: isGridVariant ? 1 : undefined,
         }}
