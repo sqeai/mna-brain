@@ -624,8 +624,8 @@ export default function CompanyDetailDialog({
           </div>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
-            {/* AI Market Scanning Remarks */}
-            {company.remarks && (
+            {/* AI Market Scanning Remarks - only for outbound deals */}
+            {company.remarks && company.source?.toLowerCase() === 'outbound' && (
               <Card className="border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-violet-50/30 dark:from-purple-950/20 dark:to-violet-950/10">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
