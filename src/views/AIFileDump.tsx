@@ -55,6 +55,7 @@ import {
   ChevronUp,
   Download,
   Eye,
+  File,
   FileSpreadsheet,
   FileText,
   FileUp,
@@ -94,6 +95,8 @@ type OtherFile = FileRecord;
 // Reusable FileTable component props
 interface FileTableProps {
   title: string;
+  icon: React.ReactNode;
+  iconColor: string;
   files: FileRecord[];
   filteredFiles: FileRecord[];
   searchQuery: string;
@@ -119,6 +122,8 @@ interface FileTableProps {
 
 function FileTable({
   title,
+  icon,
+  iconColor,
   files,
   filteredFiles,
   searchQuery,
@@ -278,7 +283,7 @@ function FileTable({
       <CardHeader>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+            <span className={iconColor}>{icon}</span>
             {title} ({filteredFiles.length})
           </CardTitle>
           <div className="relative w-full md:w-64">
@@ -295,7 +300,9 @@ function FileTable({
       <CardContent>
         {files.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <div className={cn("mx-auto h-12 w-12 mb-4 opacity-50 flex items-center justify-center", iconColor)}>
+              {icon}
+            </div>
             <p>{emptyMessage}</p>
             <p className="text-sm">{emptySubMessage}</p>
           </div>
@@ -1224,6 +1231,8 @@ export default function AIFileDump() {
         {/* MoM List */}
         <FileTable
           title="MoM"
+          icon={<FileText className="h-5 w-5" />}
+          iconColor="text-teal-500"
           files={meetingNotes}
           filteredFiles={filteredAndSortedNotes}
           searchQuery={momSearchQuery}
@@ -1249,6 +1258,8 @@ export default function AIFileDump() {
         {/* Prospectus List */}
         <FileTable
           title="Prospectus"
+          icon={<FileSpreadsheet className="h-5 w-5" />}
+          iconColor="text-teal-500"
           files={prospectus}
           filteredFiles={filteredAndSortedProspectus}
           searchQuery={prospectusSearchQuery}
@@ -1274,6 +1285,8 @@ export default function AIFileDump() {
         {/* Other List */}
         <FileTable
           title="Other"
+          icon={<File className="h-5 w-5" />}
+          iconColor=""
           files={otherFiles}
           filteredFiles={filteredAndSortedOtherFiles}
           searchQuery={otherFilesSearchQuery}
