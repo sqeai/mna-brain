@@ -576,8 +576,9 @@ export default function Pipeline() {
                             </div>
                           </CardHeader>
                           <CardContent>
+
                             {/* Header with Select All */}
-                            <div className="flex items-center mb-4">
+                            <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   checked={isAllSelected()}
@@ -588,6 +589,13 @@ export default function Pipeline() {
                                   Select All
                                 </label>
                               </div>
+                              <Button
+                                onClick={openAIScreening}
+                                className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
+                              >
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                AI Screening ({selectedIds.size} selected)
+                              </Button>
                             </div>
 
                             {/* Filters */}
@@ -790,10 +798,25 @@ export default function Pipeline() {
                         </Card>
                       </CollapsibleSection>
 
+                      <CollapsibleSection title="Screening Progress">
+                        <ScreeningProgressPanel
+                          refreshTrigger={screeningProgressRefresh}
+                          onScreeningComplete={() => {
+                            fetchCompanies();
+                          }}
+                          onCompanyClick={(companyId) => {
+                            const company = companies.find((c) => c.id === companyId);
+                            if (company) {
+                              setSelectedCompany(company);
+                            }
+                          }}
+                        />
+                      </CollapsibleSection>
+
                     </div>
                   ) : (
                     <>
-                      {/* Header with Select All and AI Screening for L1 */}
+                      {/* Header with Select All for L1 */}
                       {stage === 'L1' && (
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
@@ -806,13 +829,6 @@ export default function Pipeline() {
                               Select All
                             </label>
                           </div>
-                          <Button
-                            onClick={openAIScreening}
-                            className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
-                          >
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            AI Screening ({selectedIds.size} selected)
-                          </Button>
                         </div>
                       )}
 
@@ -1071,23 +1087,8 @@ export default function Pipeline() {
                 </CardContent>
               </Card>
 
-              {/* AI Screening Progress Panel for L1 */}
-              {stage === 'L1' && (
-                <CollapsibleSection title="Screening Progress">
-                  <ScreeningProgressPanel
-                    refreshTrigger={screeningProgressRefresh}
-                    onScreeningComplete={() => {
-                      fetchCompanies();
-                    }}
-                    onCompanyClick={(companyId) => {
-                      const company = companies.find((c) => c.id === companyId);
-                      if (company) {
-                        setSelectedCompany(company);
-                      }
-                    }}
-                  />
-                </CollapsibleSection>
-              )}
+
+
             </TabsContent>
           ))}
         </Tabs>
