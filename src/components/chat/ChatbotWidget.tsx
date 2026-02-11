@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Bot, Send, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Bot, Send, X, Maximize2, Minimize2, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 
@@ -104,20 +105,33 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
     router.push('/ai-discovery');
   };
 
-  if (!isOpen) {
-    return (
-      <Button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 z-50"
-        size="icon"
-      >
-        <Bot className="h-6 w-6" />
-      </Button>
-    );
-  }
-
   return (
     <>
+      {/* Floating Action Button */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            className="fixed bottom-6 right-6 z-50"
+          >
+            {/* Pulse rings */}
+            <span className="absolute inset-0 rounded-full bg-accent/30 animate-ping" />
+            <span className="absolute -inset-1 rounded-full bg-accent/20 animate-pulse" />
+            <Button
+              onClick={() => setIsOpen(true)}
+              className="relative h-14 w-14 rounded-full shadow-xl bg-gradient-to-br from-accent to-purple-700 hover:from-purple-700 hover:to-accent border-2 border-white/20 transition-all duration-300 hover:scale-110 hover:shadow-accent/40 hover:shadow-2xl"
+              size="icon"
+            >
+              <Sparkles className="h-6 w-6 text-white drop-shadow-lg" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {isOpen && (
       <Card
         className={cn(
           'fixed bottom-6 right-6 z-50 shadow-2xl border-purple-200 dark:border-purple-800/50 overflow-hidden transition-all duration-200',
@@ -259,6 +273,7 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
           </>
         )}
       </Card>
+      )}
     </>
   );
 }

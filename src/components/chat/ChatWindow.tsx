@@ -6,9 +6,10 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
-import { ArrowDown, LoaderCircle, Trash2 } from "lucide-react";
+import { ArrowDown, LoaderCircle, Trash2, Send, Lightbulb } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChatMessageBubble, LoadingBubble } from "./ChatMessageBubble";
 
@@ -51,7 +52,7 @@ function ChatMessages(props: {
   onClearHistory?: () => void;
 }) {
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       {/* Clear History Button - Sticky */}
       {props.messages.length > 0 && props.onClearHistory && (
         <div className="sticky top-2 z-20 flex justify-end pb-2 pr-2">
@@ -66,7 +67,7 @@ function ChatMessages(props: {
           </Button>
         </div>
       )}
-      <div className="flex flex-col max-w-[768px] mx-auto pb-12 w-full">
+      <div className="flex flex-col min-w-0 max-w-[768px] mx-auto pb-12 w-full">
         <WelcomeMessage />
         {props.messages.map((message) => (
           <ChatMessageBubble key={message.id} message={message} aiEmoji={props.aiEmoji} />
@@ -77,42 +78,67 @@ function ChatMessages(props: {
   );
 }
 
+const SUGGESTION_CHIPS = [
+  "semiconductor companies",
+  "analyze ChipTech",
+  "pipeline performance",
+];
+
+const CHAT_INPUT_PLACEHOLDER =
+  "Ask about companies, analysis, comparisons, or pipeline performance...";
+
 export function ChatInput(props: {
   onSubmit: () => void;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   loading?: boolean;
   placeholder?: string;
+  suggestionChips?: string[];
+  onChipClick?: (chip: string) => void;
   className?: string;
 }) {
+  const chips = props.suggestionChips ?? SUGGESTION_CHIPS;
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         props.onSubmit();
       }}
-      className={cn("flex w-full flex-col", props.className)}
+      className={cn("w-full space-y-3", props.className)}
     >
-      <div className="border border-input bg-secondary rounded-lg flex flex-col gap-2 max-w-[768px] w-full mx-auto shadow-sm focus-within:ring-1 focus-within:ring-ring">
-        <input
+      <div className="flex gap-2">
+        <Input
           value={props.value}
-          placeholder={props.placeholder}
           onChange={props.onChange}
-          className="border-none outline-none bg-transparent p-4 text-sm placeholder:text-muted-foreground"
+          placeholder={props.placeholder ?? CHAT_INPUT_PLACEHOLDER}
+          className="flex-1"
+          disabled={props.loading}
         />
-
-        <div className="flex justify-end mr-2 mb-2">
-          <Button type="submit" className="self-end h-8 px-4" size="sm" disabled={props.loading}>
-            {props.loading ? (
-              <span role="status" className="flex justify-center items-center gap-2">
-                <LoaderCircle className="animate-spin w-4 h-4" />
-                <span className="sr-only">Loading...</span>
-              </span>
-            ) : (
-              <span>Send</span>
-            )}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          disabled={!props.value.trim() || props.loading}
+          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 shrink-0"
+        >
+          {props.loading ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+        <span>Try:</span>
+        {chips.map((chip, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => props.onChipClick?.(chip)}
+            className="text-primary hover:underline"
+          >
+            &quot;{chip}&quot;{i < chips.length - 1 ? "," : ""}
+          </button>
+        ))}
       </div>
     </form>
   );
@@ -158,18 +184,34 @@ function StickyToBottomContent(props: {
   );
 }
 
-export function ChatLayout(props: { content: ReactNode; footer: ReactNode }) {
+export function ChatLayout(props: {
+  content: ReactNode;
+  footer: ReactNode;
+  contentClassName?: string;
+  footerClassName?: string;
+}) {
+  const footerContent = (
+    <>
+      <ScrollToBottom className="absolute -top-10 left-1/2 -translate-x-1/2 mb-4" />
+      {props.footer}
+    </>
+  );
   return (
     <StickToBottom>
       <StickyToBottomContent
         className="absolute inset-0"
-        contentClassName="py-8 px-2"
+        contentClassName={cn("py-8 px-4 sm:px-6", props.contentClassName)}
         content={props.content}
         footer={
-          <div className="sticky bottom-0 px-2 pb-4 bg-gradient-to-t from-background via-background to-transparent pt-4">
-            <ScrollToBottom className="absolute -top-10 left-1/2 -translate-x-1/2 mb-4" />
-            {props.footer}
-          </div>
+          props.footerClassName ? (
+            <div className={cn("sticky bottom-0 flex-shrink-0", props.footerClassName)}>
+              {footerContent}
+            </div>
+          ) : (
+            <div className="sticky bottom-0 px-2 pb-4 pt-4 bg-gradient-to-t from-background via-background to-transparent">
+              {footerContent}
+            </div>
+          )
         }
       />
     </StickToBottom>
@@ -205,6 +247,8 @@ export function ChatWindow(props: {
   emptyStateComponent: ReactNode;
   placeholder?: string;
   emoji?: string;
+  contentClassName?: string;
+  footerClassName?: string;
 }) {
   const [input, setInput] = useState("");
   const [isHydrated, setIsHydrated] = useState(false);
@@ -254,9 +298,11 @@ export function ChatWindow(props: {
 
   return (
     <ChatLayout
+      contentClassName={props.contentClassName}
+      footerClassName={props.footerClassName ?? "border-t bg-card p-4 flex-shrink-0"}
       content={
         messages.length === 0 ? (
-          <div className="flex flex-col max-w-[768px] mx-auto pb-12 w-full">
+          <div className="flex flex-col min-w-0 max-w-[768px] mx-auto pb-12 w-full">
             <WelcomeMessage />
           </div>
         ) : (
@@ -270,16 +316,20 @@ export function ChatWindow(props: {
         )
       }
       footer={
-        <ChatInput
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onSubmit={() => {
-            sendMessage({ text: input });
-            setInput("");
-          }}
-          loading={status === "streaming" || status === "submitted"}
-          placeholder={props.placeholder ?? "Ask a question..."}
-        />
+        <div className="max-w-5xl mx-auto space-y-3">
+          <ChatInput
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onSubmit={() => {
+              sendMessage({ text: input });
+              setInput("");
+            }}
+            loading={status === "streaming" || status === "submitted"}
+            placeholder={props.placeholder ?? CHAT_INPUT_PLACEHOLDER}
+            suggestionChips={SUGGESTION_CHIPS}
+            onChipClick={(chip) => setInput(chip)}
+          />
+        </div>
       }
     />
   );
