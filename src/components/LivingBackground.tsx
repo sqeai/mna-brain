@@ -213,9 +213,16 @@ function chipShapePath(x: number, y: number, w: number, h: number): string {
   return segments.join(' ');
 }
 
-export function LivingBackground() {
+interface LivingBackgroundProps {
+  /** Circuit-board grid variant for login/auth pages */
+  variant?: 'default' | 'grid';
+}
+
+export function LivingBackground({ variant = 'default' }: LivingBackgroundProps) {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const isGridVariant = variant === 'grid';
+  // Grid variant always uses dark teal circuit-board aesthetic to match login design
+  const isDark = isGridVariant || resolvedTheme === 'dark';
   const c = isDark ? DARK : LIGHT;
 
   const [glowStep, setGlowStep] = useState(0);
@@ -254,28 +261,33 @@ export function LivingBackground() {
       aria-hidden
     >
       <div className="absolute inset-0 opacity-60">
-      {/* Base gradient - light (soft pale blue / cyan) */}
+      {/* Base gradient - light (soft pale blue / cyan) - hidden for grid variant */}
       <div
         className="absolute inset-0 dark:opacity-0"
         style={{
           background:
             'linear-gradient(160deg, #F0FFFF 0%, #E0F2F7 45%, #E8F4F8 100%)',
+          opacity: isGridVariant ? 0 : undefined,
         }}
       />
-      {/* Base gradient - dark (deep blue space, Earth-from-space feel) */}
+      {/* Base gradient - dark (deep blue/teal; grid variant = circuit-board teal) */}
       <div
         className="absolute inset-0 opacity-0 dark:opacity-100 transition-opacity duration-300"
         style={{
-          background:
-            'linear-gradient(160deg, #0F1A28 0%, #1E2A3B 35%, #2A4B7D 65%, #1E2A3B 100%)',
+          background: isGridVariant
+            ? 'linear-gradient(160deg, #0d1820 0%, #13252e 35%, #1a3d3d 65%, #0f2428 100%)'
+            : 'linear-gradient(160deg, #0F1A28 0%, #1E2A3B 35%, #2A4B7D 65%, #1E2A3B 100%)',
+          opacity: isGridVariant ? 1 : undefined,
         }}
       />
 
-      {/* Very light Earth/hero image overlay */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.5]"
-        style={{ backgroundImage: 'url(/hero-earth-overlay.png)' }}
-      />
+      {/* Very light Earth/hero image overlay - hidden for grid variant */}
+      {!isGridVariant && (
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.5]"
+          style={{ backgroundImage: 'url(/hero-earth-overlay.png)' }}
+        />
+      )}
 
       <svg
         className="absolute inset-0 w-full h-full"
@@ -340,33 +352,37 @@ export function LivingBackground() {
           })}
         </defs>
 
-        {/* Dense horizontal traces */}
-        {/* <g fill="none" stroke="url(#traceH)" strokeWidth="0.9" filter="url(#traceGlow)">
-          {H_TRACES.map((t, i) => (
-            <motion.path
-              key={`h-${i}`}
-              d={t.d}
-              strokeDasharray={`${t.dash} ${14 - t.dash}`}
-              initial={{ strokeDashoffset: 0 }}
-              animate={{ strokeDashoffset: -(t.dash + (14 - t.dash)) }}
-              transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
-            />
-          ))}
-        </g> */}
+        {/* Dense horizontal traces - circuit-board grid lines (grid variant) */}
+        {isGridVariant && (
+          <g fill="none" stroke="url(#traceH)" strokeWidth="0.9" filter="url(#traceGlow)">
+            {H_TRACES.map((t, i) => (
+              <motion.path
+                key={`h-${i}`}
+                d={t.d}
+                strokeDasharray={`${t.dash} ${14 - t.dash}`}
+                initial={{ strokeDashoffset: 0 }}
+                animate={{ strokeDashoffset: -(t.dash + (14 - t.dash)) }}
+                transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
+              />
+            ))}
+          </g>
+        )}
 
-        {/* Dense vertical traces */}
-        {/* <g fill="none" stroke="url(#traceV)" strokeWidth="0.9" filter="url(#traceGlow)">
-          {V_TRACES.map((t, i) => (
-            <motion.path
-              key={`v-${i}`}
-              d={t.d}
-              strokeDasharray={`${t.dash} ${14 - t.dash}`}
-              initial={{ strokeDashoffset: 0 }}
-              animate={{ strokeDashoffset: i % 2 === 0 ? -(t.dash + (14 - t.dash)) : t.dash + (14 - t.dash) }}
-              transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
-            />
-          ))}
-        </g> */}
+        {/* Dense vertical traces - circuit-board grid lines (grid variant) */}
+        {isGridVariant && (
+          <g fill="none" stroke="url(#traceV)" strokeWidth="0.9" filter="url(#traceGlow)">
+            {V_TRACES.map((t, i) => (
+              <motion.path
+                key={`v-${i}`}
+                d={t.d}
+                strokeDasharray={`${t.dash} ${14 - t.dash}`}
+                initial={{ strokeDashoffset: 0 }}
+                animate={{ strokeDashoffset: i % 2 === 0 ? -(t.dash + (14 - t.dash)) : t.dash + (14 - t.dash) }}
+                transition={{ duration: t.speed, repeat: Infinity, ease: 'linear' }}
+              />
+            ))}
+          </g>
+        )}
 
         {/* Chips - square with 3 symmetrical lines per side; dark blue glow in random order with neighbor bleed */}
         <g stroke={c.GREY_CHIP_BORDER} strokeWidth="1.2">
