@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { createAgent } from "langchain";
 import { logger } from "../agent/logger";
 import { getAllCompanyReferences } from "../fuzzySearch";
 import { splitPdf } from "../pdf";
@@ -38,7 +38,7 @@ ${userRawNotes}
    - companies_detected: Array of STRINGS (exact names as they appear in the Known Companies list) that were found in the text.
    - company_notes: Array of objects { "company_name": "...", "note": "..." } containing the specific context for that company.
    - file_date: A string representing the meeting date in YYYY-MM-DD format. If not found, return null.
-   - protectus_summary: Detailed variables of the prospectus file type. Only exist if the file type is "prospectus". Please take a look at the example output below to see the structure of the prospectus_summary.
+   - prospectus_summary: Detailed variables of the prospectus file type. Only exist if the file type is "prospectus". Please take a look at the example output below to see the structure of the prospectus_summary.
 
 ## Output Format:
 Your response should end with a JSON block in this format:
@@ -155,10 +155,10 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
     temperature: 0,
   });
 
-  const agent = createReactAgent({
-    llm,
+  const agent = createAgent({
+    model: llm,
     tools: [], // No tools needed for this phase logic
-    prompt: generateSystemPrompt(allNames, userRawNotes),
+    systemPrompt: generateSystemPrompt(allNames, userRawNotes),
   });
 
   // 2. Implement Anthropic Files API for PDF processing
@@ -204,13 +204,14 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
           },
           ],
         })],
-      }
-      const result = await agent.invoke(inputs);
+      };
+      // Cast messages to satisfy the agent's type requirements
+      const result = await agent.invoke({ messages: inputs.messages } as any);
       const messagesList = result.messages as BaseMessage[];
       lastMessage = messagesList[messagesList.length - 1];
     }
   } else {
-    const result = await agent.invoke(inputs);
+    const result = await agent.invoke(inputs as any);
     const messagesList = result.messages as BaseMessage[];
     lastMessage = messagesList[messagesList.length - 1];
   }
