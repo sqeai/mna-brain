@@ -62,6 +62,7 @@ import MarketScreeningStatus from '@/components/pipeline/MarketScreeningStatus';
 import MarketScreeningResults from '@/components/pipeline/MarketScreeningResults';
 import ScreeningProgressPanel from '@/components/pipeline/ScreeningProgressPanel';
 import { CollapsibleSection } from '@/components/common/CollapsibleSection';
+import posthog from 'posthog-js';
 
 interface PipelineCompany {
   id: string;
@@ -294,6 +295,12 @@ export default function Pipeline() {
   }, []);
 
   const handleTabChange = (value: string) => {
+    // Capture pipeline stage change event
+    posthog.capture('pipeline_stage_changed', {
+      from_stage: activeTab,
+      to_stage: value,
+    });
+
     setActiveTab(value as DealStage);
     setSelectedIds(new Set());
     setCurrentPage(1);
@@ -759,7 +766,14 @@ export default function Pipeline() {
                                           </TableCell>
                                           <TableCell>
                                             <button
-                                              onClick={() => setSelectedCompany(company)}
+                                              onClick={() => {
+                                                posthog.capture('company_detail_viewed', {
+                                                  company_id: company.id,
+                                                  company_name: company.target,
+                                                  pipeline_stage: company.pipeline_stage,
+                                                });
+                                                setSelectedCompany(company);
+                                              }}
                                               className="font-medium text-left hover:text-primary hover:underline transition-colors"
                                             >
                                               {company.target}
@@ -781,12 +795,12 @@ export default function Pipeline() {
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
                                             {/* Assuming revenue_2025 is not in types yet based on previous check, check fallback */}
-                                            {/* Type check said pipeline_company has rev 2021-2024. 
-                                                If 2025 is missing, I should use 2024 or just placeholder '-'. 
+                                            {/* Type check said pipeline_company has rev 2021-2024.
+                                                If 2025 is missing, I should use 2024 or just placeholder '-'.
                                                 The user asked for Rev 2023, 2024, 2025 columns.
                                                 I'll use placeholder if data missing or assume column exists if not.
-                                                Types.ts showed revenue_2024_usd_mn is max year? 
-                                                Wait, types.ts showed revenue_2024_usd_mn. No 2025. 
+                                                Types.ts showed revenue_2024_usd_mn is max year?
+                                                Wait, types.ts showed revenue_2024_usd_mn. No 2025.
                                                 I will put '-' for 2025.
                                             */}
                                             -
@@ -1029,7 +1043,14 @@ export default function Pipeline() {
                                     <TableRow key={company.id} className="hover:bg-muted/50">
                                       <TableCell>
                                         <button
-                                          onClick={() => setSelectedCompany(company)}
+                                          onClick={() => {
+                                            posthog.capture('company_detail_viewed', {
+                                              company_id: company.id,
+                                              company_name: company.target,
+                                              pipeline_stage: company.pipeline_stage,
+                                            });
+                                            setSelectedCompany(company);
+                                          }}
                                           className="font-medium text-left hover:text-primary hover:underline transition-colors"
                                         >
                                           {company.target}

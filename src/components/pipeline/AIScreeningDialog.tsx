@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Plus, Pencil, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 
 interface Company {
   id: string;
@@ -106,6 +107,13 @@ export default function AIScreeningDialog({
       setCriteria([...criteria, data]);
       setNewCriterionName('');
       setNewCriterionPrompt('');
+
+      // Capture criterion added event
+      posthog.capture('screening_criterion_added', {
+        criterion_id: data.id,
+        criterion_name: data.name,
+      });
+
       toast.success('Criterion added');
     } catch (error: any) {
       console.error('Error adding criterion:', error);
@@ -127,6 +135,13 @@ export default function AIScreeningDialog({
       if (error) throw error;
 
       setCriteria(criteria.filter((_, i) => i !== index));
+
+      // Capture criterion deleted event
+      posthog.capture('screening_criterion_deleted', {
+        criterion_id: criterionToDelete.id,
+        criterion_name: criterionToDelete.name,
+      });
+
       toast.success('Criterion deleted');
     } catch (error: any) {
       console.error('Error deleting criterion:', error);
@@ -245,6 +260,13 @@ export default function AIScreeningDialog({
           screeningEntries.push(result.data);
         }
       }
+
+      // Capture AI screening started event
+      posthog.capture('ai_screening_started', {
+        company_count: companies.length,
+        criteria_count: criteria.length,
+        total_screenings: screeningEntries.length,
+      });
 
       toast.success(`Started AI screening for ${companies.length} companies with ${criteria.length} criteria`);
 

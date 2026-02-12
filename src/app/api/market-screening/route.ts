@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph, HumanMessage } from '@/lib/agent';
 import { createClient } from '@supabase/supabase-js';
 import { companiesSchema } from '@/lib/agent/tools';
+import { getPostHogClient } from '@/lib/posthog-server';
 
 // Create a server-side Supabase client
 function getSupabaseClient() {
@@ -252,6 +253,18 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
         })
         .eq('id', thesisId);
     }
+
+    // Capture server-side market screening completed event
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: 'server',
+      event: 'market_screening_completed',
+      properties: {
+        companies_discovered: filteredCompanies.length,
+        sources_requested: sourcesCount,
+        has_thesis_id: !!thesisId,
+      },
+    });
 
     return NextResponse.json({
       count: filteredCompanies.length,

@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { DealStage } from '@/lib/types';
+import posthog from 'posthog-js';
 
 interface PromoteDialogProps {
   open: boolean;
@@ -179,6 +180,17 @@ export default function PromoteDialog({
           // We don't re-throw here so the promotion itself (which likely succeeded) isn't rolled back in UI terms
         }
       }
+
+      // Capture deal promotion event in PostHog
+      posthog.capture('deal_promoted', {
+        deal_id: dealId,
+        company_name: companyName,
+        from_stage: currentStage,
+        to_stage: nextStage,
+        has_note: note.trim() !== '',
+        has_link: linkUrl.trim() !== '',
+        has_document: selectedFile !== null,
+      });
 
       toast.success(`Promoted to ${nextStage}`);
       resetForm();
