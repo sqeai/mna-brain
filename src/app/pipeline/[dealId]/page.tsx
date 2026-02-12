@@ -900,12 +900,12 @@ export default function CompanyDetailPage() {
 
             {/* Financial Charts */}
             <FinancialCharts
-              revenue_year1={company.revenue_2022_usd_mn ? company.revenue_2022_usd_mn * 1_000_000 : null}
-              revenue_year2={company.revenue_2023_usd_mn ? company.revenue_2023_usd_mn * 1_000_000 : null}
-              revenue_year3={company.revenue_2024_usd_mn ? company.revenue_2024_usd_mn * 1_000_000 : null}
-              ebitda_year1={company.ebitda_2022_usd_mn ? company.ebitda_2022_usd_mn * 1_000_000 : null}
-              ebitda_year2={company.ebitda_2023_usd_mn ? company.ebitda_2023_usd_mn * 1_000_000 : null}
-              ebitda_year3={company.ebitda_2024_usd_mn ? company.ebitda_2024_usd_mn * 1_000_000 : null}
+              revenue_year1={company.revenue_2022_usd_mn ? company.revenue_2022_usd_mn : null}
+              revenue_year2={company.revenue_2023_usd_mn ? company.revenue_2023_usd_mn : null}
+              revenue_year3={company.revenue_2024_usd_mn ? company.revenue_2024_usd_mn : null}
+              ebitda_year1={company.ebitda_2022_usd_mn ? company.ebitda_2022_usd_mn : null}
+              ebitda_year2={company.ebitda_2023_usd_mn ? company.ebitda_2023_usd_mn : null}
+              ebitda_year3={company.ebitda_2024_usd_mn ? company.ebitda_2024_usd_mn : null}
             />
 
             {/* AI Company Card Section */}
