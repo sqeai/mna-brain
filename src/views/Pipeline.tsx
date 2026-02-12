@@ -109,9 +109,12 @@ const stageColors: Record<DealStage, { bg: string; text: string; bgLight: string
 
 const formatCurrency = (value: number | null) => {
   if (value === null || value === undefined) return '-';
-  // Values are stored in millions, convert to billions for display
-  const billions = value / 1000;
-  return `$${billions.toFixed(2)}B`;
+  // Values are stored in millions
+  if (Math.abs(value) >= 1000) {
+    const billions = value / 1000;
+    return `$${billions.toFixed(2)}B`;
+  }
+  return `$${value.toFixed(2)}M`;
 };
 
 const getRevenueChange = (year2: number | null, year3: number | null) => {

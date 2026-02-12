@@ -224,9 +224,12 @@ interface CompanyDetailDialogProps {
 
 const formatCurrency = (value: number | null | undefined) => {
   if (value === null || value === undefined) return '-';
-  // Values are stored in millions, convert to billions for display
-  const billions = value / 1000;
-  return `$${billions.toFixed(2)}B`;
+  // Values are stored in millions
+  if (Math.abs(value) >= 1000) {
+    const billions = value / 1000;
+    return `$${billions.toFixed(2)}B`;
+  }
+  return `$${value.toFixed(2)}M`;
 };
 
 const formatDuration = (seconds: number | null) => {
