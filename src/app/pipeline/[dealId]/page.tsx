@@ -288,6 +288,33 @@ export default function CompanyDetailPage() {
     }
   };
 
+  const fetchScreenings = async () => {
+    if (!companyId) return;
+    try {
+      const { data } = await supabase
+        .from('screenings')
+        .select(`
+          *,
+          criterias (
+            id,
+            name,
+            prompt
+          )
+        `)
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      if (data) setScreenings(data as Screening[]);
+    } catch (error) {
+      console.error('Error fetching screenings:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!companyId || !screenings.some((s) => s.state === 'pending')) return;
+    const interval = setInterval(fetchScreenings, 3000);
+    return () => clearInterval(interval);
+  }, [companyId, screenings]);
+
   const fetchAnalysis = async () => {
     if (!companyId) return;
     try {

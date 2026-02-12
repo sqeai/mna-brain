@@ -297,6 +297,33 @@ export default function CompanyDetailDialog({
     }
   };
 
+  const fetchScreenings = async () => {
+    if (!company.id) return;
+    try {
+      const { data } = await supabase
+        .from('screenings')
+        .select(`
+          *,
+          criterias (
+            id,
+            name,
+            prompt
+          )
+        `)
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: false });
+      if (data) setScreenings(data as Screening[]);
+    } catch (error) {
+      console.error('Error fetching screenings:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!open || !company.id || !screenings.some((s) => s.state === 'pending')) return;
+    const interval = setInterval(fetchScreenings, 3000);
+    return () => clearInterval(interval);
+  }, [open, company.id, screenings]);
+
   const fetchAnalysis = async () => {
     try {
       const res = await fetch(`/api/company-analysis?companyId=${company.id}`);
