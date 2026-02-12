@@ -199,7 +199,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
     }
 
     if (toolName === "query_files") {
-      const notesMatch = content.match(/<!-- MEETING_NOTES_JSON:(.*?) -->/);
+      const notesMatch = content.match(/<!-- FILES_JSON:(.*?) -->/);
       if (notesMatch) {
         try {
           const notes = JSON.parse(notesMatch[1]);
@@ -298,7 +298,7 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
 
                   // Remove hidden metadata from display content
                   displayContent = displayContent.replace(/\n*<!-- CITATIONS_JSON:.*? -->/g, "");
-                  displayContent = displayContent.replace(/\n*<!-- MEETING_NOTES_JSON:.*? -->/g, "");
+                  displayContent = displayContent.replace(/\n*<!-- FILES_JSON:.*? -->/g, "");
 
                   return (
                     <div key={`tool-${index}`} className="border-b border-border/50 pb-2 last:border-0 last:pb-0">

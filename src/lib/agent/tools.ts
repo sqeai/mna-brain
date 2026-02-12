@@ -1608,7 +1608,7 @@ export const queryMeetingNotes = tool(
     limit?: number;
   }) => {
     logger.debug(
-      `🔧 TOOL CALLED: query_meeting_notes(company='${company_name}', tag='${tag}', search='${search_term}')`
+      `🔧 TOOL CALLED: query_files(company='${company_name}', tag='${tag}', search='${search_term}')`
     );
 
     try {
@@ -1653,7 +1653,7 @@ export const queryMeetingNotes = tool(
     }
   },
   {
-    name: "query_meeting_notes",
+    name: "query_files",
     description: `Search and retrieve files.
     
 Use this tool to find meeting records, summaries, and key points related to specific companies, tags, or topics.
@@ -1735,7 +1735,7 @@ function formatNotesResults(notes: any[]): string {
 
   // Include structured data for frontend parsing
   if (noteRefs.length > 0) {
-    result += `\n<!-- MEETING_NOTES_JSON:${JSON.stringify(noteRefs)} -->`;
+    result += `\n<!-- FILES_JSON:${JSON.stringify(noteRefs)} -->`;
   }
 
   return result;
@@ -1772,7 +1772,7 @@ export function getToolDescriptions(): string {
     { name: "get_past_acquisition_details", description: "Get detailed information about a specific past acquisition" },
     { name: "inven_paid_data_source_search", description: "Search for companies using Inven's AI-powered search for Screening and Sourcing" },
     { name: "inven_paid_data_source_enrichment", description: "Get detailed company data from Inven by company IDs and cache results" },
-    { name: "query_meeting_notes", description: "Search and retrieve files related to companies, tags, or topics" },
+    { name: "query_files", description: "Search and retrieve files related to companies, tags, or topics" },
   ];
 
   return toolInfo.map((t, i) => `${i + 1}. **${t.name}** - ${t.description}`).join("\n");
