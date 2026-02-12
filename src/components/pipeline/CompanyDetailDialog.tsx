@@ -1058,7 +1058,7 @@ export default function CompanyDetailDialog({
           <TabsContent value="filters" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">L1 Filter Results</CardTitle>
+                <CardTitle className="text-lg">L1 Screening Results</CardTitle>
               </CardHeader>
               <CardContent>
                 {screenings.length > 0 ? (
