@@ -43,7 +43,8 @@ resource "aws_s3_bucket_cors_configuration" "mna_files_cors" {
     allowed_methods = ["GET", "PUT", "POST", "DELETE"]
     allowed_origins = [
       "http://localhost:3000",
-      "https://mna-tracker.vercel.app"
+      "https://mna-tracker.vercel.app",
+      "https://mna.sqe.co.id"
     ]
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
