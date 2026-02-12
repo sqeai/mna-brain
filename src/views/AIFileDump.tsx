@@ -567,7 +567,7 @@ export default function AIFileDump() {
 
   const fetchMeetingNotes = useCallback(async () => {
     try {
-      const response = await fetch('/api/ai-file-dump?file_type=mom');
+      const response = await fetch('/api/ai-file-dump');
       const result = await response.json();
 
       if (result.success) {
