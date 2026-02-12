@@ -8,6 +8,7 @@ import { getAgentGraph, HumanMessage } from "@/lib/agent";
 import { getToolDescriptions } from "@/lib/agent/tools";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 // Create a server-side Supabase client
 function getSupabaseClient() {
@@ -255,6 +256,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[AI-Screening] Result for company=${company.name}, criteria=${criteriaId}: ${screeningResult.result}`);
+
+    // Capture server-side AI screening completed event
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: 'server',
+      event: 'ai_screening_completed',
+      properties: {
+        company_id: companyId,
+        company_name: company.name,
+        criteria_id: criteriaId,
+        result: screeningResult.result,
+      },
+    });
 
     return NextResponse.json({
       companyId,

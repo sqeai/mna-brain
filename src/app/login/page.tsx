@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LivingBackground } from '@/components/LivingBackground';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle } from 'lucide-react';
+import posthog from 'posthog-js';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -40,6 +41,13 @@ export default function LoginPage() {
       setError(error.message);
       setIsLoading(false);
     } else {
+      // Identify user in PostHog and capture sign-in event
+      posthog.identify(email, {
+        email: email,
+      });
+      posthog.capture('user_signed_in', {
+        email: email,
+      });
       router.push('/dashboard');
     }
   };

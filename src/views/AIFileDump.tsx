@@ -73,6 +73,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 
 interface FileRecord {
   id: string;
@@ -778,6 +779,13 @@ export default function AIFileDump() {
     }
 
     if (results.success > 0) {
+      // Capture file upload event
+      posthog.capture('file_uploaded', {
+        file_count: results.success,
+        failed_count: results.failed,
+        duplicate_count: duplicates.length,
+      });
+
       toast.success(
         filesToUpload.length === 1
           ? 'File uploaded successfully'
@@ -821,6 +829,11 @@ export default function AIFileDump() {
       const result = await response.json();
 
       if (result.success) {
+        // Capture file deleted event
+        posthog.capture('file_deleted', {
+          file_id: id,
+        });
+
         toast.success('File deleted successfully');
         fetchMeetingNotes();
         fetchProspectus();

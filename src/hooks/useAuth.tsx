@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
+import posthog from 'posthog-js';
 
 type User = Tables<'users'>;
 
@@ -76,6 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const signOut = useCallback(async () => {
+    // Capture sign-out event before resetting PostHog
+    posthog.capture('user_signed_out');
+    posthog.reset();
+
     setUser(null);
     localStorage.removeItem(USER_STORAGE_KEY);
   }, []);
