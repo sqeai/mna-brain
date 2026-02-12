@@ -80,8 +80,8 @@ function ChatMessages(props: {
 
 const SUGGESTION_CHIPS = [
   "semiconductor companies",
-  "analyze ChipTech",
-  "pipeline performance",
+  "analyze Project Oriole and why is it a good fit",
+  "observe the pipeline performance and how long companies are in L1",
 ];
 
 const CHAT_INPUT_PLACEHOLDER =

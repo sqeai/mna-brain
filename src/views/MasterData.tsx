@@ -33,8 +33,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Lightbulb,
 } from 'lucide-react';
 import type { DealStage } from '@/lib/types';
+import { SEARCH_SUGGESTION_CHIPS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -336,7 +338,7 @@ export default function MasterData() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search companies..."
+                    placeholder="Search companies or sectors..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
@@ -379,6 +381,22 @@ export default function MasterData() {
                   <SelectItem value="outbound">Outbound</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5">
+              <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span>Try:</span>
+              {SEARCH_SUGGESTION_CHIPS.map((chip, i) => (
+                <span key={chip}>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery(chip)}
+                    className="text-primary hover:underline"
+                  >
+                    &quot;{chip}&quot;
+                  </button>
+                  {i < SEARCH_SUGGESTION_CHIPS.length - 1 ? ',' : ''}
+                </span>
+              ))}
             </div>
           </CardContent>
         </Card>

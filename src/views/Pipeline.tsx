@@ -48,9 +48,11 @@ import {
   ArrowDown,
   ChevronDown,
   ChevronUp,
+  Lightbulb,
   Eye,
   EyeOff,
 } from 'lucide-react';
+import { SEARCH_SUGGESTION_CHIPS } from '@/lib/constants';
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
 import { DealStage, L1Status } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -619,11 +621,11 @@ export default function Pipeline() {
                             </div>
 
                             {/* Filters */}
-                            <div className="flex items-center gap-4 mb-4 flex-wrap">
+                            <div className="flex items-center gap-4 mb-1.5 flex-wrap">
                               <div className="relative flex-1 max-w-sm">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="Search companies..."
+                                  placeholder="Search companies or sectors..."
                                   value={searchQuery}
                                   onChange={(e) => setSearchQuery(e.target.value)}
                                   className="pl-9"
@@ -650,6 +652,22 @@ export default function Pipeline() {
                                   <SelectItem value="outbound">Outbound</SelectItem>
                                 </SelectContent>
                               </Select>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4">
+                              <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <span>Try:</span>
+                              {SEARCH_SUGGESTION_CHIPS.map((chip, i) => (
+                                <span key={chip}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSearchQuery(chip)}
+                                    className="text-primary hover:underline"
+                                  >
+                                    &quot;{chip}&quot;
+                                  </button>
+                                  {i < SEARCH_SUGGESTION_CHIPS.length - 1 ? ',' : ''}
+                                </span>
+                              ))}
                             </div>
 
                             {loading ? (
@@ -887,7 +905,7 @@ export default function Pipeline() {
                         <div className="relative flex-1 max-w-sm">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
-                            placeholder="Search companies..."
+                            placeholder="Search companies or sectors..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-9"
@@ -919,6 +937,22 @@ export default function Pipeline() {
                             </SelectContent>
                           </Select>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5 mb-4">
+                        <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>Try:</span>
+                        {SEARCH_SUGGESTION_CHIPS.map((chip, i) => (
+                          <span key={chip}>
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery(chip)}
+                              className="text-primary hover:underline"
+                            >
+                              &quot;{chip}&quot;
+                            </button>
+                            {i < SEARCH_SUGGESTION_CHIPS.length - 1 ? ',' : ''}
+                          </span>
+                        ))}
                       </div>
 
                       {/* Table for L1-L5 stages */}
