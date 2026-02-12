@@ -107,9 +107,12 @@ const getStatusColor = (status: string | null): string => {
 // Values in database are in USD Millions, so format accordingly
 const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return '-';
-  // Values are already in millions
-  if (value >= 1000) return `$${(value / 1000).toFixed(1)}B`;
-  return `$${value.toFixed(1)}M`;
+  // Values are stored in millions
+  if (Math.abs(value) >= 1000) {
+    const billions = value / 1000;
+    return `$${billions.toFixed(2)}B`;
+  }
+  return `$${value.toFixed(2)}M`;
 };
 
 const getRevenueChange = (year2023: number | null, year2024: number | null): { direction: 'up' | 'down' | 'flat'; percent: number } => {
