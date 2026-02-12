@@ -134,7 +134,7 @@ export async function downloadFile(key: string): Promise<Buffer> {
 }
 
 /**
- * Generate a unique S3 key for a meeting note file
+ * Generate a unique S3 key for a file
  * @param fileName - The original file name
  * @returns A unique S3 key
  */

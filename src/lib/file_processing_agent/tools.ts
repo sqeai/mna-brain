@@ -65,7 +65,7 @@ export const addCompanyNoteTool = tool(
           .insert({
             deal_id: id,
             content: content,
-            stage: stage || 'Meeting Note'
+            stage: stage || 'File'
           });
 
         if (error) throw error;

@@ -81,6 +81,7 @@ export default function L0AddCompany({ onSuccess }: L0AddCompanyProps) {
           ebitda_2024_usd_mn: parseNumber(formData.ebitda_year3),
           ev_2024: parseNumber(formData.valuation),
           pipeline_stage: 'L0',
+          status: 'active',
         })
         .select()
         .single();
@@ -183,6 +184,7 @@ export default function L0AddCompany({ onSuccess }: L0AddCompanyProps) {
             ebitda_2024_usd_mn: parseNumber(company.ebitda_year3),
             ev_2024: parseNumber(company.valuation),
             pipeline_stage: 'L0',
+            status: 'active',
           })
           .select()
           .single();
