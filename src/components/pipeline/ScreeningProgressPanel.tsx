@@ -190,13 +190,28 @@ export default function ScreeningProgressPanel({
     });
 
     // Calculate all_passed after all screenings are processed
+    // Pass: min 3 pass AND max 1 fail
+    // Failed: at least 1 fail (and doesn't qualify as Pass)
+    // Inconclusive: at least 3 inconclusive (or default fallback)
     grouped.forEach((summary) => {
       summary.all_passed =
-        summary.completed_criteria === summary.total_criteria &&
-        summary.passed_criteria === summary.total_criteria;
+        summary.passed_criteria >= 3 && summary.failed_criteria <= 1;
     });
 
     return Array.from(grouped.values());
+  };
+
+  const getOverallStatus = (summary: CompanyScreeningSummary): 'pass' | 'fail' | 'inconclusive' => {
+    // Pass: minimum 3 pass AND maximum 1 fail
+    if (summary.passed_criteria >= 3 && summary.failed_criteria <= 1) {
+      return 'pass';
+    }
+    // Failed: at least 1 fail (but didn't qualify as pass)
+    if (summary.failed_criteria >= 1) {
+      return 'fail';
+    }
+    // Inconclusive: everything else (e.g. 3+ inconclusive, or not enough passes)
+    return 'inconclusive';
   };
 
   const handlePromoteClick = (companyId: string, companyName: string) => {
@@ -221,8 +236,8 @@ export default function ScreeningProgressPanel({
     (completedPage + 1) * ITEMS_PER_PAGE
   );
 
-  // Count how many passed all
-  const passedCount = completed.filter((c) => c.all_passed).length;
+  // Count how many passed (min 3 pass AND max 1 fail)
+  const passedCount = completed.filter((c) => c.passed_criteria >= 3 && c.failed_criteria <= 1).length;
 
   if (loading && screenings.length === 0) {
     return null;
@@ -344,19 +359,25 @@ export default function ScreeningProgressPanel({
                 Completed ({completed.length})
               </h4>
               <div className="grid gap-2">
-                {paginatedCompleted.map((summary) => (
+                {paginatedCompleted.map((summary) => {
+                  const status = getOverallStatus(summary);
+                  return (
                   <div
                     key={summary.company_id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${summary.all_passed
+                    className={`flex items-center justify-between p-3 rounded-lg border ${status === 'pass'
                       ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50'
-                      : 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50'
+                      : status === 'fail'
+                        ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50'
+                        : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50'
                       }`}
                   >
                     <div className="flex items-center gap-3">
-                      {summary.all_passed ? (
+                      {status === 'pass' ? (
                         <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      ) : (
+                      ) : status === 'fail' ? (
                         <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      ) : (
+                        <HelpCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       )}
                       <div>
                         <button
@@ -380,35 +401,32 @@ export default function ScreeningProgressPanel({
                           </span>
                         )}
                       </span>
-                      {summary.all_passed ? (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
-                        >
-                          Move to L1
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </Button>
+                      {status === 'pass' ? (
+                        <Badge variant="default" className="bg-green-600">
+                          Passed
+                        </Badge>
+                      ) : status === 'fail' ? (
+                        <Badge variant="destructive">
+                          Failed
+                        </Badge>
                       ) : (
-                        <>
-                          <Badge variant="destructive">
-                            Failed
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-                            onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
-                          >
-                            <ArrowRight className="h-3 w-3 mr-1" />
-                            Promote to L1
-                          </Button>
-                        </>
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">
+                          Inconclusive
+                        </Badge>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                        onClick={() => handlePromoteClick(summary.company_id, summary.company_name)}
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Promote to L1
+                      </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Pagination */}
