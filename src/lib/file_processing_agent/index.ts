@@ -56,7 +56,7 @@ Your response should end with a JSON block in this format:
   "file_date": "2024-01-30",
   "prospectus_summary": {
     "segment": "...",
-    "target": "...",
+    "target": "Hidden company name. Please search for the company name in the known companies list or inside the document.",
     "segment_related_offerings": "...",
     "company_focus": "...",
     "website": "...",
@@ -120,14 +120,7 @@ Your response should end with a JSON block in this format:
     "fx_revenue_drop_count": <numeric>,
     "fx_revenue_no_consecutive_drop_local": "...",
     "fx_rationale": "...",
-    "fx_ebitda_above_10_l3y": "...",
-    "remarks": "A brief explanation of your decision (1-2 sentences), including what sources you used",
-    "business_overview": "- **Primary Products**: ...\\n- **End Markets**: ...\\n...",
-    "business_model_summary": "- **Core Focus**: ...\\n- **Value Chain Position**: ...\\n...",
-    "key_takeaways": "1. **Takeaway title** explanation...\\n2. ...\\n...",
-    "investment_highlights": "- **Market Position**: ...\\n- **Differentiation**: ...\\n...",
-    "investment_risks": "- **Customer Concentration**: ...\\n- **Regulatory Exposure**: ...\\n...",
-    "diligence_priorities": "1. Question one?\\n2. Question two?\\n..."
+    "fx_ebitda_above_10_l3y": "..."
   }
 }
 \`\`\`
@@ -167,6 +160,7 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
   };
 
   let lastMessage: BaseMessage | null = null;
+  var company = null;
   if (contentType === 'application/pdf') {
     logger.debug("📂 INVOKING FILE PROCESSING AGENT");
 
@@ -239,7 +233,6 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
         if (match) {
           finalMatchedCompanies.push(match);
         } else {
-          var companyId = null;
           if (parsed.file_type === 'prospectus') {
             const insertData = {
               // Pipeline stage for market screening
@@ -280,38 +273,19 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
               remarks: parsed?.prospectus_summary?.remarks || null,
               source: 'inbound',
             }
-            const { data: company, error: insertError } = await supabase
+            const { data: insertedCompany, error: insertError } = await supabase
               .from('companies')
               .insert(insertData)
               .select()
               .single();
             if (insertError) {
               logger.error('Error inserting companies results:');
-            } else if (company) {
-              companyId = company.id;
-
-              const { error: insertError } = await supabase
-                .from("company_analyses")
-                .insert({
-                  company_id: companyId,
-                  status: "completed",
-                  business_overview: parsed?.prospectus_summary?.business_overview || null,
-                  business_model_summary: parsed?.prospectus_summary?.business_model_summary || null,
-                  key_takeaways: parsed?.prospectus_summary?.key_takeaways || null,
-                  investment_highlights: parsed?.prospectus_summary?.investment_highlights || null,
-                  investment_risks: parsed?.prospectus_summary?.investment_risks || null,
-                  diligence_priorities: parsed?.prospectus_summary?.diligence_priorities || null,
-                  sources: [{ type: 'prospectus' }],
-                  error_message: null,
-                });
-              if (insertError) {
-                logger.error('Error inserting company_analyses results:');
-              }
             }
+            company = insertedCompany;
           }
 
           finalMatchedCompanies.push({
-            id: companyId,
+            id: company?.id || null,
             name: detectedName,
             type: 'company',
             similarity: 1
@@ -360,12 +334,14 @@ export async function processFileContent(rawText: string, buffer: Buffer, conten
         parsed.file_type = 'other';
       }
 
+      parsed.company = company;
+
       return parsed;
     } catch (e) {
       logger.error("Failed to parse JSON from agent response:");
-      return { raw_response: content };
+      return { raw_response: content, company: company };
     }
   }
 
-  return { raw_response: content };
+  return { raw_response: content, company: company };
 }

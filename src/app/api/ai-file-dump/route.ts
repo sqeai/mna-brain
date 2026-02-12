@@ -2,11 +2,11 @@
  * API Route for AI File Dump
  * Handles POST (upload) and GET (list) requests for file dumps
  */
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { uploadFile, getSignedUrl, generateMeetingNoteKey, downloadFile } from "@/lib/s3";
 import { extractTextFromFile } from "@/lib/fileExtractor";
 import { processFileContent } from "@/lib/file_processing_agent";
+import { downloadFile, getSignedUrl } from "@/lib/s3";
+import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 // Create a server-side Supabase client
 function getSupabaseClient() {
@@ -115,6 +115,133 @@ export async function POST(request: NextRequest) {
       .eq('id', initialData.id)
       .single();
 
+    const company = structuredResult.company;
+    if (!company || !company.id) {
+      return await responseSuccess(s3Key, updatedData);
+    }
+
+    const { error: companyAnalysisInsertError } = await supabase
+      .from("company_analyses")
+      .insert({
+        company_id: company.id,
+        status: "generating",
+      });
+    if (companyAnalysisInsertError) {
+      console.error('Error inserting company_analyses results:', companyAnalysisInsertError);
+    }
+
+    // Trigger company analysis and market screening in the background
+    const baseUrl = request.nextUrl.origin;
+
+    // Call company-analysis endpoint to generate analysis for the matched company
+    fetch(`${baseUrl}/api/company-analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: company.id, source : structuredResult?.file_type || 'other'}),
+    }).catch((err) => {
+      console.error('Error triggering company analysis:', err);
+    });
+
+    // Call ai-screening endpoint to execute screening for the company against all criteria
+    (async () => {
+      try {
+        // Fetch all screening criteria
+        const { data: criteriaList, error: criteriaError } = await supabase
+          .from('criterias')
+          .select('id, name, prompt')
+          .order('created_at', { ascending: true });
+
+        if (criteriaError || !criteriaList || criteriaList.length === 0) {
+          console.log('No screening criteria found, skipping ai-screening');
+          return;
+        }
+
+        // Build company data for screening
+        const companyData = {
+          id: company.id,
+          name: company.target || company.name,
+          segment: company.segment,
+          geography: company.geography,
+          company_focus: company.company_focus,
+          ownership: company.ownership,
+          website: company.website,
+          revenue_2022_usd_mn: company.revenue_2022_usd_mn,
+          revenue_2023_usd_mn: company.revenue_2023_usd_mn,
+          revenue_2024_usd_mn: company.revenue_2024_usd_mn,
+          ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
+          ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
+          ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
+          ev_2024: company.ev_2024,
+        };
+
+        // Create screening entries and trigger AI screening for each criterion
+        for (const criterion of criteriaList) {
+          // Insert screening entry with 'pending' state
+          const { data: screeningEntry, error: insertError } = await supabase
+            .from('screenings')
+            .insert({
+              company_id: company.id,
+              criteria_id: criterion.id,
+              state: 'pending',
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error(`Error creating screening entry for criterion ${criterion.id}:`, insertError);
+            continue;
+          }
+
+          // Call ai-screening endpoint
+          fetch(`${baseUrl}/api/ai-screening`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: company.id,
+              criteriaId: criterion.id,
+              criteriaPrompt: criterion.prompt,
+              company: companyData,
+            }),
+          })
+            .then(async (response) => {
+              const data = await response.json();
+              const newState = data.result === 'error' ? 'failed' : 'completed';
+              await supabase
+                .from('screenings')
+                .update({
+                  state: newState,
+                  result: data.result,
+                  remarks: data.remarks,
+                })
+                .eq('id', screeningEntry.id);
+            })
+            .catch((err) => {
+              console.error(`Error triggering ai-screening for criterion ${criterion.id}:`, err);
+              supabase
+                .from('screenings')
+                .update({
+                  state: 'failed',
+                  result: 'error',
+                  remarks: 'API call failed',
+                })
+                .eq('id', screeningEntry.id);
+            });
+        }
+      } catch (err) {
+        console.error('Error in ai-screening flow:', err);
+      }
+    })();
+
+    return await responseSuccess(s3Key, updatedData);
+  } catch (error) {
+    console.error("Upload file error:", error);
+    return NextResponse.json(
+      { error: (error as Error).message || "Failed to upload file" },
+      { status: 500 }
+    );
+  }
+
+  async function responseSuccess(s3Key: any, updatedData: any) {
     const signedUrl = await getSignedUrl(s3Key);
 
     return NextResponse.json({
@@ -124,12 +251,6 @@ export async function POST(request: NextRequest) {
         signed_url: signedUrl,
       },
     });
-  } catch (error) {
-    console.error("Upload file error:", error);
-    return NextResponse.json(
-      { error: (error as Error).message || "Failed to upload file" },
-      { status: 500 }
-    );
   }
 }
 

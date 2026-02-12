@@ -48,7 +48,7 @@ You have access to these tools — USE THEM ALL to gather comprehensive informat
 1. Use \`get_company_details\` to retrieve internal database information about "{companyName}"
 2. Use \`inven_paid_data_source_search\` to find the company on Inven, then \`inven_paid_data_source_enrichment\` for detailed data
 3. Use \`web_search\` to research the company's website, products, market position, recent news, and competitive landscape (e.g., "{companyName} company overview products services", "{companyName} revenue market position competitors")
-4. Use \`query_meeting_notes\` to check if there are any internal files about this company
+4. Use \`query_files\` to check if there are any internal files about this company
 5. Use \`compare_with_past_acquisitions\` if relevant to check how it compares to past deals
 
 ## Company Context
@@ -112,7 +112,7 @@ Respond ONLY with a JSON object. Each section value should be a markdown string 
   "investment_highlights": "- **Market Position**: ...\\n- **Differentiation**: ...\\n...",
   "investment_risks": "- **Customer Concentration**: ...\\n- **Regulatory Exposure**: ...\\n...",
   "diligence_priorities": "1. Question one?\\n2. Question two?\\n...",
-  "sources_used": [{"type": "database"}, {"type": "web", "url": "https://...", "title": "..."}, {"type": "inven"}, {"type": "meeting_notes"}]
+  "sources_used": [{"type": "database"}, {"type": "web", "url": "https://...", "title": "..."}, {"type": "inven"}, {"type": "{source}"}]
 }
 \`\`\`
 
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     companyId = body.companyId;
-
+    const source = body.source;
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required field: companyId" },
@@ -241,7 +241,8 @@ export async function POST(request: NextRequest) {
       .replace("{toolDescriptions}", toolDescriptions)
       .replace("{companyName}", company.target || "Unknown")
       .replace("{companyName}", company.target || "Unknown") // Two occurrences in web_search instruction
-      .replace("{companyContext}", companyContext);
+      .replace("{companyContext}", companyContext)
+      .replace("{source}", source || "files");
 
     // Invoke the agent
     const result = await agent.invoke({
