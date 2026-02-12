@@ -32,9 +32,22 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import type { DealStage } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface CompanyWithDeal {
   id: string;
@@ -102,6 +115,8 @@ export default function MasterData() {
   const [sectorFilter, setSectorFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { toast } = useToast();
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -161,6 +176,45 @@ export default function MasterData() {
       console.error('Error fetching companies:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteCompany = async (companyId: string, companyName: string) => {
+    setDeletingId(companyId);
+    try {
+      // First, fetch and delete any files in the deal-documents storage bucket
+      const { data: docs } = await supabase
+        .from('deal_documents')
+        .select('file_path')
+        .eq('deal_id', companyId);
+
+      if (docs && docs.length > 0) {
+        const filePaths = docs.map((d) => d.file_path);
+        await supabase.storage.from('deal-documents').remove(filePaths);
+      }
+
+      // Delete the company — all related rows cascade-delete automatically
+      const { error } = await supabase
+        .from('companies')
+        .delete()
+        .eq('id', companyId);
+
+      if (error) throw error;
+
+      setCompanies((prev) => prev.filter((c) => c.id !== companyId));
+      toast({
+        title: 'Company deleted',
+        description: `"${companyName}" and all related data have been removed.`,
+      });
+    } catch (error: any) {
+      console.error('Error deleting company:', error);
+      toast({
+        title: 'Delete failed',
+        description: error.message || 'Could not delete the company. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -362,6 +416,7 @@ export default function MasterData() {
                       <TableHead className="text-right">EBITDA Y3</TableHead>
                       <TableHead className="text-right">Valuation</TableHead>
                       <TableHead>Added</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -441,6 +496,43 @@ export default function MasterData() {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {new Date(company.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  disabled={deletingId === company.id}
+                                >
+                                  {deletingId === company.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete &ldquo;{company.name}&rdquo;?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete this company and all related data
+                                    including deal history, notes, documents, links, screening results,
+                                    and AI analyses. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => deleteCompany(company.id, company.name)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       );
