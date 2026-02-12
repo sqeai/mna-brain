@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import CompanyDetailDialog, { type CompanyData } from '@/components/pipeline/CompanyDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -118,8 +119,58 @@ export default function MasterData() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(null);
+  const [loadingDialog, setLoadingDialog] = useState(false);
   const { toast } = useToast();
   const itemsPerPage = 10;
+
+  const openCompanyDialog = async (companyId: string) => {
+    setLoadingDialog(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select(`
+          id, target, segment, website, watchlist_status,
+          revenue_2021_usd_mn, revenue_2022_usd_mn, revenue_2023_usd_mn, revenue_2024_usd_mn,
+          ebitda_2021_usd_mn, ebitda_2022_usd_mn, ebitda_2023_usd_mn, ebitda_2024_usd_mn,
+          ev_2024, pipeline_stage, l1_screening_result, remarks, created_at, updated_at, source
+        `)
+        .eq('id', companyId)
+        .single();
+
+      if (error || !data) {
+        toast({ title: 'Error', description: 'Could not load company', variant: 'destructive' });
+        return;
+      }
+
+      setSelectedCompany({
+        id: data.id,
+        target: data.target,
+        segment: data.segment,
+        website: data.website ?? null,
+        watchlist_status: data.watchlist_status,
+        pipeline_stage: data.pipeline_stage,
+        revenue_2021_usd_mn: data.revenue_2021_usd_mn,
+        revenue_2022_usd_mn: data.revenue_2022_usd_mn,
+        revenue_2023_usd_mn: data.revenue_2023_usd_mn,
+        revenue_2024_usd_mn: data.revenue_2024_usd_mn,
+        ebitda_2021_usd_mn: data.ebitda_2021_usd_mn,
+        ebitda_2022_usd_mn: data.ebitda_2022_usd_mn,
+        ebitda_2023_usd_mn: data.ebitda_2023_usd_mn,
+        ebitda_2024_usd_mn: data.ebitda_2024_usd_mn,
+        ev_2024: data.ev_2024,
+        l1_screening_result: data.l1_screening_result,
+        remarks: data.remarks,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        source: data.source ?? null,
+      });
+    } catch {
+      toast({ title: 'Error', description: 'Could not load company', variant: 'destructive' });
+    } finally {
+      setLoadingDialog(false);
+    }
+  };
 
   useEffect(() => {
     fetchCompanies();
@@ -444,7 +495,16 @@ export default function MasterData() {
 
                       return (
                         <TableRow key={company.id}>
-                          <TableCell className="font-medium">{company.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              type="button"
+                              onClick={() => openCompanyDialog(company.id)}
+                              disabled={loadingDialog}
+                              className="font-medium text-left hover:text-primary transition-colors disabled:opacity-50"
+                            >
+                              {company.name}
+                            </button>
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{company.sector || '-'}</Badge>
                           </TableCell>
@@ -586,6 +646,15 @@ export default function MasterData() {
             )}
           </CardContent>
         </Card>
+
+        {selectedCompany && (
+          <CompanyDetailDialog
+            company={selectedCompany}
+            open={!!selectedCompany}
+            onOpenChange={(open) => !open && setSelectedCompany(null)}
+            onUpdate={fetchCompanies}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
