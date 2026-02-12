@@ -34,6 +34,7 @@ import {
   Sparkles,
   Download,
   Eye,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -130,6 +131,21 @@ interface MatchedFile {
   created_at: string;
 }
 
+interface Screening {
+  id: string;
+  company_id: string;
+  criteria_id: string;
+  state: 'pending' | 'completed' | 'failed';
+  result: string | null;
+  remarks: string | null;
+  created_at: string;
+  criterias: {
+    id: string;
+    name: string;
+    prompt: string;
+  };
+}
+
 interface CompanyAnalysis {
   id?: string;
   company_id: string;
@@ -174,6 +190,7 @@ export default function CompanyDetailPage() {
   const [links, setLinks] = useState<DealLink[]>([]);
   const [documents, setDocuments] = useState<DealDocument[]>([]);
   const [matchedFiles, setMatchedFiles] = useState<MatchedFile[]>([]);
+  const [screenings, setScreenings] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<CompanyAnalysis | null>(null);
   const [analysisGenerating, setAnalysisGenerating] = useState(false);
@@ -230,7 +247,7 @@ export default function CompanyDetailPage() {
       : null;
 
     try {
-      const [notesRes, linksRes, docsRes, filesRes] = await Promise.all([
+      const [notesRes, linksRes, docsRes, filesRes, screeningsRes] = await Promise.all([
         supabase
           .from('deal_notes')
           .select('*')
@@ -247,12 +264,25 @@ export default function CompanyDetailPage() {
           .eq('deal_id', companyId)
           .order('created_at', { ascending: false }),
         filesQuery ?? Promise.resolve({ data: [] }),
+        supabase
+          .from('screenings')
+          .select(`
+            *,
+            criterias (
+              id,
+              name,
+              prompt
+            )
+          `)
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (notesRes.data) setNotes(notesRes.data);
       if (linksRes.data) setLinks(linksRes.data);
       if (docsRes.data) setDocuments(docsRes.data);
       if (filesRes?.data) setMatchedFiles((filesRes.data as MatchedFile[]) ?? []);
+      if (screeningsRes.data) setScreenings(screeningsRes.data as Screening[]);
     } catch (error) {
       console.error('Error fetching details:', error);
     }
@@ -593,12 +623,6 @@ export default function CompanyDetailPage() {
     }
   };
 
-  const getL1StatusIcon = (value: string | null) => {
-    if (value === 'Yes' || value === 'Pass') return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    if (value === 'No' || value === 'Fail') return <XCircle className="h-4 w-4 text-destructive" />;
-    return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -935,50 +959,54 @@ export default function CompanyDetailPage() {
                 <CardTitle className="text-lg">L1 Screening Results</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <div>
-                      <span className="font-medium">Vision Fit (≥25% revenue alignment)</span>
-                      <p className="text-xs text-muted-foreground">Revenue from priority segments meets threshold</p>
+                {screenings.length > 0 ? (
+                  <div className="space-y-3">
+                    {screenings.map((screening) => (
+                      <div key={screening.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{screening.criterias?.name || 'Unknown Criteria'}</span>
+                            <Badge
+                              variant={screening.state === 'completed' ? 'outline' : screening.state === 'pending' ? 'secondary' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {screening.state}
+                            </Badge>
+                          </div>
+                          {screening.result && (
+                            <p className="text-sm text-muted-foreground mt-1">{screening.result}</p>
+                          )}
+                          {screening.remarks && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">{screening.remarks}</p>
+                          )}
+                        </div>
+                        <ScreeningStateIcon state={screening.state} result={screening.result} />
+                      </div>
+                    ))}
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Overall Status</span>
+                        {(() => {
+                          const isPending = screenings.some(s => s.state === 'pending');
+                          const hasFail = screenings.some(s => s.result?.toLowerCase() === 'fail');
+
+                          if (isPending) {
+                            return <Badge variant="secondary">Pending</Badge>;
+                          }
+                          if (hasFail) {
+                            return <Badge variant="destructive">Fail</Badge>;
+                          }
+
+                          return <Badge variant="default">Pass</Badge>;
+                        })()}
+                      </div>
                     </div>
-                    {getL1StatusIcon(company.l1_vision_fit)}
                   </div>
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <div>
-                      <span className="font-medium">Priority Geography (≥50% revenue)</span>
-                      <p className="text-xs text-muted-foreground">Revenue from target geographies</p>
-                    </div>
-                    {getL1StatusIcon(company.l1_priority_geo_flag)}
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <div>
-                      <span className="font-medium">EV Below Threshold (&lt;$1B)</span>
-                      <p className="text-xs text-muted-foreground">Enterprise value within investment range</p>
-                    </div>
-                    {getL1StatusIcon(company.l1_ev_below_threshold)}
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b">
-                    <div>
-                      <span className="font-medium">Revenue Stability (No consecutive drops)</span>
-                      <p className="text-xs text-muted-foreground">Revenue growth pattern check</p>
-                    </div>
-                    {getL1StatusIcon(company.l1_revenue_no_consecutive_drop_usd)}
-                  </div>
-                  <div className="flex items-center justify-between py-2">
-                    <div>
-                      <span className="font-medium">Overall L1 Result</span>
-                      <p className="text-xs text-muted-foreground">Combined screening outcome</p>
-                    </div>
-                    {getL1StatusIcon(company.l1_screening_result)}
-                  </div>
-                  
-                  {company.l1_rationale && (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="text-sm text-muted-foreground mb-2">Rationale</p>
-                      <p className="text-sm">{company.l1_rationale}</p>
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No screenings have been run yet. Click &quot;Screen&quot; from the L0 stage to run filters.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1215,5 +1243,42 @@ export default function CompanyDetailPage() {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
+  );
+}
+
+function ScreeningStateIcon({ state, result }: { state: 'pending' | 'completed' | 'failed'; result: string | null }) {
+  if (state === 'pending') {
+    return (
+      <div className="flex items-center gap-1 text-yellow-600">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm font-medium">Pending</span>
+      </div>
+    );
+  }
+  if (state === 'failed') {
+    return (
+      <div className="flex items-center gap-1 text-red-600">
+        <XCircle className="h-4 w-4" />
+        <span className="text-sm font-medium">Failed</span>
+      </div>
+    );
+  }
+
+  const resultLower = result?.toLowerCase();
+  if (resultLower === 'inconclusive') {
+    return (
+      <div className="flex items-center gap-1 text-amber-500">
+        <HelpCircle className="h-4 w-4" />
+        <span className="text-sm font-medium">Inconclusive</span>
+      </div>
+    );
+  }
+
+  const isPassed = resultLower === 'pass' || resultLower === 'yes';
+  return (
+    <div className={`flex items-center gap-1 ${isPassed ? 'text-green-600' : 'text-red-600'}`}>
+      {isPassed ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+      <span className="text-sm font-medium">{isPassed ? 'Pass' : 'Fail'}</span>
+    </div>
   );
 }
