@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -300,12 +300,11 @@ export default function CompanyDetailPage() {
 
   const fetchDetails = async (companyTarget?: string | null) => {
     if (!companyId) return;
-    const companyName = companyTarget ?? company?.target?.trim() ?? '';
-    const filesQuery = companyName
+    const filesQuery = companyId
       ? supabase
           .from('files')
           .select('id, file_name, file_link, file_date, created_at')
-          .or(`matched_companies.ilike.%${companyName}%`)
+          .filter('matched_companies', 'cs', JSON.stringify([{ id: companyId }]))
           .order('created_at', { ascending: false })
           .limit(100)
       : null;
@@ -1291,50 +1290,59 @@ export default function CompanyDetailPage() {
                     ))}
                     {documents.length === 0 && <p className="text-muted-foreground text-sm">No documents yet</p>}
                   </div>
-                  {matchedFiles.length > 0 && (
-                    <>
-                      <Label className="text-muted-foreground text-sm font-medium mt-4 block">
-                        Files mentioning this company (from AI file dump)
-                      </Label>
-                      <div className="space-y-2 mt-2 max-h-[200px] overflow-y-auto">
-                        {matchedFiles.map((file) => (
-                          <div key={file.id} className="flex items-center justify-between p-2 bg-muted/70 rounded-lg">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <span className="text-sm truncate" title={file.file_name}>
-                                {file.file_name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => downloadMatchedFile(file)}
-                                title="Download"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenMatchedFilePreview(file)}
-                                title="Preview"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => router.push(`/ai-file-dump?highlight=${encodeURIComponent(file.id)}`)}
-                                title="Open in AI File Dump"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </div>
+                </CardContent>
+              </Card>
+              {/* Files mentioning this company (from AI file dump) */}
+              <Card className="lg:col-span-3">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Files mentioning this company
+                  </CardTitle>
+                  <CardDescription>From AI file dump</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {matchedFiles.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">No files from the AI file dump mention this company yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {matchedFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm truncate" title={file.file_name}>
+                              {file.file_name}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => downloadMatchedFile(file)}
+                              title="Download"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenMatchedFilePreview(file)}
+                              title="Preview"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => router.push(`/ai-file-dump?highlight=${encodeURIComponent(file.id)}`)}
+                              title="Open in AI File Dump"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
