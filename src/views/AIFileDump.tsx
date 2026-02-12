@@ -567,7 +567,7 @@ export default function AIFileDump() {
 
   const fetchMeetingNotes = useCallback(async () => {
     try {
-      const response = await fetch('/api/ai-file-dump');
+      const response = await fetch('/api/ai-file-dump?file_type');
       const result = await response.json();
 
       if (result.success) {
@@ -658,8 +658,12 @@ export default function AIFileDump() {
       return;
     }
 
-    // Check for duplicates
-    const existingFileNames = new Set(meetingNotes.map(note => note.file_name));
+    // Check for duplicates across all file types (meeting notes, prospectus, other files)
+    const existingFileNames = new Set([
+      ...meetingNotes.map(n => n.file_name),
+      ...prospectus.map(n => n.file_name),
+      ...otherFiles.map(n => n.file_name),
+    ]);
     const duplicates = selectedFiles.filter(file => existingFileNames.has(file.name));
     const filesToUpload = selectedFiles.filter(file => !existingFileNames.has(file.name));
 
@@ -1109,7 +1113,12 @@ export default function AIFileDump() {
                 <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">
                   {selectedFiles.map((file, index) => {
                     const fileKey = `${file.name}-${index}`;
-                    const isDuplicate = meetingNotes.some(note => note.file_name === file.name);
+                    const existingFileNames = new Set([
+                      ...meetingNotes.map(n => n.file_name),
+                      ...prospectus.map(n => n.file_name),
+                      ...otherFiles.map(n => n.file_name),
+                    ]);
+                    const isDuplicate = existingFileNames.has(file.name);
                     const notesExpanded = expandedFileNotes[fileKey];
                     const hasNotes = (fileRawNotes[fileKey] ?? '').trim() !== '';
                     return (
