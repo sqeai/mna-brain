@@ -69,6 +69,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -217,22 +218,44 @@ function FileTable({
     </div>
   );
 
-  const renderCompanies = (note: FileRecord) => (
+  const renderCompanies = (note: FileRecord) => {
+    const raw = note.matched_companies || [];
+    const isPipelineCompany = (c: { type?: string }) => c.type === 'company';
+    const list = [...raw].sort((a, b) => {
+      const aClick = isPipelineCompany(a as { type?: string }) ? 1 : 0;
+      const bClick = isPipelineCompany(b as { type?: string }) ? 1 : 0;
+      return bClick - aClick;
+    });
+    const chipClass = "inline-flex items-center gap-1 text-xs text-muted-foreground rounded px-1.5 py-0.5 min-w-[5rem] max-w-[10rem] w-[10rem] overflow-hidden";
+    const visible = expandedCompanies[note.id] ? list : list.slice(0, 2);
+    return (
     <div className="flex flex-col gap-1">
-      {note.matched_companies && note.matched_companies.length > 0 ? (
+      {list.length > 0 ? (
         <>
-          {(expandedCompanies[note.id] ? note.matched_companies : note.matched_companies.slice(0, 2)).map((company, i) => (
-            <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Building className="h-3 w-3" />
-              <span className="truncate max-w-[150px]">{company.name}</span>
-            </div>
-          ))}
-          {note.matched_companies.length > 2 && (
-            <button
-              className="text-[10px] text-primary hover:underline text-left"
-              onClick={() => toggleCompanies(note.id)}
-            >
-              {expandedCompanies[note.id] ? 'Show less' : `+${note.matched_companies.length - 2} more`}
+          {visible.map((company: { id?: string; name?: string; type?: string }, i: number) =>
+            isPipelineCompany(company) && company.id ? (
+              <Link
+                key={i}
+                href={`/pipeline/${company.id}`}
+                className={`${chipClass} hover:text-primary hover:underline bg-sky-100 dark:bg-sky-900/30`}
+                title={company.name}
+              >
+                <Building className="h-3 w-3 shrink-0" />
+                <span className="truncate">{company.name}</span>
+              </Link>
+            ) : (
+              <div key={i} className={`${chipClass} bg-orange-100 dark:bg-orange-900/30`} title={company.name}>
+                <Building className="h-3 w-3 shrink-0" />
+                <span className="truncate">{company.name}</span>
+              </div>
+            )
+          )}
+          {list.length > 2 && (
+              <button
+                className="text-[10px] text-primary hover:underline text-left"
+                onClick={() => toggleCompanies(note.id)}
+              >
+              {expandedCompanies[note.id] ? 'Show less' : `+${list.length - 2} more`}
             </button>
           )}
         </>
@@ -241,6 +264,7 @@ function FileTable({
       )}
     </div>
   );
+  };
 
   const renderStructuredNotes = (note: FileRecord) => {
     if (!note.structured_notes) {
@@ -943,8 +967,8 @@ export default function AIFileDump() {
         const searchLower = searchQuery.toLowerCase();
         const fileNameMatch = note.file_name.toLowerCase().includes(searchLower);
         const tagsMatch = note.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-        const companiesMatch = note.matched_companies?.some(company =>
-          company.name.toLowerCase().includes(searchLower)
+        const companiesMatch = note.matched_companies?.some((company: { name?: string }) =>
+          company.name?.toLowerCase().includes(searchLower)
         );
         return fileNameMatch || tagsMatch || companiesMatch;
       })
