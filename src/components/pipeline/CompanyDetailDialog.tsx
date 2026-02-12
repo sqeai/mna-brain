@@ -1166,16 +1166,28 @@ export default function CompanyDetailDialog({
                         <span className="font-medium">Overall Status</span>
                         {(() => {
                           const isPending = screenings.some(s => s.state === 'pending');
-                          const hasFail = screenings.some(s => s.result?.toLowerCase() === 'fail');
-
                           if (isPending) {
                             return <Badge variant="secondary">Pending</Badge>;
                           }
-                          if (hasFail) {
+
+                          const passCount = screenings.filter(s => s.result?.toLowerCase() === 'pass').length;
+                          const failCount = screenings.filter(s => s.result?.toLowerCase() === 'fail').length;
+                          const inconclusiveCount = screenings.filter(s => s.result?.toLowerCase() === 'inconclusive').length;
+
+                          // Pass: minimum 3 pass AND maximum 1 fail
+                          if (passCount >= 3 && failCount <= 1) {
+                            return <Badge variant="default">Pass</Badge>;
+                          }
+                          // Failed: at least 1 fail (but didn't qualify as pass)
+                          if (failCount >= 1) {
                             return <Badge variant="destructive">Fail</Badge>;
                           }
-
-                          return <Badge variant="default">Pass</Badge>;
+                          // Inconclusive: everything else
+                          return (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400">
+                              Inconclusive
+                            </Badge>
+                          );
                         })()}
                       </div>
                     </div>
