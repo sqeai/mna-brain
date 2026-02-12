@@ -2,36 +2,38 @@
 
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
-import { ArrowDown, LoaderCircle, Trash2, Send, Lightbulb } from "lucide-react";
+import { ArrowDown, LoaderCircle, Trash2, Send, Lightbulb, Paperclip, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChatMessageBubble, LoadingBubble } from "./ChatMessageBubble";
 
-const STORAGE_KEY = "mna-chat-history";
+const STORAGE_KEY = "legal-brain-chat-history";
 
-const WELCOME_MESSAGE = `# Hello! I'm your M&A discovery assistant. I can help you with
+const WELCOME_MESSAGE = `# Legal Brain Assistant
 
----
-
-🔍 **Company Discovery** - Find acquisition targets by sector  
-🔬 **Deep Dive Analysis** - Detailed company assessments  
-⚖️ **Comparison & Synergy** - Compare companies, evaluate fit  
-📊 **Pipeline Insights** - Performance metrics and bottlenecks  
+I help you analyze documents and answer legal and deal-related questions.
 
 ---
 
-💡 **Try asking:**  
-• "Find semiconductor companies"  
-• "Show me the top 3 petrochemical companies in Korea between 100 million and 1 billion enterprise value"  
-• "Show me the notes where Project Sunrise is mentioned"  
-• "Pipeline performance summary"
-• "Which companies are in the L0 step and how long have they been there?"`;
+🔍 **Web search** – Regulations, company news, public records  
+📄 **Akta cross-check** – Verify documents against internal company data  
+🏢 **Company details** – Look up companies and financials  
+
+You can **attach a file** (PDF, DOCX, etc.) in the chatbox and I’ll analyze it and cross-check when needed.
+
+---
+
+💡 **Try:**  
+• Attach a contract or Akta and ask me to cross-check it  
+• "Get company details for [Company Name]"  
+• "Search for recent M&A regulation in Indonesia"  
+• "Cross-check this document against our records"`;
 
 const welcomeUIMessage: UIMessage = {
   id: "welcome",
@@ -79,13 +81,16 @@ function ChatMessages(props: {
 }
 
 const SUGGESTION_CHIPS = [
-  "semiconductor companies",
-  "analyze Project Oriole and why is it a good fit",
-  "observe the pipeline performance and how long companies are in L1",
+  "Cross-check this document against our company records",
+  "Get company details for this company",
+  "Search for recent M&A regulation",
 ];
 
 const CHAT_INPUT_PLACEHOLDER =
-  "Ask about companies, analysis, comparisons, or pipeline performance...";
+  "Ask about documents, companies, or legal context... You can attach a file below.";
+
+const ACCEPTED_FILE_TYPES =
+  "application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,.txt,text/plain,application/json,.json,text/csv,.csv";
 
 export function ChatInput(props: {
   onSubmit: () => void;
@@ -96,8 +101,29 @@ export function ChatInput(props: {
   suggestionChips?: string[];
   onChipClick?: (chip: string) => void;
   className?: string;
+  /** Display name of attached file */
+  attachedFileName?: string | null;
+  /** Called when user selects a file; parent should store base64 + metadata for send */
+  onFileSelect?: (file: { base64: string; fileName: string; mimeType: string }) => void;
+  onClearFile?: () => void;
+  /** Optional ref to read attached file at send time (for transport body) */
+  fileInputRef?: React.RefObject<HTMLInputElement | null>;
 }) {
   const chips = props.suggestionChips ?? SUGGESTION_CHIPS;
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !props.onFileSelect) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      if (base64) props.onFileSelect({ base64, fileName: file.name, mimeType: file.type || "application/octet-stream" });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -106,7 +132,26 @@ export function ChatInput(props: {
       }}
       className={cn("w-full space-y-3", props.className)}
     >
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
+        <input
+          ref={hiddenInputRef}
+          type="file"
+          accept={ACCEPTED_FILE_TYPES}
+          className="hidden"
+          onChange={handleFileChange}
+          aria-label="Attach file"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="shrink-0 h-10 w-10"
+          onClick={() => hiddenInputRef.current?.click()}
+          disabled={props.loading}
+          title="Attach file (PDF, DOCX, TXT, etc.)"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
         <Input
           value={props.value}
           onChange={props.onChange}
@@ -116,8 +161,8 @@ export function ChatInput(props: {
         />
         <Button
           type="submit"
-          disabled={!props.value.trim() || props.loading}
-          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 shrink-0"
+          disabled={(!props.value.trim() && !props.attachedFileName) || props.loading}
+          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shrink-0"
         >
           {props.loading ? (
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
@@ -126,6 +171,20 @@ export function ChatInput(props: {
           )}
         </Button>
       </div>
+      {props.attachedFileName && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="truncate">📎 {props.attachedFileName}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+            onClick={props.onClearFile}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
         <span>Try:</span>
@@ -242,6 +301,8 @@ function saveMessagesToStorage(messages: UIMessage[]) {
   }
 }
 
+type AttachedFilePayload = { base64: string; fileName: string; mimeType: string } | null;
+
 export function ChatWindow(props: {
   endpoint: string;
   emptyStateComponent: ReactNode;
@@ -251,10 +312,19 @@ export function ChatWindow(props: {
   footerClassName?: string;
 }) {
   const [input, setInput] = useState("");
+  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const attachedFileRef = useRef<AttachedFilePayload>(null);
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: props.endpoint }),
+    () =>
+      new DefaultChatTransport({
+        api: props.endpoint,
+        body: () => {
+          const file = attachedFileRef.current;
+          return file ? { attachedFile: file } : {};
+        },
+      }),
     [props.endpoint]
   );
 
@@ -268,33 +338,42 @@ export function ChatWindow(props: {
     },
   });
 
-  // Load from localStorage on mount
   useEffect(() => {
     const stored = loadMessagesFromStorage();
-    if (stored.length > 0) {
-      setMessages(stored);
-    }
+    if (stored.length > 0) setMessages(stored);
     setIsHydrated(true);
   }, [setMessages]);
 
-  // Save messages to localStorage whenever they change
   useEffect(() => {
-    if (isHydrated && messages.length > 0) {
-      saveMessagesToStorage(messages);
-    }
+    if (isHydrated && messages.length > 0) saveMessagesToStorage(messages);
   }, [messages, isHydrated]);
 
-  // Clear history handler
   const handleClearHistory = useCallback(() => {
     setMessages([]);
     localStorage.removeItem(STORAGE_KEY);
     toast.success("Chat history cleared");
   }, [setMessages]);
 
-  // Don't render until hydrated to avoid hydration mismatch
-  if (!isHydrated) {
-    return null;
-  }
+  const handleFileSelect = useCallback((file: { base64: string; fileName: string; mimeType: string }) => {
+    attachedFileRef.current = file;
+    setAttachedFileName(file.fileName);
+  }, []);
+
+  const handleClearFile = useCallback(() => {
+    attachedFileRef.current = null;
+    setAttachedFileName(null);
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    const text = input.trim() || (attachedFileName ? `[Attached: ${attachedFileName}]` : "");
+    if (!text && !attachedFileRef.current) return;
+    sendMessage({ text: text || "Please analyze the attached document." });
+    setInput("");
+    attachedFileRef.current = null;
+    setAttachedFileName(null);
+  }, [input, attachedFileName, sendMessage]);
+
+  if (!isHydrated) return null;
 
   return (
     <ChatLayout
@@ -320,14 +399,14 @@ export function ChatWindow(props: {
           <ChatInput
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onSubmit={() => {
-              sendMessage({ text: input });
-              setInput("");
-            }}
+            onSubmit={handleSubmit}
             loading={status === "streaming" || status === "submitted"}
             placeholder={props.placeholder ?? CHAT_INPUT_PLACEHOLDER}
             suggestionChips={SUGGESTION_CHIPS}
             onChipClick={(chip) => setInput(chip)}
+            attachedFileName={attachedFileName}
+            onFileSelect={handleFileSelect}
+            onClearFile={handleClearFile}
           />
         </div>
       }
