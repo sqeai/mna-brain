@@ -22,6 +22,7 @@ import {
   Loader2,
   Trash2,
   ExternalLink,
+  Clock,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -98,6 +99,68 @@ interface CompanyData {
   updated_at: string | null;
   source: string | null;
 }
+
+/** Minimal company_logs row used to build stage history */
+interface CompanyLogRow {
+  id: string;
+  action: string;
+  created_at: string | null;
+}
+
+interface StageHistory {
+  id: string;
+  stage: string;
+  entered_at: string;
+  exited_at: string | null;
+  duration_seconds: number | null;
+}
+
+/** Parse company_logs actions into stage + entered_at. Returns null if not a stage-related action. */
+function stageFromLogAction(action: string, created_at: string): { stage: string; entered_at: string } | null {
+  const at = created_at || new Date().toISOString();
+  if (action === 'ADDED_TO_PIPELINE') return { stage: 'L0', entered_at: at };
+  if (action === 'PROMOTED_FROM_MARKET_SCREENING_TO_L0') return { stage: 'L0', entered_at: at };
+  const fromTo = /^PROMOTED_FROM_(.+)_TO_(.+)$/.exec(action);
+  if (fromTo) return { stage: fromTo[2], entered_at: at };
+  const to = /^PROMOTED_TO_(.+)$/.exec(action);
+  if (to) return { stage: to[1], entered_at: at };
+  return null;
+}
+
+/** Build StageHistory[] from company_logs rows (ordered by created_at asc). */
+function companyLogsToStageHistory(logs: CompanyLogRow[]): StageHistory[] {
+  const entries: { id: string; stage: string; entered_at: string }[] = [];
+  for (const log of logs) {
+    const parsed = stageFromLogAction(log.action, log.created_at ?? '');
+    if (parsed) entries.push({ id: log.id, stage: parsed.stage, entered_at: parsed.entered_at });
+  }
+  const result: StageHistory[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const curr = entries[i];
+    const next = entries[i + 1];
+    const exited_at = next ? next.entered_at : null;
+    const duration_seconds =
+      exited_at && curr.entered_at
+        ? (new Date(exited_at).getTime() - new Date(curr.entered_at).getTime()) / 1000
+        : null;
+    result.push({
+      id: curr.id,
+      stage: curr.stage,
+      entered_at: curr.entered_at,
+      exited_at,
+      duration_seconds,
+    });
+  }
+  return result.reverse(); // newest first for display
+}
+
+const formatDuration = (seconds: number | null) => {
+  if (seconds === null) return 'Ongoing';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  if (days > 0) return `${days}d ${hours}h`;
+  return `${hours}h`;
+};
 
 interface DealNote {
   id: string;
@@ -186,6 +249,7 @@ export default function CompanyDetailPage() {
   const returnTo = searchParams.get('from') || '/pipeline';
 
   const [company, setCompany] = useState<CompanyData | null>(null);
+  const [stageHistory, setStageHistory] = useState<StageHistory[]>([]);
   const [notes, setNotes] = useState<DealNote[]>([]);
   const [links, setLinks] = useState<DealLink[]>([]);
   const [documents, setDocuments] = useState<DealDocument[]>([]);
@@ -247,7 +311,12 @@ export default function CompanyDetailPage() {
       : null;
 
     try {
-      const [notesRes, linksRes, docsRes, filesRes, screeningsRes] = await Promise.all([
+      const [logsRes, notesRes, linksRes, docsRes, filesRes, screeningsRes] = await Promise.all([
+        supabase
+          .from('company_logs')
+          .select('id, action, created_at')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: true }),
         supabase
           .from('deal_notes')
           .select('*')
@@ -278,6 +347,7 @@ export default function CompanyDetailPage() {
           .order('created_at', { ascending: false }),
       ]);
 
+      if (logsRes.data) setStageHistory(companyLogsToStageHistory(logsRes.data as CompanyLogRow[]));
       if (notesRes.data) setNotes(notesRes.data);
       if (linksRes.data) setLinks(linksRes.data);
       if (docsRes.data) setDocuments(docsRes.data);
@@ -827,6 +897,8 @@ export default function CompanyDetailPage() {
               </CardContent>
             </Card>
 
+           
+
             {/* Financial Charts */}
             <FinancialCharts
               revenue_year1={company.revenue_2022_usd_mn ? company.revenue_2022_usd_mn * 1_000_000 : null}
@@ -978,6 +1050,40 @@ export default function CompanyDetailPage() {
                 </Button>
               </div>
             )}
+
+             {/* Stage History */}
+             <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Stage History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stageHistory.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No history yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {stageHistory.map((history) => (
+                      <div key={history.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline">{getStageLabel(history.stage)}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {format(new Date(history.entered_at), 'MMM d, yyyy HH:mm')}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {history.exited_at
+                            ? formatDuration(history.duration_seconds)
+                            : 'Current'
+                          }
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="filters" className="mt-6">
