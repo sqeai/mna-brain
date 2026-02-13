@@ -360,9 +360,10 @@ export default function Dashboard() {
                     const inboundHeightPx = segmentMinPx + inboundRatio * remainingHeight;
                     const outboundHeightPx = segmentMinPx + outboundRatio * remainingHeight;
                     return (
-                      <div
+                      <Link
                         key={item.stage}
-                        className="flex-1 flex flex-col items-center cursor-pointer group"
+                        href={`/pipeline?stage=${item.stage}`}
+                        className="flex-1 flex flex-col items-center cursor-pointer group no-underline text-inherit"
                       >
                         <span className="text-xl font-semibold mb-2 transition-transform group-hover:scale-110">{item.count}</span>
                         <Badge variant="secondary" className="mb-4 text-xs bg-muted/80 backdrop-blur-sm">
@@ -395,7 +396,7 @@ export default function Dashboard() {
                           <div className="text-base font-bold">{item.stage}</div>
                           <div className="text-xs text-muted-foreground">{item.label}</div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
