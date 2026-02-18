@@ -45,11 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
-      // Query the users table for matching email and password
+      const normalizedEmail = email.toLowerCase().trim();
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
+        .ilike('email', normalizedEmail)
         .eq('password', password)
         .single();
 

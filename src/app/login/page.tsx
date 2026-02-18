@@ -41,12 +41,12 @@ export default function LoginPage() {
       setError(error.message);
       setIsLoading(false);
     } else {
-      // Identify user in PostHog and capture sign-in event
-      posthog.identify(email, {
-        email: email,
+      const normalizedEmail = email.toLowerCase().trim();
+      posthog.identify(normalizedEmail, {
+        email: normalizedEmail,
       });
       posthog.capture('user_signed_in', {
-        email: email,
+        email: normalizedEmail,
       });
       router.push('/dashboard');
     }
