@@ -1,8 +1,7 @@
 "use client";
 
-import { useChat, type UIMessage } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import type { UIMessage } from "@ai-sdk/react";
+import { useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
@@ -12,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChatMessageBubble, LoadingBubble } from "./ChatMessageBubble";
-
-const STORAGE_KEY = "mna-chat-history";
+import { useChatContext, STORAGE_KEY } from "./ChatProvider";
 
 const WELCOME_MESSAGE = `# Hello! I'm your M&A discovery assistant. I can help you with
 
@@ -44,7 +42,7 @@ function WelcomeMessage() {
 }
 
 function ChatMessages(props: {
-  messages: ReturnType<typeof useChat>["messages"];
+  messages: UIMessage[];
   emptyStateComponent: ReactNode;
   aiEmoji?: string;
   className?: string;
@@ -218,30 +216,6 @@ export function ChatLayout(props: {
   );
 }
 
-// Load messages from localStorage
-function loadMessagesFromStorage(): UIMessage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error("Failed to load chat history:", e);
-  }
-  return [];
-}
-
-// Save messages to localStorage
-function saveMessagesToStorage(messages: UIMessage[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  } catch (e) {
-    console.error("Failed to save chat history:", e);
-  }
-}
-
 export function ChatWindow(props: {
   endpoint: string;
   emptyStateComponent: ReactNode;
@@ -252,46 +226,19 @@ export function ChatWindow(props: {
 }) {
   const [input, setInput] = useState("");
   const [isHydrated, setIsHydrated] = useState(false);
+  const { messages, sendMessage, status, setMessages } = useChatContext();
 
-  const transport = useMemo(
-    () => new DefaultChatTransport({ api: props.endpoint }),
-    [props.endpoint]
-  );
-
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport,
-    onError: (e: Error) => {
-      console.error(e);
-      toast.error(`Error while processing your request`, {
-        description: e.message,
-      });
-    },
-  });
-
-  // Load from localStorage on mount
+  // Defer render until client to avoid hydration mismatch with stored messages
   useEffect(() => {
-    const stored = loadMessagesFromStorage();
-    if (stored.length > 0) {
-      setMessages(stored);
-    }
     setIsHydrated(true);
-  }, [setMessages]);
+  }, []);
 
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    if (isHydrated && messages.length > 0) {
-      saveMessagesToStorage(messages);
-    }
-  }, [messages, isHydrated]);
-
-  // Clear history handler
   const handleClearHistory = useCallback(() => {
     setMessages([]);
     localStorage.removeItem(STORAGE_KEY);
     toast.success("Chat history cleared");
   }, [setMessages]);
 
-  // Don't render until hydrated to avoid hydration mismatch
   if (!isHydrated) {
     return null;
   }

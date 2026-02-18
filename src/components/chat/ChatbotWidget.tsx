@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useChat, type UIMessage } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
-import { toast } from 'sonner';
+import type { UIMessage } from '@ai-sdk/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,28 +11,7 @@ import { Bot, Send, X, Maximize2, Minimize2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
-
-const STORAGE_KEY = 'mna-chat-history';
-
-function loadMessagesFromStorage(): UIMessage[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch (e) {
-    console.error('Failed to load chat history:', e);
-  }
-  return [];
-}
-
-function saveMessagesToStorage(messages: UIMessage[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  } catch (e) {
-    console.error('Failed to save chat history:', e);
-  }
-}
+import { useChatContext } from '@/components/chat/ChatProvider';
 
 function getTextFromUIMessage(m: UIMessage): string {
   const parts = (m as { parts?: Array<{ type: string; text?: string }> }).parts ?? [];
@@ -58,25 +35,11 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat' }), []);
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport,
-    onError: (e: Error) => {
-      console.error(e);
-      toast.error('Error while processing your request', { description: e.message });
-    },
-  });
+  const { messages, sendMessage, status } = useChatContext();
 
   useEffect(() => {
-    const stored = loadMessagesFromStorage();
-    if (stored.length > 0) setMessages(stored);
     setIsHydrated(true);
-  }, [setMessages]);
-
-  useEffect(() => {
-    if (isHydrated && messages.length > 0) saveMessagesToStorage(messages);
-  }, [messages, isHydrated]);
+  }, []);
 
   useEffect(() => {
     const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');

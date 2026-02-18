@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/hooks/useAuth';
-
+import { ChatProvider } from '@/components/chat/ChatProvider';
 import { ThemeProvider } from 'next-themes';
 
 const queryClient = new QueryClient();
@@ -20,11 +20,13 @@ export function Providers({ children }: ProvidersProps) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            {children}
-          </TooltipProvider>
+          <ChatProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              {children}
+            </TooltipProvider>
+          </ChatProvider>
         </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
