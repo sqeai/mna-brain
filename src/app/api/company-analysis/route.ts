@@ -7,19 +7,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentGraph, HumanMessage } from "@/lib/agent";
 import { getToolDescriptions } from "@/lib/agent/tools";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { z } from "zod";
 
 // Server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-  return createClient(url, key);
-}
-
 // Zod schema for the agent's structured response
 const CompanyAnalysisResultSchema = z.object({
   business_overview: z.string(),
@@ -133,7 +124,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from("company_analyses")
       .select("*")
@@ -166,7 +157,7 @@ export async function GET(request: NextRequest) {
  * POST: Generate (or return cached) company analysis.
  */
 export async function POST(request: NextRequest) {
-  const supabase = getSupabaseClient();
+  const supabase = createSupabaseClient();
   let companyId: string | undefined;
 
   try {
@@ -364,7 +355,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     const { error } = await supabase
       .from("company_analyses")
       .delete()

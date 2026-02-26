@@ -25,7 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Search,
@@ -63,6 +62,12 @@ import MarketScreeningResults from '@/components/pipeline/MarketScreeningResults
 import ScreeningProgressPanel from '@/components/pipeline/ScreeningProgressPanel';
 import { CollapsibleSection } from '@/components/common/CollapsibleSection';
 import posthog from 'posthog-js';
+import {
+  getCompanies,
+  getCompaniesCount,
+  promoteCompany,
+  runCompanyL1Filters,
+} from '@/lib/api/pipeline';
 
 interface PipelineCompany {
   id: string;
@@ -210,33 +215,12 @@ export default function Pipeline() {
   const fetchCompanies = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          id,
-          target,
-          segment,
-          website,
-          watchlist_status,
-          revenue_2021_usd_mn,
-          revenue_2022_usd_mn,
-          revenue_2023_usd_mn,
-          revenue_2024_usd_mn,
-          ebitda_2021_usd_mn,
-          ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          pipeline_stage,
-          l1_screening_result,
-          created_at,
-          updated_at
-        `)
-        .not('pipeline_stage', 'is', null)
-        .neq('pipeline_stage', 'market_screening')
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await getCompanies({
+        stageNotNull: true,
+        excludeStage: 'market_screening',
+        orderBy: 'updated_at',
+        orderDir: 'desc',
+      });
 
       const formatted: PipelineCompany[] = data?.map((company: any) => ({
         id: company.id,
@@ -275,14 +259,10 @@ export default function Pipeline() {
     try {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const { count, error } = await supabase
-        .from('companies')
-        .select('*', { count: 'exact', head: true })
-        .eq('pipeline_stage', 'market_screening')
-        .gte('created_at', sevenDaysAgo.toISOString());
-
-      if (error) throw error;
+      const count = await getCompaniesCount({
+        stage: 'market_screening',
+        createdAfter: sevenDaysAgo.toISOString(),
+      });
       setNewCandidatesCount(count || 0);
     } catch (error) {
       console.error('Error fetching candidates count:', error);
@@ -393,8 +373,7 @@ export default function Pipeline() {
 
   const runL1Filters = async (dealId: string) => {
     try {
-      const { data, error } = await (supabase as any).rpc('run_l1_filters', { deal_id_param: dealId });
-      if (error) throw error;
+      const data = await runCompanyL1Filters(dealId);
       const result = data as { status: string } | null;
       toast.success(`Filter completed: ${result?.status || 'Unknown'}`);
       fetchCompanies();
@@ -440,18 +419,9 @@ export default function Pipeline() {
     const nextStage = STAGES[stageIndex + 1];
 
     try {
-      // Update company pipeline stage
-      const { error } = await supabase
-        .from('companies')
-        .update({ pipeline_stage: nextStage })
-        .eq('id', companyId);
-
-      if (error) throw error;
-
-      // Log the promotion
-      await supabase.from('company_logs').insert({
-        company_id: companyId,
-        action: `PROMOTED_TO_${nextStage}`,
+      await promoteCompany(companyId, {
+        currentStage,
+        nextStage,
       });
 
       toast.success(`Promoted to ${nextStage}`);

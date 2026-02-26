@@ -5,20 +5,8 @@
 import { extractTextFromFile } from "@/lib/fileExtractor";
 import { processFileContent } from "@/lib/file_processing_agent";
 import { downloadFile, getSignedUrl } from "@/lib/s3";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { NextRequest, NextResponse } from "next/server";
-
-// Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
 
 /**
  * POST - Upload a new file
@@ -39,7 +27,7 @@ export async function POST(request: NextRequest) {
     const s3Key = key;
     const fileType = contentType || "application/octet-stream";
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     // Initial insert with 'processing' status
     const { data: initialData, error: insertError } = await supabase
@@ -76,7 +64,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Invoke the agent to structure the text
-      structuredResult = await processFileContent(rawText, buffer, fileType, userRawNotes);
+      structuredResult = await processFileContent(rawText, buffer, fileType, userRawNotes, supabase);
 
       if (structuredResult) {
         tags = structuredResult.tags || [];
@@ -261,7 +249,7 @@ export async function GET(request: NextRequest) {
   try {
     const fileType = request.nextUrl.searchParams.get("file_type");
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     let query = supabase
       .from("files")
       .select("*");
@@ -326,7 +314,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from("files")
       .update(updates)

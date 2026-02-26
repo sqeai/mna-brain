@@ -20,9 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Settings, Radar, Play, Sparkles, EyeOff, Eye, ChevronUp, ChevronDown } from 'lucide-react';
+import { getActiveInvestmentThesis, saveInvestmentThesis } from '@/lib/api/pipeline';
 
 interface InvestmentThesis {
   id: string;
@@ -56,17 +56,7 @@ export default function MarketScreeningStatus({ onScanComplete, newCandidatesCou
 
   const fetchThesis = async () => {
     try {
-      const { data, error } = await (supabase as any)
-        .from('investment_thesis')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      const data = await getActiveInvestmentThesis();
 
       if (data) {
         setThesis(data as InvestmentThesis);
@@ -94,18 +84,13 @@ export default function MarketScreeningStatus({ onScanComplete, newCandidatesCou
       }
 
       if (thesis) {
-        // Update existing thesis
-        const { error } = await (supabase as any)
-          .from('investment_thesis')
-          .update({
-            title: thesisTitle,
-            content: thesisContent,
-            scan_frequency: scanFrequency,
-            sources_count: sourcesCount,
-          })
-          .eq('id', thesis.id);
-
-        if (error) throw error;
+        await saveInvestmentThesis({
+          id: thesis.id,
+          title: thesisTitle,
+          content: thesisContent,
+          scan_frequency: scanFrequency,
+          sources_count: sourcesCount,
+        });
         toast.success('Investment thesis updated');
       } else {
         // Create new thesis
@@ -118,19 +103,13 @@ export default function MarketScreeningStatus({ onScanComplete, newCandidatesCou
           nextScan.setMonth(nextScan.getMonth() + 1);
         }
 
-        const { data, error } = await (supabase as any)
-          .from('investment_thesis')
-          .insert({
-            title: thesisTitle || 'Default Thesis',
-            content: thesisContent,
-            scan_frequency: scanFrequency,
-            sources_count: sourcesCount,
-            next_scan_at: nextScan.toISOString(),
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
+        const data = await saveInvestmentThesis({
+          title: thesisTitle || 'Default Thesis',
+          content: thesisContent,
+          scan_frequency: scanFrequency,
+          sources_count: sourcesCount,
+          next_scan_at: nextScan.toISOString(),
+        });
         setThesis(data as InvestmentThesis);
         toast.success('Investment thesis created');
       }

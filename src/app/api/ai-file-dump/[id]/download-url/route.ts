@@ -2,21 +2,10 @@
  * API Route for getting a signed download URL for a file
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { getSignedUrl } from "@/lib/s3";
 
 // Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
-
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -38,7 +27,7 @@ export async function GET(
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     // Get the record to find the S3 key
     const { data: record, error: fetchError } = await supabase

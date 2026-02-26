@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { getCompanies } from '@/lib/api/pipeline';
 import {
   Building2,
   TrendingUp,
@@ -141,32 +141,10 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       // Fetch all companies
-      const { data: companiesData, error } = await supabase
-        .from('companies')
-        .select(`
-          id,
-          target,
-          segment,
-          watchlist_status,
-          source,
-          pipeline_stage,
-          revenue_2021_usd_mn,
-          revenue_2022_usd_mn,
-          revenue_2023_usd_mn,
-          revenue_2024_usd_mn,
-          ebitda_2021_usd_mn,
-          ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          l1_screening_result,
-          remarks,
-          created_at,
-          updated_at
-        `)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
+      const companiesData = await getCompanies({
+        orderBy: 'updated_at',
+        orderDir: 'desc',
+      });
 
       if (companiesData) {
         setCompanies(companiesData);

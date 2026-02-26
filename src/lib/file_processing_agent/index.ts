@@ -1,10 +1,10 @@
-import { supabase } from "@/integrations/supabase/client";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { createAgent } from "langchain";
 import { logger } from "../agent/logger";
 import { getAllCompanyReferences } from "../fuzzySearch";
 import { splitPdf } from "../pdf";
+import type { DbClient } from "@/lib/server/supabase";
 
 const generateSystemPrompt = (companies_list, userRawNotes) => `You are a specialized M&A File Processing Assistant. Your task is to analyze raw text extracted from meeting documents (like PPTX slides) and transform it into a highly structured format.
 
@@ -130,7 +130,13 @@ Always prioritize accuracy. Only list a company in 'companies_detected' if you a
 /**
  * Invoke the file processing agent.
  */
-export async function processFileContent(rawText: string, buffer: Buffer, contentType: string, userRawNotes: string) {
+export async function processFileContent(
+  rawText: string,
+  buffer: Buffer,
+  contentType: string,
+  userRawNotes: string,
+  supabase: DbClient
+) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");

@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { getSignedUrl } from "@/lib/s3";
-
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
 
 /**
  * GET - Get a signed URL for downloading or previewing a deal document from S3
@@ -30,7 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     const { data: row, error: fetchError } = await supabase
       .from("deal_documents")

@@ -10,9 +10,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Plus, Pencil, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import posthog from 'posthog-js';
+import {
+  createCriteria,
+  deleteCriteria,
+  getCriterias,
+  prepareScreenings,
+  updateCriteria,
+  updateScreening,
+} from '@/lib/api/pipeline';
 
 interface Company {
   id: string;
@@ -68,12 +75,7 @@ export default function AIScreeningDialog({
     const fetchCriteria = async () => {
       setIsLoadingCriteria(true);
       try {
-        const { data, error } = await supabase
-          .from('criterias')
-          .select('id, name, prompt')
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
+        const data = await getCriterias();
         setCriteria(data || []);
       } catch (error: any) {
         console.error('Error fetching criteria:', error);
@@ -93,16 +95,7 @@ export default function AIScreeningDialog({
 
     setIsSaving(true);
     try {
-      const { data, error } = await supabase
-        .from('criterias')
-        .insert({
-          name: newCriterionName.trim(),
-          prompt: newCriterionPrompt.trim(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const data = await createCriteria(newCriterionName.trim(), newCriterionPrompt.trim());
 
       setCriteria([...criteria, data]);
       setNewCriterionName('');
@@ -127,12 +120,7 @@ export default function AIScreeningDialog({
     const criterionToDelete = criteria[index];
 
     try {
-      const { error } = await supabase
-        .from('criterias')
-        .delete()
-        .eq('id', criterionToDelete.id);
-
-      if (error) throw error;
+      await deleteCriteria(criterionToDelete.id);
 
       setCriteria(criteria.filter((_, i) => i !== index));
 
@@ -162,15 +150,7 @@ export default function AIScreeningDialog({
     setIsSaving(true);
 
     try {
-      const { error } = await supabase
-        .from('criterias')
-        .update({
-          name: editName.trim(),
-          prompt: editPrompt.trim(),
-        })
-        .eq('id', criterionToUpdate.id);
-
-      if (error) throw error;
+      await updateCriteria(criterionToUpdate.id, editName.trim(), editPrompt.trim());
 
       const newCriteria = [...criteria];
       newCriteria[editingIndex] = {
@@ -211,55 +191,10 @@ export default function AIScreeningDialog({
     setIsScreening(true);
 
     try {
-      // Step 1: Create pending screening entries for all company × criteria combinations
-      const screeningEntries: { id: string; company_id: string; criteria_id: string }[] = [];
-      const insertPromises: Promise<any>[] = [];
-
-      for (const company of companies) {
-        for (const criterion of criteria) {
-          // Check if screening already exists
-          const { data: existing } = await supabase
-            .from('screenings')
-            .select('id')
-            .eq('company_id', company.id)
-            .eq('criteria_id', criterion.id)
-            .single();
-
-          if (existing) {
-            // Update existing to pending
-            const promise = Promise.resolve(
-              supabase
-                .from('screenings')
-                .update({ state: 'pending', result: null, remarks: null })
-                .eq('id', existing.id)
-                .select()
-                .single()
-            );
-            insertPromises.push(promise);
-          } else {
-            // Insert new pending entry
-            const promise = Promise.resolve(
-              supabase
-                .from('screenings')
-                .insert({
-                  company_id: company.id,
-                  criteria_id: criterion.id,
-                  state: 'pending',
-                })
-                .select()
-                .single()
-            );
-            insertPromises.push(promise);
-          }
-        }
-      }
-
-      const insertResults = await Promise.all(insertPromises);
-      for (const result of insertResults) {
-        if (result.data) {
-          screeningEntries.push(result.data);
-        }
-      }
+      const screeningEntries = await prepareScreenings(
+        companies.map((c) => c.id),
+        criteria.map((c) => c.id)
+      );
 
       // Capture AI screening started event
       posthog.capture('ai_screening_started', {
@@ -312,25 +247,19 @@ export default function AIScreeningDialog({
 
           // Update screening entry in database
           const newState = data.result === 'error' ? 'failed' : 'completed';
-          await supabase
-            .from('screenings')
-            .update({
-              state: newState,
-              result: data.result,
-              remarks: data.remarks,
-            })
-            .eq('id', entry.id);
+          await updateScreening(entry.id, {
+            state: newState,
+            result: data.result,
+            remarks: data.remarks,
+          });
         } catch (error) {
           console.error(`Screening error for ${company.id}/${criterion.id}:`, error);
           // Update as failed in database
-          await supabase
-            .from('screenings')
-            .update({
-              state: 'failed',
-              result: 'error',
-              remarks: 'API call failed',
-            })
-            .eq('id', entry.id);
+          await updateScreening(entry.id, {
+            state: 'failed',
+            result: 'error',
+            remarks: 'API call failed',
+          });
         }
       });
     } catch (error: any) {

@@ -5,19 +5,11 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
+import { createSupabaseClient } from "@/lib/server/supabase";
 
-// Create a server-side Supabase client
 function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
+  return createSupabaseClient();
 }
 
 const PROJECT_CODENAME_PATTERN = /\bProject\s+[A-Za-z0-9][A-Za-z0-9\-]*(?:\s+[A-Za-z0-9][A-Za-z0-9\-]*){0,3}\b/gi;

@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Building2,
@@ -50,6 +49,15 @@ import { FinancialCharts } from '@/components/pipeline/FinancialCharts';
 import { DealStage } from '@/lib/types';
 import { STAGE_LABELS } from '@/lib/constants';
 import { formatDistanceToNow, format } from 'date-fns';
+import {
+  addCompanyLink,
+  addCompanyNote,
+  deleteDealLink,
+  deleteDealNote,
+  getCompanies,
+  getCompanyDetails,
+  getScreenings,
+} from '@/lib/api/pipeline';
 
 const websiteHref = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `https://${url}`;
@@ -278,13 +286,7 @@ export default function CompanyDetailPage() {
   const fetchCompany = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', companyId)
-        .single();
-
-      if (error) throw error;
+      const data = await getCompanies({ id: companyId });
       if (data) {
         setCompany(data as CompanyData);
         fetchDetails((data as CompanyData).target?.trim() || null);
@@ -300,58 +302,14 @@ export default function CompanyDetailPage() {
 
   const fetchDetails = async (companyTarget?: string | null) => {
     if (!companyId) return;
-    const filesQuery = companyId
-      ? supabase
-          .from('files')
-          .select('id, file_name, file_link, file_date, created_at')
-          .filter('matched_companies', 'cs', JSON.stringify([{ id: companyId }]))
-          .order('created_at', { ascending: false })
-          .limit(100)
-      : null;
-
     try {
-      const [logsRes, notesRes, linksRes, docsRes, filesRes, screeningsRes] = await Promise.all([
-        supabase
-          .from('company_logs')
-          .select('id, action, created_at')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('deal_notes')
-          .select('*')
-          .eq('deal_id', companyId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('deal_links')
-          .select('*')
-          .eq('deal_id', companyId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('deal_documents')
-          .select('*')
-          .eq('deal_id', companyId)
-          .order('created_at', { ascending: false }),
-        filesQuery ?? Promise.resolve({ data: [] }),
-        supabase
-          .from('screenings')
-          .select(`
-            *,
-            criterias (
-              id,
-              name,
-              prompt
-            )
-          `)
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false }),
-      ]);
-
-      if (logsRes.data) setStageHistory(companyLogsToStageHistory(logsRes.data as CompanyLogRow[]));
-      if (notesRes.data) setNotes(notesRes.data);
-      if (linksRes.data) setLinks(linksRes.data);
-      if (docsRes.data) setDocuments(docsRes.data);
-      if (filesRes?.data) setMatchedFiles((filesRes.data as MatchedFile[]) ?? []);
-      if (screeningsRes.data) setScreenings(screeningsRes.data as Screening[]);
+      const data = await getCompanyDetails(companyId);
+      setStageHistory(companyLogsToStageHistory((data.logs || []) as CompanyLogRow[]));
+      setNotes((data.notes || []) as DealNote[]);
+      setLinks((data.links || []) as DealLink[]);
+      setDocuments((data.documents || []) as DealDocument[]);
+      setMatchedFiles((data.matchedFiles || []) as MatchedFile[]);
+      setScreenings((data.screenings || []) as Screening[]);
     } catch (error) {
       console.error('Error fetching details:', error);
     }
@@ -360,18 +318,7 @@ export default function CompanyDetailPage() {
   const fetchScreenings = async () => {
     if (!companyId) return;
     try {
-      const { data } = await supabase
-        .from('screenings')
-        .select(`
-          *,
-          criterias (
-            id,
-            name,
-            prompt
-          )
-        `)
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+      const data = await getScreenings({ companyId });
       if (data) setScreenings(data as Screening[]);
     } catch (error) {
       console.error('Error fetching screenings:', error);
@@ -477,12 +424,7 @@ export default function CompanyDetailPage() {
     if (!newNote.trim() || !company) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('deal_notes').insert({
-        deal_id: company.id,
-        content: newNote,
-        stage: company.pipeline_stage || 'L0',
-      });
-      if (error) throw error;
+      await addCompanyNote(company.id, newNote, company.pipeline_stage || 'L0');
       setNewNote('');
       await fetchDetails();
       toast.success('Note added');
@@ -498,13 +440,7 @@ export default function CompanyDetailPage() {
     if (!newLinkUrl.trim() || !company) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('deal_links').insert({
-        deal_id: company.id,
-        url: newLinkUrl,
-        title: newLinkTitle || null,
-        stage: company.pipeline_stage || 'L0',
-      });
-      if (error) throw error;
+      await addCompanyLink(company.id, newLinkUrl, newLinkTitle || undefined, company.pipeline_stage || 'L0');
       setNewLinkUrl('');
       setNewLinkTitle('');
       await fetchDetails();
@@ -600,7 +536,7 @@ export default function CompanyDetailPage() {
 
   const deleteNote = async (noteId: string) => {
     try {
-      await supabase.from('deal_notes').delete().eq('id', noteId);
+      await deleteDealNote(noteId);
       fetchDetails();
       toast.success('Note deleted');
     } catch (error) {
@@ -610,7 +546,7 @@ export default function CompanyDetailPage() {
 
   const deleteLink = async (linkId: string) => {
     try {
-      await supabase.from('deal_links').delete().eq('id', linkId);
+      await deleteDealLink(linkId);
       fetchDetails();
       toast.success('Link deleted');
     } catch (error) {

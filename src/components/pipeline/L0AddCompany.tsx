@@ -11,10 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Upload, FileSpreadsheet, Loader2, Trash2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
+import { createCompany } from '@/lib/api/pipeline';
 
 interface CompanyFormData {
   name: string;
@@ -68,31 +68,19 @@ export default function L0AddCompany({ onSuccess }: L0AddCompanyProps) {
 
     setIsSubmitting(true);
     try {
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          target: formData.name,
-          segment: formData.sector,
-          revenue_2022_usd_mn: parseNumber(formData.revenue_year1),
-          revenue_2023_usd_mn: parseNumber(formData.revenue_year2),
-          revenue_2024_usd_mn: parseNumber(formData.revenue_year3),
-          ebitda_2022_usd_mn: parseNumber(formData.ebitda_year1),
-          ebitda_2023_usd_mn: parseNumber(formData.ebitda_year2),
-          ebitda_2024_usd_mn: parseNumber(formData.ebitda_year3),
-          ev_2024: parseNumber(formData.valuation),
-          pipeline_stage: 'L0',
-          status: 'active',
-        })
-        .select()
-        .single();
-
-      if (companyError) throw companyError;
-
-      // Log the company addition
-      await supabase.from('company_logs').insert({
-        company_id: company.id,
-        action: 'ADDED_TO_PIPELINE',
-      });
+      await createCompany({
+        target: formData.name,
+        segment: formData.sector,
+        revenue_2022_usd_mn: parseNumber(formData.revenue_year1),
+        revenue_2023_usd_mn: parseNumber(formData.revenue_year2),
+        revenue_2024_usd_mn: parseNumber(formData.revenue_year3),
+        ebitda_2022_usd_mn: parseNumber(formData.ebitda_year1),
+        ebitda_2023_usd_mn: parseNumber(formData.ebitda_year2),
+        ebitda_2024_usd_mn: parseNumber(formData.ebitda_year3),
+        ev_2024: parseNumber(formData.valuation),
+        pipeline_stage: 'L0',
+        status: 'active',
+      }, 'ADDED_TO_PIPELINE');
 
       toast.success(`${formData.name} added to pipeline!`);
       setFormData(emptyForm);
@@ -171,34 +159,19 @@ export default function L0AddCompany({ onSuccess }: L0AddCompanyProps) {
       for (const company of importedCompanies) {
         if (!company.name || !company.sector) continue;
 
-        const { data: newCompany, error: companyError } = await supabase
-          .from('companies')
-          .insert({
-            target: company.name,
-            segment: company.sector,
-            revenue_2022_usd_mn: parseNumber(company.revenue_year1),
-            revenue_2023_usd_mn: parseNumber(company.revenue_year2),
-            revenue_2024_usd_mn: parseNumber(company.revenue_year3),
-            ebitda_2022_usd_mn: parseNumber(company.ebitda_year1),
-            ebitda_2023_usd_mn: parseNumber(company.ebitda_year2),
-            ebitda_2024_usd_mn: parseNumber(company.ebitda_year3),
-            ev_2024: parseNumber(company.valuation),
-            pipeline_stage: 'L0',
-            status: 'active',
-          })
-          .select()
-          .single();
-
-        if (companyError) {
-          console.error('Error adding company:', companyError);
-          continue;
-        }
-
-        // Log the company addition
-        await supabase.from('company_logs').insert({
-          company_id: newCompany.id,
-          action: 'ADDED_TO_PIPELINE',
-        });
+        await createCompany({
+          target: company.name,
+          segment: company.sector,
+          revenue_2022_usd_mn: parseNumber(company.revenue_year1),
+          revenue_2023_usd_mn: parseNumber(company.revenue_year2),
+          revenue_2024_usd_mn: parseNumber(company.revenue_year3),
+          ebitda_2022_usd_mn: parseNumber(company.ebitda_year1),
+          ebitda_2023_usd_mn: parseNumber(company.ebitda_year2),
+          ebitda_2024_usd_mn: parseNumber(company.ebitda_year3),
+          ev_2024: parseNumber(company.valuation),
+          pipeline_stage: 'L0',
+          status: 'active',
+        }, 'ADDED_TO_PIPELINE');
 
         successCount++;
       }

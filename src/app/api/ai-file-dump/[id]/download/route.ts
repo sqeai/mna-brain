@@ -1,19 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { getSignedUrl } from "@/lib/s3";
 
 // Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
-
 /**
  * GET - Generate a pre-signed download URL for a specific file
  */
@@ -31,7 +20,7 @@ export async function GET(
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     // Fetch the file record to get the S3 key and original filename
     const { data, error } = await supabase

@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph, HumanMessage } from '@/lib/agent';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseClient } from '@/lib/server/supabase';
 import { companiesSchema } from '@/lib/agent/tools';
 import { getPostHogClient } from '@/lib/posthog-server';
 
 // Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  return createClient(url, key);
-}
-
 // Generate the schema fields for the AI prompt
 function getSchemaFieldsForPrompt(): string {
   // Exclude internal fields that shouldn't be searched for
@@ -87,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing company names to exclude
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     const { data: existingCompanies } = await supabase
       .from('companies')
       .select('target');

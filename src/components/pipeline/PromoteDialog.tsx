@@ -12,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
@@ -24,6 +23,7 @@ import {
 } from 'lucide-react';
 import { DealStage } from '@/lib/types';
 import posthog from 'posthog-js';
+import { promoteCompany } from '@/lib/api/pipeline';
 
 interface PromoteDialogProps {
   open: boolean;
@@ -54,25 +54,18 @@ export default function PromoteDialog({
   const handlePromote = async () => {
     setIsSubmitting(true);
     try {
-      // Update company pipeline stage
-      const { error } = await supabase
-        .from('companies')
-        .update({ pipeline_stage: nextStage })
-        .eq('id', dealId);
-
-      if (error) throw error;
-
-      // Log the promotion with any notes/links in the action
+      // Promote and persist optional note/link in a single server-side action.
       const logDetails: string[] = [];
       if (note.trim()) logDetails.push(`Note: ${note}`);
       if (linkUrl.trim()) logDetails.push(`Link: ${linkTitle || linkUrl}`);
       if (selectedFile) logDetails.push(`Document: ${selectedFile.name}`);
-
-      const { error: logError } = await supabase.from('company_logs').insert({
-        company_id: dealId,
-        action: `PROMOTED_FROM_${currentStage}_TO_${nextStage}`,
+      await promoteCompany(dealId, {
+        currentStage,
+        nextStage,
+        note,
+        linkUrl,
+        linkTitle,
       });
-      if (logError) console.error('Error creating log:', logError);
 
       // Auto-trigger AI Company Card when promoting to L1
       if (nextStage === 'L1') {
@@ -81,33 +74,6 @@ export default function PromoteDialog({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ companyId: dealId }),
         }).catch(() => { }); // Silent — don't block promotion on analysis
-      }
-
-      // 1. Save Note
-      if (note.trim()) {
-        const { error: noteError } = await supabase.from('deal_notes').insert({
-          deal_id: dealId,
-          content: note,
-          stage: currentStage,
-        });
-        if (noteError) {
-          console.error('Error saving note:', noteError);
-          toast.error(`Failed to save note: ${noteError.message}`);
-        }
-      }
-
-      // 2. Save Link
-      if (linkUrl.trim()) {
-        const { error: linkError } = await supabase.from('deal_links').insert({
-          deal_id: dealId,
-          url: linkUrl,
-          title: linkTitle || null,
-          stage: currentStage,
-        });
-        if (linkError) {
-          console.error('Error saving link:', linkError);
-          toast.error(`Failed to save link: ${linkError.message}`);
-        }
       }
 
       // 3. Upload and Save Document
