@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { deleteFile } from "@/lib/s3";
-
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
 
 /**
  * POST - Register a deal document after client has uploaded to S3
@@ -29,7 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     const { error } = await supabase.from("deal_documents").insert({
       deal_id: dealId,
@@ -74,7 +63,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
 
     const { data: row, error: fetchError } = await supabase
       .from("deal_documents")

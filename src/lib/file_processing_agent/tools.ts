@@ -1,19 +1,11 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
 import { findBestCompanyMatch } from "../fuzzySearch";
 import { logger } from "../agent/logger";
+import { createSupabaseClient } from "@/lib/server/supabase";
 
-// Create a server-side Supabase client
 function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
+  return createSupabaseClient();
 }
 
 /**

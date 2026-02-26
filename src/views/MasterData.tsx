@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { deleteCompanyById, getCompanies } from '@/lib/api/pipeline';
 import {
   Database,
   Search,
@@ -127,18 +127,8 @@ export default function MasterData() {
   const openCompanyDialog = async (companyId: string) => {
     setLoadingDialog(true);
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          id, target, segment, website, watchlist_status,
-          revenue_2021_usd_mn, revenue_2022_usd_mn, revenue_2023_usd_mn, revenue_2024_usd_mn,
-          ebitda_2021_usd_mn, ebitda_2022_usd_mn, ebitda_2023_usd_mn, ebitda_2024_usd_mn,
-          ev_2024, pipeline_stage, l1_screening_result, remarks, created_at, updated_at, source
-        `)
-        .eq('id', companyId)
-        .single();
-
-      if (error || !data) {
+      const data = await getCompanies({ id: companyId });
+      if (!data) {
         toast({ title: 'Error', description: 'Could not load company', variant: 'destructive' });
         return;
       }
@@ -182,27 +172,11 @@ export default function MasterData() {
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          id,
-          target,
-          segment,
-          watchlist_status,
-          revenue_2022_usd_mn,
-          revenue_2023_usd_mn,
-          revenue_2024_usd_mn,
-          ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          pipeline_stage,
-          created_at
-        `)
-        .in('pipeline_stage', ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await getCompanies({
+        stageIn: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'],
+        orderBy: 'created_at',
+        orderDir: 'desc',
+      });
 
       if (data) {
         const formatted = data
@@ -235,24 +209,7 @@ export default function MasterData() {
   const deleteCompany = async (companyId: string, companyName: string) => {
     setDeletingId(companyId);
     try {
-      // First, fetch and delete any files in the deal-documents storage bucket
-      const { data: docs } = await supabase
-        .from('deal_documents')
-        .select('file_path')
-        .eq('deal_id', companyId);
-
-      if (docs && docs.length > 0) {
-        const filePaths = docs.map((d) => d.file_path);
-        await supabase.storage.from('deal-documents').remove(filePaths);
-      }
-
-      // Delete the company — all related rows cascade-delete automatically
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', companyId);
-
-      if (error) throw error;
+      await deleteCompanyById(companyId);
 
       setCompanies((prev) => prev.filter((c) => c.id !== companyId));
       toast({

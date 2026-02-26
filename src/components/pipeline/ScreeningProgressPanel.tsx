@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -22,6 +21,7 @@ import {
 } from 'lucide-react';
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
 import { DealStage } from '@/lib/types';
+import { getScreenings } from '@/lib/api/pipeline';
 
 interface Screening {
   id: string;
@@ -79,34 +79,8 @@ export default function ScreeningProgressPanel({
   const fetchScreenings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('screenings')
-        .select(`
-          id,
-          company_id,
-          criteria_id,
-          state,
-          result,
-          remarks,
-          created_at,
-          updated_at,
-          company:companies(target, pipeline_stage),
-          criterias(name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Transform the data to flatten nested objects and filter for L0 only
-      const transformed = (data || [])
-        .map((s: any) => ({
-          ...s,
-          company: s.company,
-          criterias: s.criterias,
-        }))
-        .filter((s: any) => s.company?.pipeline_stage === 'L0');
-
-      setScreenings(transformed);
+      const data = await getScreenings({ onlyL0: true });
+      setScreenings(data);
     } catch (error) {
       console.error('Error fetching screenings:', error);
     } finally {
@@ -117,24 +91,6 @@ export default function ScreeningProgressPanel({
   useEffect(() => {
     fetchScreenings();
   }, [refreshTrigger]);
-
-  // Set up real-time subscription for screening updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('screenings-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'screenings' },
-        () => {
-          fetchScreenings();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   // Poll every 5 seconds as fallback for real-time updates
   useEffect(() => {

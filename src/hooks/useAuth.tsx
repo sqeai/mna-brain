@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import posthog from 'posthog-js';
+import { signInWithPassword } from '@/lib/api/pipeline';
 
 type User = Tables<'users'>;
 
@@ -45,21 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
-      const normalizedEmail = email.toLowerCase().trim();
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .ilike('email', normalizedEmail)
-        .eq('password', password)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return { error: new Error('Invalid email or password') };
-        }
-        return { error: new Error(error.message) };
-      }
-
+      const data = await signInWithPassword(email, password);
       if (!data) {
         return { error: new Error('Invalid email or password') };
       }

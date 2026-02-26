@@ -11,12 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Plus, Zap, Target, Sparkles, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import CompanyDetailDialog from './CompanyDetailDialog';
 import { cn } from '@/lib/utils';
 import { DealStage } from '@/lib/types';
+import { bulkUpdateCompanies, deleteCompanyById, getCompanies } from '@/lib/api/pipeline';
 
 interface MarketScreeningResult {
   id: string;
@@ -91,13 +91,11 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
 
   const fetchResults = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('pipeline_stage', 'market_screening')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await getCompanies({
+        stage: 'market_screening',
+        orderBy: 'created_at',
+        orderDir: 'desc',
+      });
       setResults((data || []) as MarketScreeningResult[]);
     } catch (error: any) {
       console.error('Error fetching results:', error);
@@ -140,20 +138,11 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
 
     setAdding(true);
     try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ pipeline_stage: 'L0', status: 'active' })
-        .in('id', Array.from(selectedIds));
-
-      if (error) throw error;
-
-      // Log actions
-      const logs = Array.from(selectedIds).map(id => ({
-        company_id: id,
-        action: 'PROMOTED_FROM_MARKET_SCREENING_TO_L0',
-      }));
-
-      await supabase.from('company_logs').insert(logs);
+      await bulkUpdateCompanies(
+        Array.from(selectedIds),
+        { pipeline_stage: 'L0', status: 'active' },
+        'PROMOTED_FROM_MARKET_SCREENING_TO_L0'
+      );
 
       toast.success(`Added ${selectedIds.size} companies to L0`);
       setSelectedIds(new Set());
@@ -169,10 +158,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
 
   const dismissResult = async (id: string) => {
     try {
-      await supabase
-        .from('companies')
-        .delete()
-        .eq('id', id);
+      await deleteCompanyById(id);
 
       toast.success('Result dismissed');
       fetchResults();

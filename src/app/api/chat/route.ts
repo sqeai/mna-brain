@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentGraph, AIMessage } from "@/lib/agent";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { BaseMessage } from "@langchain/core/messages";
 import { toUIMessageStream, toBaseMessages } from "@ai-sdk/langchain";
 import { createUIMessageStreamResponse, UIMessage } from "ai";
@@ -23,23 +23,12 @@ const convertLangChainMessageToVercelMessage = (message: BaseMessage) => {
 };
 
 // Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-
-  return createClient(url, key);
-}
-
 /**
  * Fetch active investment thesis and screening criteria to provide context.
  */
 async function fetchContextData(): Promise<string> {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = createSupabaseClient();
     const contextParts: string[] = [];
 
     // Fetch active investment thesis

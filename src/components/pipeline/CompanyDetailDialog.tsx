@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Building2,
@@ -49,6 +48,14 @@ import FilePreview from '@/components/Files/FilePreview';
 import { DealStage, L1Status } from '@/lib/types';
 import { STAGE_LABELS } from '@/lib/constants';
 import { formatDistanceToNow, format } from 'date-fns';
+import {
+  addCompanyLink,
+  addCompanyNote,
+  deleteDealLink,
+  deleteDealNote,
+  getCompanyDetails,
+  getScreenings,
+} from '@/lib/api/pipeline';
 
 const getStageLabel = (stage: string | null): string => {
   const key = (stage || 'L0') as DealStage;
@@ -285,60 +292,13 @@ export default function CompanyDetailDialog({
   const fetchDetails = async () => {
     setLoading(true);
     try {
-      const companyId = company.id?.trim() || '';
-      console.log(companyId);
-      const filesQuery = companyId
-        ? supabase
-            .from('files')
-            .select('id, file_name, file_link, file_date, created_at')
-            .filter('matched_companies', 'cs', JSON.stringify([{ id: companyId }]))
-            .order('created_at', { ascending: false })
-            .limit(100)
-        : null;
-
-      const [logsRes, notesRes, linksRes, docsRes, screeningsRes, filesRes] = await Promise.all([
-        supabase
-          .from('company_logs')
-          .select('id, action, created_at')
-          .eq('company_id', company.id)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('deal_notes')
-          .select('*')
-          .eq('deal_id', company.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('deal_links')
-          .select('*')
-          .eq('deal_id', company.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('deal_documents')
-          .select('*')
-          .eq('deal_id', company.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('screenings')
-          .select(`
-            *,
-            criterias (
-              id,
-              name,
-              prompt
-            )
-          `)
-          .eq('company_id', company.id)
-          .order('created_at', { ascending: false }),
-        filesQuery ?? Promise.resolve({ data: [] }),
-      ]);
-
-      if (logsRes.data) setStageHistory(companyLogsToStageHistory(logsRes.data as CompanyLogRow[]));
-      if (notesRes.data) setNotes(notesRes.data);
-      if (linksRes.data) setLinks(linksRes.data);
-      if (docsRes.data) setDocuments(docsRes.data);
-      if (screeningsRes.data) setScreenings(screeningsRes.data as Screening[]);
-      console.log(filesRes?.data)
-      if (filesRes?.data) setMatchedFiles(filesRes.data as MatchedFile[]);
+      const data = await getCompanyDetails(company.id);
+      setStageHistory(companyLogsToStageHistory((data.logs || []) as CompanyLogRow[]));
+      setNotes((data.notes || []) as DealNote[]);
+      setLinks((data.links || []) as DealLink[]);
+      setDocuments((data.documents || []) as DealDocument[]);
+      setScreenings((data.screenings || []) as Screening[]);
+      setMatchedFiles((data.matchedFiles || []) as MatchedFile[]);
     } catch (error) {
       console.error('Error fetching details:', error);
     } finally {
@@ -349,18 +309,7 @@ export default function CompanyDetailDialog({
   const fetchScreenings = async () => {
     if (!company.id) return;
     try {
-      const { data } = await supabase
-        .from('screenings')
-        .select(`
-          *,
-          criterias (
-            id,
-            name,
-            prompt
-          )
-        `)
-        .eq('company_id', company.id)
-        .order('created_at', { ascending: false });
+      const data = await getScreenings({ companyId: company.id });
       if (data) setScreenings(data as Screening[]);
     } catch (error) {
       console.error('Error fetching screenings:', error);
@@ -466,12 +415,7 @@ export default function CompanyDetailDialog({
     if (!newNote.trim()) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('deal_notes').insert({
-        deal_id: company.id,
-        content: newNote,
-        stage: company.pipeline_stage || 'L0',
-      });
-      if (error) throw error;
+      await addCompanyNote(company.id, newNote, company.pipeline_stage || 'L0');
       setNewNote('');
       fetchDetails();
       toast.success('Note added');
@@ -486,13 +430,7 @@ export default function CompanyDetailDialog({
     if (!newLinkUrl.trim()) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('deal_links').insert({
-        deal_id: company.id,
-        url: newLinkUrl,
-        title: newLinkTitle || null,
-        stage: company.pipeline_stage || 'L0',
-      });
-      if (error) throw error;
+      await addCompanyLink(company.id, newLinkUrl, newLinkTitle || undefined, company.pipeline_stage || 'L0');
       setNewLinkUrl('');
       setNewLinkTitle('');
       fetchDetails();
@@ -587,7 +525,7 @@ export default function CompanyDetailDialog({
 
   const deleteNote = async (noteId: string) => {
     try {
-      await supabase.from('deal_notes').delete().eq('id', noteId);
+      await deleteDealNote(noteId);
       fetchDetails();
       toast.success('Note deleted');
     } catch (error) {
@@ -597,7 +535,7 @@ export default function CompanyDetailDialog({
 
   const deleteLink = async (linkId: string) => {
     try {
-      await supabase.from('deal_links').delete().eq('id', linkId);
+      await deleteDealLink(linkId);
       fetchDetails();
       toast.success('Link deleted');
     } catch (error) {
@@ -1501,4 +1439,3 @@ function ScreeningStateIcon({ state, result }: { state: 'pending' | 'completed' 
     </div>
   );
 }
-

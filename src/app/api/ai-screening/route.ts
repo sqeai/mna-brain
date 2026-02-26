@@ -6,20 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgentGraph, HumanMessage } from "@/lib/agent";
 import { getToolDescriptions } from "@/lib/agent/tools";
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@/lib/server/supabase";
 import { z } from "zod";
 import { getPostHogClient } from "@/lib/posthog-server";
 
 // Create a server-side Supabase client
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    throw new Error("Supabase environment variables are not configured");
-  }
-  return createClient(url, key);
-}
-
 // Schema for the screening result
 const ScreeningResultSchema = z.object({
   result: z.enum(["pass", "fail", "inconclusive", "error"]),
@@ -133,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Fetch company data from database to enrich context
     let enrichedCompany: CompanyData = { ...company };
     try {
-      const supabase = getSupabaseClient();
+      const supabase = createSupabaseClient();
       const { data: dbCompany, error: dbError } = await supabase
         .from("companies")
         .select("*")
@@ -143,7 +134,7 @@ export async function POST(request: NextRequest) {
       if (dbError) {
         console.warn(`[AI-Screening] DB fetch failed for company=${companyId}: ${dbError.message}. Falling back to request body.`);
       } else if (dbCompany) {
-        console.log(`[AI-Screening] Enriched company data from DB for company=${dbCompany.name}`);
+        console.log(`[AI-Screening] Enriched company data from DB for company=${dbCompany.target || company.name || company.id}`);
         // Merge DB data with request body (DB takes precedence for non-null values)
         enrichedCompany = {
           ...company,
