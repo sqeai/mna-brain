@@ -35,6 +35,7 @@ import {
   Download,
   Eye,
   HelpCircle,
+  Presentation,
 } from 'lucide-react';
 import {
   Dialog,
@@ -715,23 +716,36 @@ export default function CompanyDetailPage() {
               <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <div className="flex flex-col items-end gap-1">
-              <Button
-                size="sm"
-                className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
-                onClick={analysis?.status === 'completed' ? regenerateAnalysis : generateAnalysis}
-                disabled={analysisGenerating}
-              >
-                {analysisGenerating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
+              <div className="flex items-center gap-2">
+                {analysis?.status === 'completed' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => router.push(`/pipeline/${companyId}/slides`)}
+                  >
+                    <Presentation className="h-4 w-4" />
+                    Generate Slides
+                  </Button>
                 )}
-                {analysisGenerating
-                  ? 'Generating...'
-                  : analysis?.status === 'completed'
-                    ? 'Regenerate'
-                    : 'AI Company Card'}
-              </Button>
+                <Button
+                  size="sm"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2"
+                  onClick={analysis?.status === 'completed' ? regenerateAnalysis : generateAnalysis}
+                  disabled={analysisGenerating}
+                >
+                  {analysisGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {analysisGenerating
+                    ? 'Generating...'
+                    : analysis?.status === 'completed'
+                      ? 'Regenerate'
+                      : 'AI Company Card'}
+                </Button>
+              </div>
               {analysis?.updated_at && analysis.status === 'completed' && (
                 <span className="text-xs text-muted-foreground">
                   Last: {format(new Date(analysis.updated_at), 'MMM d, yyyy HH:mm')}
