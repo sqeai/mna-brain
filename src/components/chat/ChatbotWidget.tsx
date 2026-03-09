@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { UIMessage } from '@ai-sdk/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Bot, Send, X, Maximize2, Minimize2, Sparkles } from 'lucide-react';
+import { Bot, Send, X, Maximize2, Minimize2, Sparkles, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -18,7 +18,6 @@ function getTextFromUIMessage(m: UIMessage): string {
   return parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
 }
 
-/** Hide THINKING_START/THINKING_END blocks; show only content after THINKING_END (matches full chat behavior). */
 function scrubThinkingMarkers(text: string): string {
   const start = '<!-- THINKING_START -->';
   const end = '<!-- THINKING_END -->';
@@ -29,6 +28,47 @@ function scrubThinkingMarkers(text: string): string {
   return text;
 }
 
+function useDraggable(initialPos: { x: number; y: number }) {
+  const [position, setPosition] = useState(initialPos);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragOffset.current = {
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    };
+    e.preventDefault();
+  }, [position]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newX = e.clientX - dragOffset.current.x;
+      const newY = e.clientY - dragOffset.current.y;
+      const maxX = window.innerWidth - 80;
+      const maxY = window.innerHeight - 40;
+      setPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY)),
+      });
+    };
+
+    const handleMouseUp = () => setIsDragging(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  return { position, setPosition, isDragging, handleMouseDown };
+}
+
 export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -37,8 +77,18 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, sendMessage, status } = useChatContext();
 
+  const fabDrag = useDraggable({ x: 0, y: 0 });
+  const widgetDrag = useDraggable({ x: 0, y: 0 });
+  const [posInitialized, setPosInitialized] = useState(false);
+
   useEffect(() => {
     setIsHydrated(true);
+    if (!posInitialized) {
+      fabDrag.setPosition({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+      widgetDrag.setPosition({ x: window.innerWidth - 410, y: window.innerHeight - 530 });
+      setPosInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -78,14 +128,26 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            className="fixed bottom-6 right-6 z-50"
+            className="fixed z-50"
+            style={{ left: fabDrag.position.x, top: fabDrag.position.y }}
           >
-            {/* Pulse rings */}
             <span className="absolute inset-0 rounded-full bg-accent/30 animate-ping" />
             <span className="absolute -inset-1 rounded-full bg-accent/20 animate-pulse" />
             <Button
-              onClick={() => setIsOpen(true)}
-              className="relative h-14 w-14 rounded-full shadow-xl bg-gradient-to-br from-accent to-purple-700 hover:from-purple-700 hover:to-accent border-2 border-white/20 transition-all duration-300 hover:scale-110 hover:shadow-accent/40 hover:shadow-2xl"
+              onClick={() => {
+                if (!fabDrag.isDragging) {
+                  setIsOpen(true);
+                  widgetDrag.setPosition({
+                    x: Math.min(fabDrag.position.x, window.innerWidth - 410),
+                    y: Math.max(0, fabDrag.position.y - 460),
+                  });
+                }
+              }}
+              onMouseDown={fabDrag.handleMouseDown}
+              className={cn(
+                'relative h-14 w-14 rounded-full shadow-xl bg-gradient-to-br from-accent to-purple-700 hover:from-purple-700 hover:to-accent border-2 border-white/20 transition-all duration-300 hover:scale-110 hover:shadow-accent/40 hover:shadow-2xl',
+                fabDrag.isDragging && 'cursor-grabbing scale-110'
+              )}
               size="icon"
             >
               <Sparkles className="h-6 w-6 text-white drop-shadow-lg" />
@@ -97,16 +159,24 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
       {isOpen && (
       <Card
         className={cn(
-          'fixed bottom-6 right-6 z-50 shadow-2xl border-purple-200 dark:border-purple-800/50 overflow-hidden transition-all duration-200',
+          'fixed z-50 shadow-2xl border-purple-200 dark:border-purple-800/50 overflow-hidden transition-[width,height] duration-200',
           isMinimized ? 'w-80 h-14' : 'w-96 h-[500px]'
         )}
+        style={{ left: widgetDrag.position.x, top: widgetDrag.position.y }}
       >
-        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white">
+        <div
+          className={cn(
+            'flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white',
+            widgetDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          )}
+          onMouseDown={widgetDrag.handleMouseDown}
+        >
           <div className="flex items-center gap-2">
+            <GripVertical className="h-4 w-4 text-white/50" />
             <Bot className="h-5 w-5" />
-            <span className="font-medium">AI CoPilot</span>
+            <span className="font-medium select-none">AI CoPilot</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
             <Button
               variant="ghost"
               size="icon"

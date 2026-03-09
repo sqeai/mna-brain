@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -15,6 +16,8 @@ import {
   Maximize2,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Send,
   Pencil,
   Copy,
@@ -22,6 +25,9 @@ import {
   X,
   FileText,
   Save,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
 } from 'lucide-react';
 import { getCompanies } from '@/lib/api/pipeline';
 
@@ -129,7 +135,7 @@ function blankSlideHtml(title: string): string {
 // Slide Canvas (renders HTML in an iframe)
 // ---------------------------------------------------------------------------
 
-function SlideCanvas({ html, width = 1120, height = 630 }: { html: string; width?: number; height?: number }) {
+function SlideCanvas({ html, width = 1120, height = 630, zoom = 1 }: { html: string; width?: number; height?: number; zoom?: number }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -150,19 +156,21 @@ function SlideCanvas({ html, width = 1120, height = 630 }: { html: string; width
     overflow: hidden;
     background: white;
     color: #1e293b;
+    transform: scale(${zoom});
+    transform-origin: top left;
   }
 </style>
 </head>
 <body>${html}</body>
 </html>`);
     doc.close();
-  }, [html, width, height]);
+  }, [html, width, height, zoom]);
 
   return (
     <iframe
       ref={iframeRef}
       className="border-0"
-      style={{ width, height, pointerEvents: 'none' }}
+      style={{ width: width * zoom, height: height * zoom, pointerEvents: 'none' }}
       title="Slide preview"
       sandbox="allow-same-origin"
     />
@@ -306,11 +314,13 @@ export default function SlidesPage() {
   const [titleDraft, setTitleDraft] = useState('');
   const [presentationMode, setPresentationMode] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const [slideZooms, setSlideZooms] = useState<Record<string, number>>({});
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedSlide = slides.find((s) => s.id === selectedSlideId) ?? null;
   const selectedIndex = slides.findIndex((s) => s.id === selectedSlideId);
+  const selectedZoom = selectedSlide ? (slideZooms[selectedSlide.id] ?? 100) : 100;
 
   // -----------------------------------------------------------------------
   // Load company, analysis, and persisted slides
@@ -403,7 +413,7 @@ export default function SlidesPage() {
   }
 
   // -----------------------------------------------------------------------
-  // Initialize default slides (Executive Summary + Corporate Structure)
+  // Initialize default slides
   // -----------------------------------------------------------------------
 
   const initializeDefaultSlides = async () => {
@@ -419,6 +429,18 @@ export default function SlidesPage() {
       {
         title: 'Corporate Structure',
         instruction: `Create a Corporate Structure / Deal Overview slide for "${company.target}". Show: ownership structure (${company.ownership || 'Private'}), organizational diagram using HTML/CSS boxes and arrows showing the corporate hierarchy, geography (${company.geography || 'N/A'}), segment (${company.segment || 'N/A'}), and current pipeline stage. Use boxes connected by lines/arrows to show structure. Include key deal parameters in a side panel.`,
+      },
+      {
+        title: 'Product Breakdown',
+        instruction: `Create a Product Breakdown slide for "${company.target}". Break down the company's main products and/or services into distinct categories. For each product/service, include: the product name as a bold header, a concise description of what it is and what problem it solves, the target customer segment, and any available revenue contribution or market positioning. Use the company focus (${company.company_focus || 'N/A'}), segment (${company.segment || 'N/A'}), and business overview from the analysis to infer products. Layout as a grid or card-based design with each product in its own box. If exact products are unknown, infer from the business description and segment.`,
+      },
+      {
+        title: 'Financials',
+        instruction: `Create a Financials slide for "${company.target}" that summarizes the company's financial data in a professional balance-sheet-style table. Include rows for: Revenue (2021-2024), EBITDA (2021-2024), EBITDA Margin (2021-2024), and Enterprise Value (2024). Show year-over-year growth rates where possible. Use the following data — Revenue: ${[company.revenue_2021_usd_mn, company.revenue_2022_usd_mn, company.revenue_2023_usd_mn, company.revenue_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA: ${[company.ebitda_2021_usd_mn, company.ebitda_2022_usd_mn, company.ebitda_2023_usd_mn, company.ebitda_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA Margins: ${[company.ebitda_margin_2021, company.ebitda_margin_2022, company.ebitda_margin_2023, company.ebitda_margin_2024].map((v, i) => v != null ? `${(v * 100).toFixed(1)}% (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EV 2024: ${company.ev_2024 != null ? `$${company.ev_2024}M` : 'N/A'}. Format as a clean HTML table with alternating row colors, bold headers, and a summary row at the bottom highlighting key ratios like EV/EBITDA and EV/Revenue.`,
+      },
+      {
+        title: 'Sources',
+        instruction: `Create a Sources / References slide for "${company.target}". List the data sources used in this presentation including: company website (${company.website || 'N/A'}), internal pipeline database, company financial filings, AI-generated analysis, and any other relevant sources. Format as a clean numbered list with source name, type (e.g. Public Filing, Company Website, Internal Database, AI Analysis), and brief description. Include a disclaimer at the bottom noting that AI-generated content should be verified. Use a professional, clean layout.`,
       },
     ];
 
@@ -447,6 +469,27 @@ export default function SlidesPage() {
     setSlides(created);
     if (created.length > 0) setSelectedSlideId(created[0].id);
     setInitializing(false);
+  };
+
+  // -----------------------------------------------------------------------
+  // Regenerate all slides (delete existing, then re-create)
+  // -----------------------------------------------------------------------
+
+  const regenerateSlides = async () => {
+    if (!company || initializing) return;
+
+    const confirmed = window.confirm(
+      'This will delete all existing slides and regenerate them from scratch. Continue?'
+    );
+    if (!confirmed) return;
+
+    // Delete all existing slides from DB
+    await Promise.all(slides.map((s) => dbDeleteSlide(s.id)));
+    setSlides([]);
+    setSelectedSlideId(null);
+
+    await initializeDefaultSlides();
+    toast.success('Slides regenerated');
   };
 
   // -----------------------------------------------------------------------
@@ -544,6 +587,26 @@ export default function SlidesPage() {
   };
 
   // -----------------------------------------------------------------------
+  // Rearrange (move slide up/down)
+  // -----------------------------------------------------------------------
+
+  const moveSlide = async (id: string, direction: 'up' | 'down') => {
+    const idx = slides.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= slides.length) return;
+
+    const newSlides = [...slides];
+    [newSlides[idx], newSlides[targetIdx]] = [newSlides[targetIdx], newSlides[idx]];
+    setSlides(newSlides);
+
+    await Promise.all([
+      dbUpdateSlide(newSlides[idx].id, { sort_order: idx }),
+      dbUpdateSlide(newSlides[targetIdx].id, { sort_order: targetIdx }),
+    ]);
+  };
+
+  // -----------------------------------------------------------------------
   // Rename
   // -----------------------------------------------------------------------
 
@@ -622,6 +685,20 @@ export default function SlidesPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={regenerateSlides}
+              disabled={initializing || slides.length === 0}
+              className="gap-2"
+            >
+              {initializing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Regenerate Slides
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setPresentationMode(true)}
               disabled={slides.length === 0}
               className="gap-2"
@@ -691,6 +768,24 @@ export default function SlidesPage() {
 
                     {/* Title + actions */}
                     <div className="px-2 py-1.5 flex items-center gap-1">
+                      <div className="flex flex-col shrink-0 mr-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveSlide(slide.id, 'up'); }}
+                          className="p-0 hover:bg-muted rounded disabled:opacity-20"
+                          disabled={idx === 0}
+                          title="Move up"
+                        >
+                          <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveSlide(slide.id, 'down'); }}
+                          className="p-0 hover:bg-muted rounded disabled:opacity-20"
+                          disabled={idx === slides.length - 1}
+                          title="Move down"
+                        >
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      </div>
                       <span className="text-[10px] text-muted-foreground font-medium w-4 shrink-0">
                         {idx + 1}
                       </span>
@@ -744,21 +839,76 @@ export default function SlidesPage() {
           {/* Center: slide canvas + prompt */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Canvas area */}
-            <div className="flex-1 flex items-center justify-center bg-muted/20 overflow-auto p-6">
+            <div className="flex-1 flex flex-col bg-muted/20 overflow-hidden">
               {selectedSlide ? (
-                <div
-                  className="bg-white rounded-lg shadow-xl overflow-hidden"
-                  style={{ width: 1120, height: 630, flexShrink: 0 }}
-                >
-                  <SlideCanvas html={selectedSlide.html} />
-                </div>
+                <>
+                  {/* Zoom controls */}
+                  <div className="flex items-center justify-center gap-3 px-4 py-2 border-b bg-background/60 backdrop-blur-sm shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setSlideZooms((prev) => ({ ...prev, [selectedSlide.id]: Math.max(30, (prev[selectedSlide.id] ?? 100) - 10) }))}
+                      title="Zoom out"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <div className="w-32">
+                      <Slider
+                        value={[selectedZoom]}
+                        min={30}
+                        max={150}
+                        step={5}
+                        onValueChange={([v]) => setSlideZooms((prev) => ({ ...prev, [selectedSlide.id]: v }))}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setSlideZooms((prev) => ({ ...prev, [selectedSlide.id]: Math.min(150, (prev[selectedSlide.id] ?? 100) + 10) }))}
+                      title="Zoom in"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground w-10 text-center tabular-nums">{selectedZoom}%</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setSlideZooms((prev) => ({ ...prev, [selectedSlide.id]: 100 }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="flex-1 flex items-center justify-center overflow-auto p-4 relative">
+                    {generating && (
+                      <div className="absolute inset-x-0 top-4 z-10 flex justify-center pointer-events-none">
+                        <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground shadow-lg animate-pulse pointer-events-auto">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm font-medium">AI is editing this slide — content will update shortly</span>
+                        </div>
+                      </div>
+                    )}
+                    <div
+                      className={`bg-white rounded-lg shadow-xl overflow-hidden transition-opacity duration-300 ${generating ? 'opacity-50' : ''}`}
+                      style={{
+                        width: 1120 * (selectedZoom / 100),
+                        height: 630 * (selectedZoom / 100),
+                        flexShrink: 0,
+                      }}
+                    >
+                      <SlideCanvas html={selectedSlide.html} zoom={selectedZoom / 100} />
+                    </div>
+                  </div>
+                </>
               ) : initializing ? (
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex-1 flex flex-col items-center justify-center gap-4">
                   <Loader2 className="h-10 w-10 animate-spin text-primary" />
                   <p className="text-muted-foreground">Generating your presentation...</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-4 text-center">
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
                   <Presentation className="h-16 w-16 text-muted-foreground/30" />
                   <div>
                     <p className="text-lg font-medium text-muted-foreground">No slide selected</p>
