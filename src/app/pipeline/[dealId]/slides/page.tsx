@@ -158,12 +158,14 @@ function SlideCanvas({ html, width = 1120, height = 630, zoom = 1 }: { html: str
     color: #1e293b;
     transform: scale(${zoom});
     transform-origin: top left;
+    pointer-events: none;
   }
   body > div {
     max-width: ${width}px;
     max-height: ${height}px;
     overflow: hidden;
   }
+  a { pointer-events: auto; cursor: pointer; }
 </style>
 </head>
 <body>${html}</body>
@@ -175,9 +177,9 @@ function SlideCanvas({ html, width = 1120, height = 630, zoom = 1 }: { html: str
     <iframe
       ref={iframeRef}
       className="border-0"
-      style={{ width: width * zoom, height: height * zoom, pointerEvents: 'none' }}
+      style={{ width: width * zoom, height: height * zoom }}
       title="Slide preview"
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
     />
   );
 }
@@ -432,20 +434,28 @@ export default function SlidesPage() {
         instruction: `Create an Executive Summary slide for "${company.target}". Include: company name as title, key metrics (Revenue, EBITDA, EV, EV/EBITDA multiple) in callout boxes at the top, a brief business description, key investment highlights as bullet points on the left, and key risks on the right. Use the financial data and analysis provided. Make it data-dense and professional.`,
       },
       {
-        title: 'Corporate Structure',
-        instruction: `Create a Corporate Structure / Deal Overview slide for "${company.target}". Show: ownership structure (${company.ownership || 'Private'}), organizational diagram using HTML/CSS boxes and arrows showing the corporate hierarchy, geography (${company.geography || 'N/A'}), segment (${company.segment || 'N/A'}), and current pipeline stage. Use boxes connected by lines/arrows to show structure. Include key deal parameters in a side panel.`,
+        title: 'Shareholding Structure',
+        instruction: `Create a Shareholding Structure slide for "${company.target}". Show the ownership breakdown: who owns the company, percentage stakes of major shareholders, and the type of ownership (${company.ownership || 'Private'}). Use a visual layout with boxes or a pie-chart-style representation using HTML/CSS to show ownership percentages. Include shareholder names, stake percentages, and any known institutional/PE/founder holdings. If exact data is unavailable, infer from ownership type and any context provided. Use a clean professional layout with a summary table.`,
       },
       {
-        title: 'Product Breakdown',
-        instruction: `Create a Product Breakdown slide for "${company.target}". Break down the company's main products and/or services into distinct categories. For each product/service, include: the product name as a bold header, a concise description of what it is and what problem it solves, the target customer segment, and any available revenue contribution or market positioning. Use the company focus (${company.company_focus || 'N/A'}), segment (${company.segment || 'N/A'}), and business overview from the analysis to infer products. Layout as a grid or card-based design with each product in its own box. If exact products are unknown, infer from the business description and segment.`,
+        title: 'Current Company Structure',
+        instruction: `Create a Current Company Structure slide for "${company.target}". Show the organizational/corporate hierarchy using HTML/CSS boxes and arrows: parent company, subsidiaries, divisions, and key business units. Include geography (${company.geography || 'N/A'}), segment (${company.segment || 'N/A'}), and any known operational structure. Use boxes connected by lines/arrows to show the corporate tree. If exact structure is unknown, infer a plausible structure from the business overview, segment, and geography.`,
       },
       {
-        title: 'Financials',
-        instruction: `Create a Financials slide for "${company.target}" that summarizes the company's financial data in a professional balance-sheet-style table. Include rows for: Revenue (2021-2024), EBITDA (2021-2024), EBITDA Margin (2021-2024), and Enterprise Value (2024). Show year-over-year growth rates where possible. Use the following data — Revenue: ${[company.revenue_2021_usd_mn, company.revenue_2022_usd_mn, company.revenue_2023_usd_mn, company.revenue_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA: ${[company.ebitda_2021_usd_mn, company.ebitda_2022_usd_mn, company.ebitda_2023_usd_mn, company.ebitda_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA Margins: ${[company.ebitda_margin_2021, company.ebitda_margin_2022, company.ebitda_margin_2023, company.ebitda_margin_2024].map((v, i) => v != null ? `${(v * 100).toFixed(1)}% (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EV 2024: ${company.ev_2024 != null ? `$${company.ev_2024}M` : 'N/A'}. Format as a clean HTML table with alternating row colors, bold headers, and a summary row at the bottom highlighting key ratios like EV/EBITDA and EV/Revenue.`,
+        title: 'Products/Services & Customer Distribution',
+        instruction: `Create a Products/Services & Customer Distribution slide for "${company.target}". Split into two sections: LEFT side shows product/service breakdown with categories, descriptions, and revenue contribution estimates; RIGHT side shows customer distribution by segment, geography, or type. Use the company focus (${company.company_focus || 'N/A'}), segment (${company.segment || 'N/A'}), geography (${company.geography || 'N/A'}), and business overview to infer products and customer mix. Use card-based or table layouts. If exact data is unavailable, provide plausible estimates based on the industry and segment.`,
       },
       {
-        title: 'Sources',
-        instruction: `Create a Sources / References slide for "${company.target}". List the data sources used in this presentation including: company website (${company.website || 'N/A'}), internal pipeline database, company financial filings, AI-generated analysis, and any other relevant sources. Format as a clean numbered list with source name, type (e.g. Public Filing, Company Website, Internal Database, AI Analysis), and brief description. Include a disclaimer at the bottom noting that AI-generated content should be verified. Use a professional, clean layout.`,
+        title: 'Historical Financials',
+        instruction: `Create a Historical Financials slide for "${company.target}" that summarizes the company's financial data in a professional table. Include rows for: Revenue (2021-2024), EBITDA (2021-2024), EBITDA Margin (2021-2024), and Enterprise Value (2024). Show year-over-year growth rates where possible. Use the following data — Revenue: ${[company.revenue_2021_usd_mn, company.revenue_2022_usd_mn, company.revenue_2023_usd_mn, company.revenue_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA: ${[company.ebitda_2021_usd_mn, company.ebitda_2022_usd_mn, company.ebitda_2023_usd_mn, company.ebitda_2024_usd_mn].map((v, i) => v != null ? `$${v}M (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EBITDA Margins: ${[company.ebitda_margin_2021, company.ebitda_margin_2022, company.ebitda_margin_2023, company.ebitda_margin_2024].map((v, i) => v != null ? `${(v * 100).toFixed(1)}% (${2021 + i})` : `N/A (${2021 + i})`).join(', ')}; EV 2024: ${company.ev_2024 != null ? `$${company.ev_2024}M` : 'N/A'}. Format as a clean HTML table with alternating row colors, bold headers, and a summary row at the bottom highlighting key ratios like EV/EBITDA and EV/Revenue. Include YoY growth bars or indicators where data permits.`,
+      },
+      {
+        title: 'Indicative Valuation',
+        instruction: `Create an Indicative Valuation slide for "${company.target}". Show a valuation summary using multiple methodologies: EV/Revenue multiple, EV/EBITDA multiple, and comparable transaction analysis. Use the available data — EV 2024: ${company.ev_2024 != null ? `$${company.ev_2024}M` : 'N/A'}, Revenue 2024: ${company.revenue_2024_usd_mn != null ? `$${company.revenue_2024_usd_mn}M` : 'N/A'}, EBITDA 2024: ${company.ebitda_2024_usd_mn != null ? `$${company.ebitda_2024_usd_mn}M` : 'N/A'}. Include: implied multiples, a valuation range (low/mid/high) using a football-field-style horizontal bar chart in HTML/CSS, and key assumptions. Show the implied enterprise value range prominently. Use professional M&A valuation formatting.`,
+      },
+      {
+        title: 'Company Overview',
+        instruction: `Create a Company Overview slide for "${company.target}". Include: company name and logo placeholder, founding year (if known), headquarters/geography (${company.geography || 'N/A'}), industry/segment (${company.segment || 'N/A'}), ownership (${company.ownership || 'N/A'}), website (${company.website || 'N/A'}), company focus (${company.company_focus || 'N/A'}), number of employees (if known), and a brief description of what the company does. Use a clean two-column layout: left side with key facts in a structured list/table, right side with a business description and market positioning summary. Make it the definitive "at a glance" overview of the company.`,
       },
     ];
 
@@ -886,7 +896,7 @@ export default function SlidesPage() {
                       Reset
                     </Button>
                   </div>
-                  <div className="flex-1 overflow-auto p-4 relative">
+                  <div className="flex-1 overflow-auto relative">
                     {generating && (
                       <div className="absolute inset-x-0 top-4 z-10 flex justify-center pointer-events-none">
                         <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground shadow-lg animate-pulse pointer-events-auto">
@@ -895,15 +905,17 @@ export default function SlidesPage() {
                         </div>
                       </div>
                     )}
-                    <div
-                      className={`bg-white rounded-lg shadow-xl overflow-hidden transition-opacity duration-300 ${generating ? 'opacity-50' : ''}`}
-                      style={{
-                        width: 1120 * (selectedZoom / 100),
-                        height: 630 * (selectedZoom / 100),
-                        margin: '0 auto',
-                      }}
-                    >
-                      <SlideCanvas html={selectedSlide.html} zoom={selectedZoom / 100} />
+                    <div className="min-h-full flex items-center p-4" style={{ minWidth: 'fit-content' }}>
+                      <div
+                        className={`bg-white rounded-lg shadow-xl overflow-hidden transition-opacity duration-300 ${generating ? 'opacity-50' : ''}`}
+                        style={{
+                          width: 1120 * (selectedZoom / 100),
+                          height: 630 * (selectedZoom / 100),
+                          margin: '0 auto',
+                        }}
+                      >
+                        <SlideCanvas html={selectedSlide.html} zoom={selectedZoom / 100} />
+                      </div>
                     </div>
                   </div>
                 </>
