@@ -20,6 +20,7 @@ import {
   Upload,
   Loader2,
   ChevronRight,
+  ChevronLeft,
 } from 'lucide-react';
 import { DealStage } from '@/lib/types';
 import posthog from 'posthog-js';
@@ -33,6 +34,7 @@ interface PromoteDialogProps {
   currentStage: DealStage;
   nextStage: DealStage;
   onSuccess: () => void;
+  mode?: 'promote' | 'demote';
 }
 
 export default function PromoteDialog({
@@ -43,6 +45,7 @@ export default function PromoteDialog({
   currentStage,
   nextStage,
   onSuccess,
+  mode = 'promote',
 }: PromoteDialogProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,8 +150,7 @@ export default function PromoteDialog({
         }
       }
 
-      // Capture deal promotion event in PostHog
-      posthog.capture('deal_promoted', {
+      posthog.capture(mode === 'demote' ? 'deal_demoted' : 'deal_promoted', {
         deal_id: dealId,
         company_name: companyName,
         from_stage: currentStage,
@@ -158,13 +160,13 @@ export default function PromoteDialog({
         has_document: selectedFile !== null,
       });
 
-      toast.success(`Promoted to ${nextStage}`);
+      toast.success(mode === 'demote' ? `Demoted to ${nextStage}` : `Promoted to ${nextStage}`);
       resetForm();
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
       console.error('Error promoting company:', error);
-      toast.error(`Failed to promote company: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to ${mode === 'demote' ? 'demote' : 'promote'} company: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -189,10 +191,10 @@ export default function PromoteDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Promote to {nextStage}
+            {mode === 'demote' ? `Demote to ${nextStage}` : `Promote to ${nextStage}`}
           </DialogTitle>
           <DialogDescription>
-            Add supporting information before promoting <span className="font-medium">{companyName}</span> from {currentStage} to {nextStage}.
+            Add supporting information before {mode === 'demote' ? 'demoting' : 'promoting'} <span className="font-medium">{companyName}</span> from {currentStage} to {nextStage}.
           </DialogDescription>
         </DialogHeader>
 
@@ -217,7 +219,7 @@ export default function PromoteDialog({
               <Label htmlFor="note">Add a note (optional)</Label>
               <Textarea
                 id="note"
-                placeholder="Enter notes about this promotion..."
+                placeholder={mode === 'demote' ? "Enter reason for demotion..." : "Enter notes about this promotion..."}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={4}
@@ -273,11 +275,16 @@ export default function PromoteDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handlePromote} disabled={isSubmitting}>
+          <Button onClick={handlePromote} disabled={isSubmitting} variant={mode === 'demote' ? 'destructive' : 'default'}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Promoting...
+                {mode === 'demote' ? 'Demoting...' : 'Promoting...'}
+              </>
+            ) : mode === 'demote' ? (
+              <>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Demote
               </>
             ) : (
               <>

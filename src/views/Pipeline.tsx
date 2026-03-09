@@ -208,9 +208,10 @@ export default function Pipeline() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Promote dialog state
+  // Promote/Demote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotingCompany, setPromotingCompany] = useState<PipelineCompany | null>(null);
+  const [dialogMode, setDialogMode] = useState<'promote' | 'demote'>('promote');
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -820,6 +821,7 @@ export default function Pipeline() {
                                               variant="outline"
                                               size="sm"
                                               onClick={() => {
+                                                setDialogMode('promote');
                                                 setPromotingCompany(company);
                                                 setPromoteDialogOpen(true);
                                               }}
@@ -1068,19 +1070,34 @@ export default function Pipeline() {
                                         {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        {stage !== 'L5' && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                              setPromotingCompany(company);
-                                              setPromoteDialogOpen(true);
-                                            }}
-                                          >
-                                            Promote
-                                            <ChevronRight className="ml-1 h-4 w-4" />
-                                          </Button>
-                                        )}
+                                        <div className="flex flex-col items-end gap-0.5">
+                                          {stage !== 'L5' && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => {
+                                                setDialogMode('promote');
+                                                setPromotingCompany(company);
+                                                setPromoteDialogOpen(true);
+                                              }}
+                                            >
+                                              Promote
+                                              <ChevronRight className="ml-1 h-4 w-4" />
+                                            </Button>
+                                          )}
+                                          {STAGES.indexOf(stage) > 0 && (
+                                            <button
+                                              onClick={() => {
+                                                setDialogMode('demote');
+                                                setPromotingCompany(company);
+                                                setPromoteDialogOpen(true);
+                                              }}
+                                              className="text-[11px] text-muted-foreground hover:text-destructive hover:underline transition-colors"
+                                            >
+                                              Demote
+                                            </button>
+                                          )}
+                                        </div>
                                       </TableCell>
                                     </TableRow>
                                   ));
@@ -1155,11 +1172,16 @@ export default function Pipeline() {
               dealId={promotingCompany.id}
               companyName={promotingCompany.target}
               currentStage={promotingCompany.pipeline_stage}
-              nextStage={STAGES[STAGES.indexOf(promotingCompany.pipeline_stage) + 1] as DealStage}
+              nextStage={
+                dialogMode === 'demote'
+                  ? STAGES[STAGES.indexOf(promotingCompany.pipeline_stage) - 1] as DealStage
+                  : STAGES[STAGES.indexOf(promotingCompany.pipeline_stage) + 1] as DealStage
+              }
               onSuccess={() => {
                 setPromotingCompany(null);
                 fetchCompanies();
               }}
+              mode={dialogMode}
             />
           )
         }
