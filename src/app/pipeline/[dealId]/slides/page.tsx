@@ -123,7 +123,7 @@ function buildCompanyContext(company: CompanyData, analysis: CompanyAnalysis | n
 }
 
 function blankSlideHtml(title: string): string {
-  return `<div style="display:flex;align-items:center;justify-content:center;width:1120px;height:630px;background:#f8fafc;font-family:Inter,system-ui,sans-serif;">
+  return `<div style="display:flex;align-items:center;justify-content:center;width:1120px;height:630px;overflow:hidden;background:#f8fafc;font-family:Inter,system-ui,sans-serif;">
   <div style="text-align:center;">
     <h1 style="font-size:28px;font-weight:700;color:#1e3a5f;margin-bottom:8px;">${title}</h1>
     <p style="font-size:14px;color:#94a3b8;">Use the prompt below to generate content for this slide</p>
@@ -158,6 +158,11 @@ function SlideCanvas({ html, width = 1120, height = 630, zoom = 1 }: { html: str
     color: #1e293b;
     transform: scale(${zoom});
     transform-origin: top left;
+  }
+  body > div {
+    max-width: ${width}px;
+    max-height: ${height}px;
+    overflow: hidden;
   }
 </style>
 </head>
@@ -881,7 +886,7 @@ export default function SlidesPage() {
                       Reset
                     </Button>
                   </div>
-                  <div className="flex-1 flex items-center justify-center overflow-auto p-4 relative">
+                  <div className="flex-1 overflow-auto p-4 relative">
                     {generating && (
                       <div className="absolute inset-x-0 top-4 z-10 flex justify-center pointer-events-none">
                         <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground shadow-lg animate-pulse pointer-events-auto">
@@ -895,7 +900,7 @@ export default function SlidesPage() {
                       style={{
                         width: 1120 * (selectedZoom / 100),
                         height: 630 * (selectedZoom / 100),
-                        flexShrink: 0,
+                        margin: '0 auto',
                       }}
                     >
                       <SlideCanvas html={selectedSlide.html} zoom={selectedZoom / 100} />

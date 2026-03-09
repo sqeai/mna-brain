@@ -28,13 +28,19 @@ function scrubThinkingMarkers(text: string): string {
   return text;
 }
 
+const DRAG_THRESHOLD = 5;
+
 function useDraggable(initialPos: { x: number; y: number }) {
   const [position, setPosition] = useState(initialPos);
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const startPos = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
+    hasDragged.current = false;
+    startPos.current = { x: e.clientX, y: e.clientY };
     dragOffset.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y,
@@ -46,6 +52,11 @@ function useDraggable(initialPos: { x: number; y: number }) {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - startPos.current.x;
+      const dy = e.clientY - startPos.current.y;
+      if (!hasDragged.current && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+        hasDragged.current = true;
+      }
       const newX = e.clientX - dragOffset.current.x;
       const newY = e.clientY - dragOffset.current.y;
       const maxX = window.innerWidth - 80;
@@ -66,7 +77,7 @@ function useDraggable(initialPos: { x: number; y: number }) {
     };
   }, [isDragging]);
 
-  return { position, setPosition, isDragging, handleMouseDown };
+  return { position, setPosition, isDragging, hasDragged, handleMouseDown };
 }
 
 export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }) {
@@ -135,7 +146,7 @@ export function ChatbotWidget({ defaultOpen = false }: { defaultOpen?: boolean }
             <span className="absolute -inset-1 rounded-full bg-accent/20 animate-pulse" />
             <Button
               onClick={() => {
-                if (!fabDrag.isDragging) {
+                if (!fabDrag.hasDragged.current) {
                   setIsOpen(true);
                   widgetDrag.setPosition({
                     x: Math.min(fabDrag.position.x, window.innerWidth - 410),

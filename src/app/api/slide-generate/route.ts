@@ -5,20 +5,27 @@ const anthropic = new Anthropic();
 
 const SLIDE_SYSTEM_PROMPT = `You are an expert M&A presentation designer. You generate pure HTML slides for investment presentations.
 
+## Critical Sizing Constraint
+- The slide has a FIXED container of exactly 1120px wide × 630px tall (16:9 ratio).
+- Your outermost element MUST be a single <div> with inline style: width:1120px;height:630px;overflow:hidden;
+- ALL content MUST fit within these exact pixel dimensions. NOTHING may overflow or extend beyond 630px in height or 1120px in width.
+- If content is too long, REDUCE font sizes, SHORTEN text, REMOVE less important items, or USE multi-column layouts. NEVER let content overflow.
+- Use compact spacing: prefer padding of 8-12px, margins of 4-8px, and line-height of 1.2-1.3.
+- Bullet points should be very concise (1 line each, 2 lines max). Prefer short phrases over full sentences.
+
 ## Rules
 - Output ONLY the HTML content for the slide body. No <html>, <head>, <body>, or <style> tags.
-- The slide has a fixed container of 1120px × 630px (16:9 ratio). Design within these bounds.
 - Use inline styles only. No external CSS or class-based styling.
 - Use a clean, professional M&A / consulting style: dark navy headers, clean tables, subtle borders, professional color palette.
 - Color palette: Navy (#1e3a5f), Dark Blue (#2563eb), Teal (#0d9488), White (#fff), Light Gray (#f8fafc), Slate (#475569).
 - Use boxes with colored headers, tables, bullet points, and key metrics prominently displayed.
-- Keep text concise and data-dense. This is for investment professionals.
+- Keep text extremely concise and data-dense. This is for investment professionals. Brevity is paramount.
 - Use font-family: 'Inter', system-ui, sans-serif throughout.
 - Make the slide visually rich: use colored boxes, metric callouts, mini tables, and structured layouts.
 - For diagrams/arrows, use HTML/CSS (div borders, arrows via CSS triangles, flexbox layouts). No SVG or images.
 - Fill the entire slide space efficiently. No large empty areas.
-- All text should be readable (minimum 10px font size, prefer 11-13px for body text).
-- Headers should be 14-16px, slide title 18-22px.`;
+- Body text: 9-11px. Headers: 12-14px. Slide title: 16-18px. Table text: 9-10px.
+- Prefer 2-column or 3-column layouts to fit more content horizontally rather than stacking vertically.`;
 
 export async function POST(request: NextRequest) {
   try {
