@@ -1614,7 +1614,7 @@ export const queryMeetingNotes = tool(
 
       // Apply filters
       if (company_name) {
-        query = query.or(`raw_notes.ilike.%${company_name}%,structured_notes.ilike.%${company_name}%,matched_companies.ilike.%${company_name}%`);
+        query = query.or(`raw_notes.ilike.%${company_name}%,structured_notes.ilike.%${company_name}%`);
       }
 
       if (tag) {
