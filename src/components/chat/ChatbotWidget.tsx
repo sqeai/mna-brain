@@ -21,11 +21,32 @@ function getTextFromUIMessage(m: UIMessage): string {
 function scrubThinkingMarkers(text: string): string {
   const start = '<!-- THINKING_START -->';
   const end = '<!-- THINKING_END -->';
-  const endIdx = text.indexOf(end);
-  if (endIdx !== -1) return text.slice(endIdx + end.length).trim();
-  const startIdx = text.indexOf(start);
-  if (startIdx !== -1) return text.slice(0, startIdx).trim();
-  return text;
+
+  if (!text.includes(start) && !text.includes(end)) return text;
+
+  // Remove all THINKING_START...THINKING_END blocks (and any unclosed trailing block)
+  let result = '';
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    const startIdx = remaining.indexOf(start);
+    if (startIdx === -1) {
+      result += remaining;
+      break;
+    }
+    result += remaining.slice(0, startIdx);
+    remaining = remaining.slice(startIdx + start.length);
+
+    const endIdx = remaining.indexOf(end);
+    if (endIdx !== -1) {
+      remaining = remaining.slice(endIdx + end.length);
+    } else {
+      // Unclosed thinking block — discard the rest (still streaming)
+      break;
+    }
+  }
+
+  return result.trim();
 }
 
 const DRAG_THRESHOLD = 5;

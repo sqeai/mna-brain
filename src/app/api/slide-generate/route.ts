@@ -75,7 +75,7 @@ Generate the HTML content for this slide. Output ONLY the HTML, nothing else.`;
     }
 
     const message = await anthropic.messages.create({
-      model: "claude-claude-sonnet-4-6-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 4096,
       system: SLIDE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],

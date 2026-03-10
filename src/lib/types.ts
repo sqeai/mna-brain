@@ -5,6 +5,7 @@ export interface User {
   id: string;
   name: string;
   password: string;
+  favorite_companies: string[] | null;
   created_at: string;
   updated_at: string;
 }

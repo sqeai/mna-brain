@@ -123,27 +123,52 @@ export function ChatMessageBubble(props: ChatMessageBubbleProps) {
   const THINKING_END_DELIMITER = "<!-- THINKING_END -->";
 
   const fullText = textParts.map((part) => (part as any).text || "").join("");
-  const startIndex = fullText.indexOf(THINKING_START_DELIMITER);
-  const endIndex = fullText.indexOf(THINKING_END_DELIMITER);
 
   let thinkingText = "";
   let responseText = "";
 
-  const hasEitherDelimiter = startIndex !== -1 || endIndex !== -1;
+  const hasEitherDelimiter = fullText.includes(THINKING_START_DELIMITER) || fullText.includes(THINKING_END_DELIMITER);
 
   if (!hasEitherDelimiter) {
-    // No thinking delimiters — treat everything as the main response (e.g. simple reply, no tools).
     responseText = fullText;
   } else {
-    // Thinking: between THINKING_START and THINKING_END (or from start / to end if one delimiter missing).
-    const thinkingFrom = startIndex === -1 ? 0 : startIndex + THINKING_START_DELIMITER.length;
-    const thinkingTo = endIndex === -1 ? fullText.length : endIndex;
-    thinkingText = fullText.substring(thinkingFrom, thinkingTo).trim();
+    // Collect all thinking blocks (text between each THINKING_START and THINKING_END pair)
+    const thinkingParts: string[] = [];
+    let remaining = fullText;
 
-    // Response: only content after THINKING_END.
-    if (endIndex !== -1) {
-      responseText = fullText.substring(endIndex + THINKING_END_DELIMITER.length);
+    while (remaining.length > 0) {
+      const startIdx = remaining.indexOf(THINKING_START_DELIMITER);
+      const endIdx = remaining.indexOf(THINKING_END_DELIMITER);
+
+      if (startIdx === -1 && endIdx === -1) {
+        // No more delimiters — rest is response text
+        responseText += remaining;
+        break;
+      }
+
+      if (startIdx !== -1 && (endIdx === -1 || startIdx < endIdx)) {
+        // Found a THINKING_START — text before it is response
+        responseText += remaining.substring(0, startIdx);
+        remaining = remaining.substring(startIdx + THINKING_START_DELIMITER.length);
+
+        // Look for matching THINKING_END
+        const matchingEnd = remaining.indexOf(THINKING_END_DELIMITER);
+        if (matchingEnd !== -1) {
+          thinkingParts.push(remaining.substring(0, matchingEnd).trim());
+          remaining = remaining.substring(matchingEnd + THINKING_END_DELIMITER.length);
+        } else {
+          // No closing delimiter yet (still streaming) — rest is thinking
+          thinkingParts.push(remaining.trim());
+          remaining = "";
+        }
+      } else {
+        // THINKING_END without a preceding START — skip past it
+        responseText += remaining.substring(0, endIdx);
+        remaining = remaining.substring(endIdx + THINKING_END_DELIMITER.length);
+      }
     }
+
+    thinkingText = thinkingParts.filter(Boolean).join("\n\n---\n\n");
   }
 
   const hasThinkingContent = thinkingText.trim().length > 0;

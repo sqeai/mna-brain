@@ -2365,6 +2365,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          favorite_companies: string[] | null
           id: string
           name: string
           password: string
@@ -2373,6 +2374,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
+          favorite_companies?: string[] | null
           id?: string
           name: string
           password: string
@@ -2381,6 +2383,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
+          favorite_companies?: string[] | null
           id?: string
           name?: string
           password?: string

@@ -186,3 +186,14 @@ export async function saveInvestmentThesis(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function getFavoriteCompanies(userId: string): Promise<string[]> {
+  return apiRequest<string[]>(`/api/users/${encodeURIComponent(userId)}/favorites`);
+}
+
+export async function toggleFavoriteCompany(userId: string, companyId: string): Promise<string[]> {
+  return apiRequest<string[]>(`/api/users/${encodeURIComponent(userId)}/favorites`, {
+    method: 'PATCH',
+    body: JSON.stringify({ companyId }),
+  });
+}

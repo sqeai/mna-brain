@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,11 +12,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Loader2, Plus, Zap, Target, Sparkles, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Plus, Zap, Target, Sparkles, Trash2, ArrowUpDown, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Star } from 'lucide-react';
 import CompanyDetailDialog from './CompanyDetailDialog';
 import { cn } from '@/lib/utils';
 import { DealStage } from '@/lib/types';
-import { bulkUpdateCompanies, deleteCompanyById, getCompanies } from '@/lib/api/pipeline';
+import { bulkUpdateCompanies, deleteCompanyById, getCompanies, getFavoriteCompanies, toggleFavoriteCompany } from '@/lib/api/pipeline';
+import { useAuth } from '@/hooks/useAuth';
 
 interface MarketScreeningResult {
   id: string;
@@ -77,7 +78,10 @@ const formatCurrency = (value: number | null) => {
   return `$${billions.toFixed(2)}B`;
 };
 
+const ITEMS_PER_PAGE = 10;
+
 export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeline, collapsed = false, onToggleCollapse }: MarketScreeningResultsProps) {
+  const { user } = useAuth();
   const [results, setResults] = useState<MarketScreeningResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -88,6 +92,13 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
   // Sorting state
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Favorites state
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null);
 
   const fetchResults = async () => {
     try {
@@ -104,9 +115,23 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     }
   };
 
+  const fetchFavorites = async () => {
+    if (!user?.id) return;
+    try {
+      const favs = await getFavoriteCompanies(user.id);
+      setFavoriteIds(new Set(favs || []));
+    } catch (error: any) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
   useEffect(() => {
     fetchResults();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [user?.id]);
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedIds);
@@ -168,6 +193,20 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     }
   };
 
+  const handleToggleFavorite = async (companyId: string) => {
+    if (!user?.id) return;
+    setTogglingFavorite(companyId);
+    try {
+      const updated = await toggleFavoriteCompany(user.id, companyId);
+      setFavoriteIds(new Set(updated || []));
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    } finally {
+      setTogglingFavorite(null);
+    }
+  };
+
   const toggleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -177,45 +216,63 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
     }
   };
 
-  const sortedResults = [...results].sort((a, b) => {
-    if (!sortField) return 0;
+  const sortedResults = useMemo(() => {
+    const sorted = [...results].sort((a, b) => {
+      // Favorites always come first
+      const aFav = favoriteIds.has(a.id) ? 1 : 0;
+      const bFav = favoriteIds.has(b.id) ? 1 : 0;
+      if (aFav !== bFav) return bFav - aFav;
 
-    let aVal: any = 0;
-    let bVal: any = 0;
+      if (!sortField) return 0;
 
-    switch (sortField) {
-      case 'target':
-        aVal = (a.target || '').toLowerCase();
-        bVal = (b.target || '').toLowerCase();
-        break;
-      case 'segment':
-        aVal = (a.segment || '').toLowerCase();
-        bVal = (b.segment || '').toLowerCase();
-        break;
-      case 'revenue_2023':
-        aVal = a.revenue_2023_usd_mn || 0;
-        bVal = b.revenue_2023_usd_mn || 0;
-        break;
-      case 'revenue_2024':
-        aVal = a.revenue_2024_usd_mn || 0;
-        bVal = b.revenue_2024_usd_mn || 0;
-        break;
-      case 'revenue_2025':
-        aVal = 0;
-        bVal = 0;
-        break;
-      case 'valuation':
-        aVal = a.ev_2024 || 0;
-        bVal = b.ev_2024 || 0;
-        break;
-      default:
-        return 0;
-    }
+      let aVal: any = 0;
+      let bVal: any = 0;
 
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
+      switch (sortField) {
+        case 'target':
+          aVal = (a.target || '').toLowerCase();
+          bVal = (b.target || '').toLowerCase();
+          break;
+        case 'segment':
+          aVal = (a.segment || '').toLowerCase();
+          bVal = (b.segment || '').toLowerCase();
+          break;
+        case 'revenue_2023':
+          aVal = a.revenue_2023_usd_mn || 0;
+          bVal = b.revenue_2023_usd_mn || 0;
+          break;
+        case 'revenue_2024':
+          aVal = a.revenue_2024_usd_mn || 0;
+          bVal = b.revenue_2024_usd_mn || 0;
+          break;
+        case 'revenue_2025':
+          aVal = 0;
+          bVal = 0;
+          break;
+        case 'valuation':
+          aVal = a.ev_2024 || 0;
+          bVal = b.ev_2024 || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [results, favoriteIds, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / ITEMS_PER_PAGE));
+  const paginatedResults = sortedResults.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortField, sortDirection]);
 
   const ModernHeader = ({ showDescription = false }: { showDescription?: boolean }) => (
     <CardHeader className="pb-4 relative">
@@ -365,6 +422,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[40px]"></TableHead>
                     <TableHead className="w-[50px]">Select</TableHead>
                     <TableHead><SortButton field="target" label="Company" /></TableHead>
                     <TableHead><SortButton field="segment" label="Sector" /></TableHead>
@@ -380,69 +438,124 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedResults.map((result) => (
-                    <TableRow key={result.id} className="hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors">
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(result.id)}
-                          onCheckedChange={() => toggleSelect(result.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
+                  {paginatedResults.map((result) => {
+                    const isFav = favoriteIds.has(result.id);
+                    return (
+                      <TableRow
+                        key={result.id}
+                        className={cn(
+                          "transition-colors",
+                          isFav
+                            ? "bg-amber-50/60 dark:bg-amber-900/10 hover:bg-amber-100/60 dark:hover:bg-amber-900/20"
+                            : "hover:bg-purple-50/50 dark:hover:bg-purple-900/10"
+                        )}
+                      >
+                        <TableCell className="pr-0">
                           <button
-                            onClick={() => {
-                              setSelectedResult(result);
-                              setDetailDialogOpen(true);
-                            }}
-                            className="font-medium text-left hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                            onClick={() => handleToggleFavorite(result.id)}
+                            disabled={togglingFavorite === result.id}
+                            className={cn(
+                              "p-1 rounded-md transition-colors",
+                              isFav
+                                ? "text-amber-500 hover:text-amber-600"
+                                : "text-muted-foreground/40 hover:text-amber-400"
+                            )}
                           >
-                            {result.target}
+                            <Star className={cn("h-4 w-4", isFav && "fill-current")} />
                           </button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">{result.segment || 'Unknown'}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">-</span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatCurrency(result.revenue_2023_usd_mn)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatCurrency(result.revenue_2024_usd_mn)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        -
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatCurrency(result.ebitda_2023_usd_mn)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {formatCurrency(result.ebitda_2024_usd_mn)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        -
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                        {formatCurrency(result.ev_2024)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => dismissResult(result.id)}
-                          className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(result.id)}
+                            onCheckedChange={() => toggleSelect(result.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => {
+                                setSelectedResult(result);
+                                setDetailDialogOpen(true);
+                              }}
+                              className="font-medium text-left hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                            >
+                              {result.target}
+                            </button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">{result.segment || 'Unknown'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">-</span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(result.revenue_2023_usd_mn)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(result.revenue_2024_usd_mn)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          -
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(result.ebitda_2023_usd_mn)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(result.ebitda_2024_usd_mn)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          -
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-medium text-foreground">
+                          {formatCurrency(result.ev_2024)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => dismissResult(result.id)}
+                            className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 h-8 w-8 p-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, sortedResults.length)} of {sortedResults.length} companies
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {selectedResult && (
               <CompanyDetailDialog
