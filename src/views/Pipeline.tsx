@@ -50,6 +50,7 @@ import {
   Lightbulb,
   Eye,
   EyeOff,
+  Star,
 } from 'lucide-react';
 import { SEARCH_SUGGESTION_CHIPS } from '@/lib/constants';
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
@@ -61,10 +62,14 @@ import MarketScreeningStatus from '@/components/pipeline/MarketScreeningStatus';
 import MarketScreeningResults from '@/components/pipeline/MarketScreeningResults';
 import ScreeningProgressPanel from '@/components/pipeline/ScreeningProgressPanel';
 import { CollapsibleSection } from '@/components/common/CollapsibleSection';
+import { cn } from '@/lib/utils';
 import posthog from 'posthog-js';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getCompanies,
   getCompaniesCount,
+  getFavoriteCompanies,
+  toggleFavoriteCompany,
   promoteCompany,
   runCompanyL1Filters,
 } from '@/lib/api/pipeline';
@@ -170,6 +175,7 @@ const L1StatusBadge = ({ status }: { status: L1Status | null }) => {
 };
 
 export default function Pipeline() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialTab = searchParams.get('stage') || 'L0';
@@ -203,6 +209,10 @@ export default function Pipeline() {
 
   // Source filter
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+
+  // Favorites state
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -270,10 +280,38 @@ export default function Pipeline() {
     }
   };
 
+  const fetchFavorites = async () => {
+    if (!user?.id) return;
+    try {
+      const favs = await getFavoriteCompanies(user.id);
+      setFavoriteIds(new Set(favs || []));
+    } catch (error: any) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
+  const handleToggleFavorite = async (companyId: string) => {
+    if (!user?.id) return;
+    setTogglingFavorite(companyId);
+    try {
+      const updated = await toggleFavoriteCompany(user.id, companyId);
+      setFavoriteIds(new Set(updated || []));
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    } finally {
+      setTogglingFavorite(null);
+    }
+  };
+
   useEffect(() => {
     fetchCompanies();
     fetchNewCandidatesCount();
   }, []);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [user?.id]);
 
   const handleTabChange = (value: string) => {
     // Capture pipeline stage change event
@@ -305,8 +343,12 @@ export default function Pipeline() {
     return matchesStage && matchesSearch && matchesL1Status && matchesSector;
   });
 
-  // Apply sorting
+  // Apply sorting (favorites always first)
   const sortedCompanies = [...filteredCompanies].sort((a, b) => {
+    const aFav = favoriteIds.has(a.id) ? 1 : 0;
+    const bFav = favoriteIds.has(b.id) ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
+
     if (!sortField) return 0;
 
     let aVal: any;
@@ -663,6 +705,7 @@ export default function Pipeline() {
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
+                                        <TableHead className="w-[40px]"></TableHead>
                                         <TableHead className="w-[50px]">Select</TableHead>
                                         <TableHead>
                                           <button
@@ -719,8 +762,32 @@ export default function Pipeline() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {paginatedCompanies.map((company) => (
-                                        <TableRow key={company.id} className="hover:bg-muted/50">
+                                      {paginatedCompanies.map((company) => {
+                                        const isFav = favoriteIds.has(company.id);
+                                        return (
+                                        <TableRow
+                                          key={company.id}
+                                          className={cn(
+                                            "transition-colors",
+                                            isFav
+                                              ? "bg-amber-50/60 dark:bg-amber-900/10 hover:bg-amber-100/60 dark:hover:bg-amber-900/20"
+                                              : "hover:bg-muted/50"
+                                          )}
+                                        >
+                                          <TableCell className="pr-0">
+                                            <button
+                                              onClick={() => handleToggleFavorite(company.id)}
+                                              disabled={togglingFavorite === company.id}
+                                              className={cn(
+                                                "p-1 rounded-md transition-colors",
+                                                isFav
+                                                  ? "text-amber-500 hover:text-amber-600"
+                                                  : "text-muted-foreground/40 hover:text-amber-400"
+                                              )}
+                                            >
+                                              <Star className={cn("h-4 w-4", isFav && "fill-current")} />
+                                            </button>
+                                          </TableCell>
                                           <TableCell>
                                             <Checkbox
                                               checked={selectedIds.has(company.id)}
@@ -832,7 +899,8 @@ export default function Pipeline() {
                                             </Button>
                                           </TableCell>
                                         </TableRow>
-                                      ))}
+                                        );
+                                      })}
                                     </TableBody>
                                   </Table>
                                 </div>
@@ -957,6 +1025,7 @@ export default function Pipeline() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
+                                  <TableHead className="w-[40px]"></TableHead>
                                   <TableHead>
                                     <button
                                       onClick={() => toggleSort('name')}
@@ -1011,8 +1080,32 @@ export default function Pipeline() {
                                     currentPage * itemsPerPage
                                   );
 
-                                  return paginatedCompanies.map((company) => (
-                                    <TableRow key={company.id} className="hover:bg-muted/50">
+                                  return paginatedCompanies.map((company) => {
+                                    const isFav = favoriteIds.has(company.id);
+                                    return (
+                                    <TableRow
+                                      key={company.id}
+                                      className={cn(
+                                        "transition-colors",
+                                        isFav
+                                          ? "bg-amber-50/60 dark:bg-amber-900/10 hover:bg-amber-100/60 dark:hover:bg-amber-900/20"
+                                          : "hover:bg-muted/50"
+                                      )}
+                                    >
+                                      <TableCell className="pr-0">
+                                        <button
+                                          onClick={() => handleToggleFavorite(company.id)}
+                                          disabled={togglingFavorite === company.id}
+                                          className={cn(
+                                            "p-1 rounded-md transition-colors",
+                                            isFav
+                                              ? "text-amber-500 hover:text-amber-600"
+                                              : "text-muted-foreground/40 hover:text-amber-400"
+                                          )}
+                                        >
+                                          <Star className={cn("h-4 w-4", isFav && "fill-current")} />
+                                        </button>
+                                      </TableCell>
                                       <TableCell>
                                         <button
                                           onClick={() => {
@@ -1100,7 +1193,8 @@ export default function Pipeline() {
                                         </div>
                                       </TableCell>
                                     </TableRow>
-                                  ));
+                                    );
+                                  });
                                 })()}
                               </TableBody>
                             </Table>
