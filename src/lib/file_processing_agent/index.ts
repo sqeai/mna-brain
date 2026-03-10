@@ -149,7 +149,7 @@ export async function processFileContent(
   const allNames = allReferences.map(r => r.name).join(", ");
 
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-claude-sonnet-4-6-4-20250514",
     anthropicApiKey: apiKey,
     temperature: 0,
   });

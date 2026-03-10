@@ -569,7 +569,7 @@ export const webSearch = tool(
 
       // Use Claude with web search tool enabled
       const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-claude-sonnet-4-6-4-20250514",
         max_tokens: 4096,
         tools: [
           {
@@ -1226,7 +1226,7 @@ Country codes examples: US (United States), KR (Korea), JP (Japan), CN (China), 
 Respond ONLY with a valid JSON object, no explanation.`;
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-claude-sonnet-4-6-4-20250514",
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
