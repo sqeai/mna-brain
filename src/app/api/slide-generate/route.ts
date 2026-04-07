@@ -13,14 +13,16 @@ const SLIDE_SYSTEM_PROMPT = `You are an expert M&A presentation designer. You ge
 - Use compact spacing: prefer padding of 8-12px, margins of 4-8px, and line-height of 1.2-1.3.
 - Bullet points should be very concise (1 line each, 2 lines max). Prefer short phrases over full sentences.
 
-## Citation Footer
-- Every slide MUST include a citation footer at the very bottom.
+## Citation Footer (MANDATORY)
+- Every slide MUST include a citation footer at the very bottom. This is NON-NEGOTIABLE.
 - The footer should be positioned at the bottom of the slide using: position:absolute;bottom:0;left:0;right:0;
 - Footer style: background:#f1f5f9; padding:4px 16px; font-size:8px; color:#64748b; border-top:1px solid #e2e8f0;
 - List 1-3 relevant source citations as clickable hyperlinks (<a> tags with href, target="_blank", style="color:#2563eb;text-decoration:underline;").
-- Citations should reference real, plausible sources for the slide content (e.g. company website, annual reports, industry databases, regulatory filings).
+- IMPORTANT: Look for "Available Sources for Citations" and "Company Website URL for citations" in the provided context. Use those REAL URLs in the citation footer.
+- If specific source URLs are provided in the context, you MUST use them instead of making up URLs.
+- If the company website URL is provided, always include it as a citation where relevant.
 - Format: "Sources: <a href="URL">Source Name</a>, <a href="URL">Source Name</a>"
-- If the company website URL is provided in the context, always include it as a citation where relevant.
+- If no source URLs are provided in the context, use plausible sources (e.g. company website, annual reports, industry databases, regulatory filings).
 - Reserve ~20px at the bottom for this footer. Main content should not overlap with it.
 
 ## Rules
@@ -63,7 +65,7 @@ The user wants to modify this slide with the following instruction:
 
 ${companyContext ? `\n## Company Context\n${companyContext}\n` : ""}
 
-Generate the updated HTML for this slide. Output ONLY the HTML, nothing else.`;
+IMPORTANT: Include a citation footer at the bottom of the slide with real source URLs from the context above. Generate the updated HTML for this slide. Output ONLY the HTML, nothing else.`;
     } else {
       prompt = `Generate an HTML slide titled "${slideTitle || instruction}" for an M&A investment presentation.
 
@@ -71,7 +73,7 @@ The user's instruction: "${instruction}"
 
 ${companyContext ? `\n## Company Context\n${companyContext}\n` : ""}
 
-Generate the HTML content for this slide. Output ONLY the HTML, nothing else.`;
+IMPORTANT: Include a citation footer at the bottom of the slide with real source URLs from the context above. Generate the HTML content for this slide. Output ONLY the HTML, nothing else.`;
     }
 
     const message = await anthropic.messages.create({

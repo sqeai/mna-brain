@@ -72,6 +72,12 @@ interface CompanyData {
   remarks?: string | null;
 }
 
+interface AnalysisSource {
+  type: string;
+  url?: string;
+  title?: string;
+}
+
 interface CompanyAnalysis {
   business_overview: string | null;
   business_model_summary: string | null;
@@ -79,6 +85,7 @@ interface CompanyAnalysis {
   investment_highlights: string | null;
   investment_risks: string | null;
   diligence_priorities: string | null;
+  sources: AnalysisSource[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +101,7 @@ function buildCompanyContext(company: CompanyData, analysis: CompanyAnalysis | n
   if (company.company_focus) lines.push(`Focus: ${company.company_focus}`);
   if (company.website) lines.push(`Website: ${company.website}`);
   if (company.comments) lines.push(`Comments: ${company.comments}`);
+  if (company.remarks) lines.push(`Remarks: ${company.remarks}`);
 
   const fin: string[] = [];
   if (company.revenue_2021_usd_mn != null) fin.push(`Rev 2021: $${company.revenue_2021_usd_mn}M`);
@@ -117,6 +125,22 @@ function buildCompanyContext(company: CompanyData, analysis: CompanyAnalysis | n
     if (analysis.investment_highlights) lines.push(`\nInvestment Highlights:\n${analysis.investment_highlights}`);
     if (analysis.investment_risks) lines.push(`\nInvestment Risks:\n${analysis.investment_risks}`);
     if (analysis.diligence_priorities) lines.push(`\nDiligence Priorities:\n${analysis.diligence_priorities}`);
+
+    if (analysis.sources && analysis.sources.length > 0) {
+      lines.push(`\nAvailable Sources for Citations (USE THESE URLs in slide citation footers):`);
+      for (const src of analysis.sources) {
+        if (src.url) {
+          lines.push(`- ${src.title || src.type}: ${src.url}`);
+        } else {
+          lines.push(`- ${src.title || src.type}`);
+        }
+      }
+    }
+  }
+
+  // Always include the company website as a citation source if available
+  if (company.website) {
+    lines.push(`\nCompany Website URL for citations: ${company.website}`);
   }
 
   return lines.join('\n');
