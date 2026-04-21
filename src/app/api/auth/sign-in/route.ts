@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { UserRepository } from '@/lib/repositories';
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const userRepo = new UserRepository(db);
 
-    const normalizedEmail = String(email || '').toLowerCase().trim();
+    const user = await userRepo.findByEmailAndPassword(email, password);
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .ilike('email', normalizedEmail)
-      .eq('password', password)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) {
+    if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Sign in failed' }, { status: 500 });
+    return NextResponse.json({ data: user });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Sign in failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

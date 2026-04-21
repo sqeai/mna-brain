@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { CompanyRepository } from '@/lib/repositories';
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
 
-    const { data, error } = await (supabase as any).rpc('run_l1_filters', { deal_id_param: id });
-    if (error) throw error;
-
+    const data = await companyRepo.runL1Filters(id);
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to run L1 filters' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to run L1 filters';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

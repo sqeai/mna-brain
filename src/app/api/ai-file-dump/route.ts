@@ -6,6 +6,13 @@ import { extractTextFromFile } from "@/lib/fileExtractor";
 import { processFileContent } from "@/lib/file_processing_agent";
 import { downloadFile, getSignedUrl } from "@/lib/s3";
 import { createSupabaseClient } from "@/lib/server/supabase";
+import {
+  FileRepository,
+  CompanyAnalysisRepository,
+  CriteriaRepository,
+  ScreeningRepository,
+} from "@/lib/repositories";
+import type { Tables } from "@/lib/repositories";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -18,133 +25,105 @@ export async function POST(request: NextRequest) {
     if (!key || !fileName) {
       return NextResponse.json(
         { error: "key and fileName are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Download file content from S3
     const buffer = await downloadFile(key);
-    const s3Key = key;
-    const fileType = contentType || "application/octet-stream";
+    const s3Key = key as string;
+    const fileType = (contentType as string) || "application/octet-stream";
 
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const fileRepo = new FileRepository(db);
+    const companyAnalysisRepo = new CompanyAnalysisRepository(db);
+    const criteriaRepo = new CriteriaRepository(db);
+    const screeningRepo = new ScreeningRepository(db);
 
-    // Initial insert with 'processing' status
-    const { data: initialData, error: insertError } = await supabase
-      .from("files")
-      .insert({
-        file_name: fileName,
-        file_link: s3Key,
-        processing_status: 'processing',
-        file_type: 'other'
-      })
-      .select()
-      .single();
+    const initialData = await fileRepo.insert({
+      file_name: fileName,
+      file_link: s3Key,
+      processing_status: "processing",
+      file_type: "other",
+    });
 
-    if (insertError || !initialData) {
-      console.error("Database insert error:", insertError);
-      return NextResponse.json(
-        { error: "Failed to create file record" },
-        { status: 500 }
-      );
-    }
-
-    // Process file in the background (or continue in-thread for now)
-    // In a production app, this would be a background job
     let rawText = "";
-    let structuredResult = null;
+    let structuredResult: Awaited<ReturnType<typeof processFileContent>> = null;
     let tags: string[] = [];
-    let matched_companies: any[] = [];
+    let matched_companies: unknown[] = [];
 
     try {
-      // 1. Extract raw text from supported formats (skip for PDFs)
-      const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+      const isPdf =
+        fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
       if (!isPdf) {
         rawText = await extractTextFromFile(buffer, fileType, fileName);
       }
 
-      // 2. Invoke the agent to structure the text
-      structuredResult = await processFileContent(rawText, buffer, fileType, userRawNotes, supabase);
+      structuredResult = await processFileContent(
+        rawText,
+        buffer,
+        fileType,
+        userRawNotes,
+        db,
+      );
 
       if (structuredResult) {
         tags = structuredResult.tags || [];
         matched_companies = structuredResult.matched_companies || [];
       }
 
-      // 3. Update the record with full technical results
-      await supabase
-        .from("files")
-        .update({
-          raw_notes: rawText,
-          file_type: structuredResult?.file_type || 'other',
-          structured_notes: structuredResult ? JSON.stringify(structuredResult, null, 2) : null,
-          tags: tags,
-          matched_companies: matched_companies,
-          file_date: structuredResult?.file_date || null,
-          processing_status: 'completed'
-        })
-        .eq('id', initialData.id);
-
+      await fileRepo.updatePartial(initialData.id, {
+        raw_notes: rawText,
+        file_type: structuredResult?.file_type || "other",
+        structured_notes: structuredResult
+          ? JSON.stringify(structuredResult, null, 2)
+          : null,
+        tags: tags,
+        matched_companies: matched_companies as Tables<'files'>['matched_companies'],
+        file_date: structuredResult?.file_date || null,
+        processing_status: "completed",
+      });
     } catch (processError) {
       console.error("Error during file processing:", processError);
-      await supabase
-        .from("files")
-        .update({
-          processing_status: 'failed',
-          raw_notes: rawText || "Extraction failed"
-        })
-        .eq('id', initialData.id);
+      await fileRepo.updatePartial(initialData.id, {
+        processing_status: "failed",
+        raw_notes: rawText || "Extraction failed",
+      });
     }
 
-    // Fetch the updated record
-    const { data: updatedData } = await supabase
-      .from("files")
-      .select("*")
-      .eq('id', initialData.id)
-      .single();
+    const updatedData = await fileRepo.findById(initialData.id);
 
-    const company = structuredResult.company;
+    const company = structuredResult?.company;
     if (!company || !company.id) {
       return await responseSuccess(s3Key, updatedData);
     }
 
-    const { error: companyAnalysisInsertError } = await supabase
-      .from("company_analyses")
-      .insert({
-        company_id: company.id,
-        status: "generating",
-      });
-    if (companyAnalysisInsertError) {
-      console.error('Error inserting company_analyses results:', companyAnalysisInsertError);
-    }
-
-    // Trigger company analysis and market screening in the background
-    const baseUrl = request.nextUrl.origin;
-
-    // Call company-analysis endpoint to generate analysis for the matched company
-    fetch(`${baseUrl}/api/company-analysis`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId: company.id, source : structuredResult?.file_type || 'other'}),
-    }).catch((err) => {
-      console.error('Error triggering company analysis:', err);
+    await companyAnalysisRepo.insert({
+      company_id: company.id,
+      status: "generating",
     });
 
-    // Call ai-screening endpoint to execute screening for the company against all criteria
+    const baseUrl = request.nextUrl.origin;
+
+    fetch(`${baseUrl}/api/company-analysis`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId: company.id,
+        source: structuredResult?.file_type || "other",
+      }),
+    }).catch((err) => {
+      console.error("Error triggering company analysis:", err);
+    });
+
     (async () => {
       try {
-        // Fetch all screening criteria
-        const { data: criteriaList, error: criteriaError } = await supabase
-          .from('criterias')
-          .select('id, name, prompt')
-          .order('created_at', { ascending: true });
+        const criteriaList = await criteriaRepo.findAll();
 
-        if (criteriaError || !criteriaList || criteriaList.length === 0) {
-          console.log('No screening criteria found, skipping ai-screening');
+        if (criteriaList.length === 0) {
+          console.log("No screening criteria found, skipping ai-screening");
           return;
         }
 
-        // Build company data for screening
         const companyData = {
           id: company.id,
           name: company.target || company.name,
@@ -162,28 +141,16 @@ export async function POST(request: NextRequest) {
           ev_2024: company.ev_2024,
         };
 
-        // Create screening entries and trigger AI screening for each criterion
         for (const criterion of criteriaList) {
-          // Insert screening entry with 'pending' state
-          const { data: screeningEntry, error: insertError } = await supabase
-            .from('screenings')
-            .insert({
-              company_id: company.id,
-              criteria_id: criterion.id,
-              state: 'pending',
-            })
-            .select()
-            .single();
+          const screeningEntry = await screeningRepo.insert({
+            company_id: company.id,
+            criteria_id: criterion.id,
+            state: "pending",
+          });
 
-          if (insertError) {
-            console.error(`Error creating screening entry for criterion ${criterion.id}:`, insertError);
-            continue;
-          }
-
-          // Call ai-screening endpoint
           fetch(`${baseUrl}/api/ai-screening`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               companyId: company.id,
               criteriaId: criterion.id,
@@ -193,30 +160,27 @@ export async function POST(request: NextRequest) {
           })
             .then(async (response) => {
               const data = await response.json();
-              const newState = data.result === 'error' ? 'failed' : 'completed';
-              await supabase
-                .from('screenings')
-                .update({
-                  state: newState,
-                  result: data.result,
-                  remarks: data.remarks,
-                })
-                .eq('id', screeningEntry.id);
+              const newState = data.result === "error" ? "failed" : "completed";
+              await screeningRepo.update(screeningEntry.id, {
+                state: newState,
+                result: data.result,
+                remarks: data.remarks,
+              });
             })
-            .catch((err) => {
-              console.error(`Error triggering ai-screening for criterion ${criterion.id}:`, err);
-              supabase
-                .from('screenings')
-                .update({
-                  state: 'failed',
-                  result: 'error',
-                  remarks: 'API call failed',
-                })
-                .eq('id', screeningEntry.id);
+            .catch(async (err) => {
+              console.error(
+                `Error triggering ai-screening for criterion ${criterion.id}:`,
+                err,
+              );
+              await screeningRepo.update(screeningEntry.id, {
+                state: "failed",
+                result: "error",
+                remarks: "API call failed",
+              });
             });
         }
       } catch (err) {
-        console.error('Error in ai-screening flow:', err);
+        console.error("Error in ai-screening flow:", err);
       }
     })();
 
@@ -225,19 +189,15 @@ export async function POST(request: NextRequest) {
     console.error("Upload file error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Failed to upload file" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  async function responseSuccess(s3Key: any, updatedData: any) {
+  async function responseSuccess(s3Key: string, updatedData: Tables<'files'>) {
     const signedUrl = await getSignedUrl(s3Key);
-
     return NextResponse.json({
       success: true,
-      data: {
-        ...updatedData,
-        signed_url: signedUrl,
-      },
+      data: { ...updatedData, signed_url: signedUrl },
     });
   }
 }
@@ -247,55 +207,30 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const fileType = request.nextUrl.searchParams.get("file_type");
+    const fileType = request.nextUrl.searchParams.get("file_type") ?? undefined;
+    const db = createSupabaseClient();
+    const fileRepo = new FileRepository(db);
 
-    const supabase = createSupabaseClient();
-    let query = supabase
-      .from("files")
-      .select("*");
+    const files = await fileRepo.findAll(fileType);
 
-    if (fileType) {
-      query = query.eq("file_type", fileType);
-    }
-
-    const { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Database query error:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch files" },
-        { status: 500 }
-      );
-    }
-
-    // Generate signed URLs for all files
-    const notesWithUrls = await Promise.all(
-      (data || []).map(async (note) => {
+    const filesWithUrls = await Promise.all(
+      files.map(async (file) => {
         try {
-          const signedUrl = await getSignedUrl(note.file_link);
-          return {
-            ...note,
-            signed_url: signedUrl,
-          };
+          const signedUrl = await getSignedUrl(file.file_link);
+          return { ...file, signed_url: signedUrl };
         } catch (urlError) {
-          console.error(`Error generating signed URL for ${note.file_link}:`, urlError);
-          return {
-            ...note,
-            signed_url: null,
-          };
+          console.error(`Error generating signed URL for ${file.file_link}:`, urlError);
+          return { ...file, signed_url: null };
         }
-      })
+      }),
     );
 
-    return NextResponse.json({
-      success: true,
-      data: notesWithUrls,
-    });
+    return NextResponse.json({ success: true, data: filesWithUrls });
   } catch (error) {
     console.error("Fetch files error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Failed to fetch files" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -308,37 +243,19 @@ export async function PATCH(request: NextRequest) {
     const { id, ...updates } = await request.json();
 
     if (!id) {
-      return NextResponse.json(
-        { error: "File ID is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "File ID is required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("files")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
+    const db = createSupabaseClient();
+    const fileRepo = new FileRepository(db);
 
-    if (error) {
-      console.error("Database update error:", error);
-      return NextResponse.json(
-        { error: "Failed to update file record" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data,
-    });
+    const data = await fileRepo.update(id, updates);
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("Update file error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Failed to update file record" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

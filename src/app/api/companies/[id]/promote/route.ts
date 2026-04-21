@@ -1,26 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import {
+  CompanyRepository,
+  CompanyLogRepository,
+  DealNoteRepository,
+  DealLinkRepository,
+} from '@/lib/repositories';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { currentStage, nextStage, note, linkUrl, linkTitle } = await req.json();
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
+    const companyLogRepo = new CompanyLogRepository(db);
+    const dealNoteRepo = new DealNoteRepository(db);
+    const dealLinkRepo = new DealLinkRepository(db);
 
-    const { error } = await supabase
-      .from('companies')
-      .update({ pipeline_stage: nextStage })
-      .eq('id', id);
+    await companyRepo.update(id, { pipeline_stage: nextStage });
 
-    if (error) throw error;
-
-    await supabase.from('company_logs').insert({
+    await companyLogRepo.insert({
       company_id: id,
-      action: currentStage ? `PROMOTED_FROM_${currentStage}_TO_${nextStage}` : `PROMOTED_TO_${nextStage}`,
+      action: currentStage
+        ? `PROMOTED_FROM_${currentStage}_TO_${nextStage}`
+        : `PROMOTED_TO_${nextStage}`,
     });
 
     if (note?.trim()) {
-      await supabase.from('deal_notes').insert({
+      await dealNoteRepo.insert({
         deal_id: id,
         content: note,
         stage: currentStage || 'L0',
@@ -28,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     if (linkUrl?.trim()) {
-      await supabase.from('deal_links').insert({
+      await dealLinkRepo.insert({
         deal_id: id,
         url: linkUrl,
         title: linkTitle || null,
@@ -37,7 +44,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json({ data: { success: true } });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to promote company' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to promote company';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

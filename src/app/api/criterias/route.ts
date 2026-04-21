@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { CriteriaRepository } from '@/lib/repositories';
 
 export async function GET() {
   try {
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from('criterias')
-      .select('id, name, prompt')
-      .order('created_at', { ascending: true });
+    const db = createSupabaseClient();
+    const criteriaRepo = new CriteriaRepository(db);
 
-    if (error) throw error;
-    return NextResponse.json({ data: data || [] });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch criterias' }, { status: 500 });
+    const data = await criteriaRepo.findAll();
+    return NextResponse.json({ data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch criterias';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createSupabaseClient();
     const { name, prompt } = await req.json();
+    const db = createSupabaseClient();
+    const criteriaRepo = new CriteriaRepository(db);
 
-    const { data, error } = await supabase
-      .from('criterias')
-      .insert({ name, prompt })
-      .select('*')
-      .single();
-
-    if (error) throw error;
+    const data = await criteriaRepo.insert({ name, prompt });
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to create criteria' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create criteria';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
