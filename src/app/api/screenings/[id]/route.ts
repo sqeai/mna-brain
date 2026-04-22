@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { ScreeningRepository } from '@/lib/repositories';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const updates = await req.json();
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const screeningRepo = new ScreeningRepository(db);
 
-    const { data, error } = await supabase
-      .from('screenings')
-      .update(updates)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) throw error;
+    const data = await screeningRepo.update(id, updates);
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to update screening' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to update screening';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

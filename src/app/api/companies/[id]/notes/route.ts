@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { DealNoteRepository } from '@/lib/repositories';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { content, stage } = await req.json();
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const dealNoteRepo = new DealNoteRepository(db);
 
-    const { data, error } = await supabase
-      .from('deal_notes')
-      .insert({ deal_id: id, content, stage: stage || 'L0' })
-      .select('*')
-      .single();
-
-    if (error) throw error;
+    const data = await dealNoteRepo.insert({
+      deal_id: id,
+      content,
+      stage: stage || 'L0',
+    });
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to add note' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to add note';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

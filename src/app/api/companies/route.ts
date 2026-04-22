@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { CompanyRepository, CompanyLogRepository, DealDocumentRepository } from '@/lib/repositories';
 
 function parseBool(value: string | null) {
   return value === 'true' || value === '1';
@@ -7,82 +8,83 @@ function parseBool(value: string | null) {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
     const params = req.nextUrl.searchParams;
 
-    const id = params.get('id');
-    const stage = params.get('stage');
-    const stageIn = params.get('stageIn');
-    const excludeStage = params.get('excludeStage');
+    const id = params.get('id') ?? undefined;
+    const stage = params.get('stage') ?? undefined;
+    const stageIn = params.get('stageIn')
+      ? params.get('stageIn')!.split(',').filter(Boolean)
+      : undefined;
+    const excludeStage = params.get('excludeStage') ?? undefined;
     const stageNotNull = parseBool(params.get('stageNotNull'));
-    const createdAfter = params.get('createdAfter');
-    const orderBy = params.get('orderBy') || 'updated_at';
-    const orderDir = params.get('orderDir') || 'desc';
-    const limit = params.get('limit');
+    const createdAfter = params.get('createdAfter') ?? undefined;
+    const orderBy = params.get('orderBy') ?? 'updated_at';
+    const orderDir = (params.get('orderDir') ?? 'desc') as 'asc' | 'desc';
+    const limit = params.get('limit') ? Number(params.get('limit')) : undefined;
     const countOnly = parseBool(params.get('countOnly'));
 
-    let query = supabase
-      .from('companies')
-      .select('*', countOnly ? { head: true, count: 'exact' } : undefined);
+    if (countOnly) {
+      const count = await companyRepo.count({
+        id,
+        stage,
+        stageIn,
+        excludeStage,
+        stageNotNull,
+        createdAfter,
+      });
+      return NextResponse.json({ data: { count } });
+    }
 
-    if (id) query = query.eq('id', id);
-    if (stage) query = query.eq('pipeline_stage', stage);
-    if (stageIn) query = query.in('pipeline_stage', stageIn.split(',').filter(Boolean));
-    if (excludeStage) query = query.neq('pipeline_stage', excludeStage);
-    if (stageNotNull) query = query.not('pipeline_stage', 'is', null);
-    if (createdAfter) query = query.gte('created_at', createdAfter);
-    if (!countOnly) query = query.order(orderBy as any, { ascending: orderDir === 'asc' });
-    if (limit && !countOnly) query = query.limit(Number(limit));
-
-    if (id && !countOnly) {
-      const { data, error } = await query.single();
-      if (error) throw error;
+    if (id) {
+      const data = await companyRepo.findById(id);
       return NextResponse.json({ data });
     }
 
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    if (countOnly) {
-      return NextResponse.json({ data: { count: count || 0 } });
-    }
-
-    return NextResponse.json({ data: data || [] });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch companies' }, { status: 500 });
+    const data = await companyRepo.findAll({
+      stage,
+      stageIn,
+      excludeStage,
+      stageNotNull,
+      createdAfter,
+      orderBy,
+      orderDir,
+      limit,
+    });
+    return NextResponse.json({ data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch companies';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
+    const companyLogRepo = new CompanyLogRepository(db);
     const body = await req.json();
     const { company, logAction } = body;
 
-    const { data, error } = await supabase
-      .from('companies')
-      .insert(company)
-      .select('*')
-      .single();
-
-    if (error) throw error;
+    const data = await companyRepo.insert(company);
 
     if (logAction) {
-      await supabase.from('company_logs').insert({
-        company_id: data.id,
-        action: logAction,
-      });
+      await companyLogRepo.insert({ company_id: data.id, action: logAction });
     }
 
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to create company' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create company';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
+    const companyLogRepo = new CompanyLogRepository(db);
     const body = await req.json();
     const { id, ids, updates, logAction } = body;
 
@@ -90,54 +92,44 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Missing id/ids or updates' }, { status: 400 });
     }
 
-    let query = supabase.from('companies').update(updates);
-
-    if (id) {
-      query = query.eq('id', id);
-    } else {
-      query = query.in('id', ids);
-    }
-
-    const { data, error } = await query.select('*');
-    if (error) throw error;
+    const data = id
+      ? await companyRepo.update(id, updates)
+      : await companyRepo.updateMany(ids, updates);
 
     if (logAction) {
-      const companyIds = id ? [id] : ids;
-      await supabase.from('company_logs').insert(
-        companyIds.map((companyId: string) => ({ company_id: companyId, action: logAction }))
+      const companyIds: string[] = id ? [id] : ids;
+      await companyLogRepo.insertMany(
+        companyIds.map((companyId: string) => ({ company_id: companyId, action: logAction })),
       );
     }
 
-    return NextResponse.json({ data: data || [] });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to update company' }, { status: 500 });
+    return NextResponse.json({ data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to update company';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const companyRepo = new CompanyRepository(db);
+    const dealDocRepo = new DealDocumentRepository(db);
     const id = req.nextUrl.searchParams.get('id');
 
     if (!id) {
       return NextResponse.json({ error: 'Missing company id' }, { status: 400 });
     }
 
-    const { data: docs } = await supabase
-      .from('deal_documents')
-      .select('file_path')
-      .eq('deal_id', id);
-
-    const filePaths = (docs || []).map((d: any) => d.file_path).filter(Boolean);
+    const filePaths = await dealDocRepo.findFilePathsByDealId(id);
     if (filePaths.length > 0) {
-      await supabase.storage.from('deal-documents').remove(filePaths);
+      await db.storage.from('deal-documents').remove(filePaths);
     }
 
-    const { error } = await supabase.from('companies').delete().eq('id', id);
-    if (error) throw error;
-
+    await companyRepo.delete(id);
     return NextResponse.json({ data: { success: true } });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to delete company' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete company';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

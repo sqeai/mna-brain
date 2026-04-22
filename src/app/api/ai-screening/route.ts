@@ -7,11 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgentGraph, HumanMessage } from "@/lib/agent";
 import { getToolDescriptions } from "@/lib/agent/tools";
 import { createSupabaseClient } from "@/lib/server/supabase";
+import { CompanyRepository } from "@/lib/repositories";
+import type { Tables } from "@/lib/repositories";
 import { z } from "zod";
 import { getPostHogClient } from "@/lib/posthog-server";
 
-// Create a server-side Supabase client
-// Schema for the screening result
 const ScreeningResultSchema = z.object({
   result: z.enum(["pass", "fail", "inconclusive", "error"]),
   remarks: z.string(),
@@ -104,81 +104,76 @@ export async function POST(request: NextRequest) {
     const body: ScreeningRequest = await request.json();
     const { companyId, criteriaId, criteriaPrompt, company } = body;
 
-    // Validate required fields
     if (!companyId || !criteriaId || !criteriaPrompt || !company) {
       return NextResponse.json(
         { error: "Missing required fields: companyId, criteriaId, criteriaPrompt, company" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Get the agent
     const agent = await getAgentGraph();
     if (!agent) {
       return NextResponse.json(
         { error: "Agent not available. Please ensure ANTHROPIC_API_KEY is set." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    // Fetch company data from database to enrich context
     let enrichedCompany: CompanyData = { ...company };
     try {
-      const supabase = createSupabaseClient();
-      const { data: dbCompany, error: dbError } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("id", companyId)
-        .single();
+      const db = createSupabaseClient();
+      const companyRepo = new CompanyRepository(db);
+      const dbCompany = await companyRepo.findById(companyId);
 
-      if (dbError) {
-        console.warn(`[AI-Screening] DB fetch failed for company=${companyId}: ${dbError.message}. Falling back to request body.`);
-      } else if (dbCompany) {
-        console.log(`[AI-Screening] Enriched company data from DB for company=${dbCompany.target || company.name || company.id}`);
-        // Merge DB data with request body (DB takes precedence for non-null values)
-        enrichedCompany = {
-          ...company,
-          ...Object.fromEntries(
-            Object.entries(dbCompany).filter(([, v]) => v != null)
-          ),
-        } as CompanyData;
-      }
+      console.log(
+        `[AI-Screening] Enriched company data from DB for company=${dbCompany.target || company.name || company.id}`,
+      );
+      enrichedCompany = {
+        ...company,
+        ...Object.fromEntries(
+          Object.entries(dbCompany as Record<string, unknown>).filter(([, v]) => v != null),
+        ),
+      } as CompanyData;
     } catch (dbFetchError) {
-      console.warn(`[AI-Screening] Could not fetch from DB: ${(dbFetchError as Error).message}. Using request body data.`);
+      console.warn(
+        `[AI-Screening] Could not fetch from DB: ${(dbFetchError as Error).message}. Using request body data.`,
+      );
     }
 
-    // Build company context string
     const companyContext = buildCompanyContext(enrichedCompany);
-
-    // Get dynamically injected tool descriptions
     const toolDescriptions = getToolDescriptions();
 
-    // Create the evaluation prompt with tool descriptions
-    const evaluationPrompt = SCREENING_PROMPT_TEMPLATE
-      .replace("{toolDescriptions}", toolDescriptions)
+    const evaluationPrompt = SCREENING_PROMPT_TEMPLATE.replace(
+      "{toolDescriptions}",
+      toolDescriptions,
+    )
       .replace("{companyContext}", companyContext)
       .replace("{criteriaPrompt}", criteriaPrompt);
 
-    // Invoke the agent with a timeout to prevent hanging
-    // 4 minutes allows for multiple tool-call round trips (each ~10-30s) even under concurrent load
-    console.log(`[AI-Screening] Invoking agent for company=${company.name}, criteria=${criteriaId}`);
-    const AGENT_TIMEOUT_MS = 240_000; // 4 minutes timeout
+    const AGENT_TIMEOUT_MS = 240_000;
+    console.log(
+      `[AI-Screening] Invoking agent for company=${company.name}, criteria=${criteriaId}`,
+    );
+
     let result;
     try {
       result = await Promise.race([
-        agent.invoke({
-          messages: [new HumanMessage(evaluationPrompt)],
-        }),
+        agent.invoke({ messages: [new HumanMessage(evaluationPrompt)] }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Agent invocation timed out")), AGENT_TIMEOUT_MS)
+          setTimeout(
+            () => reject(new Error("Agent invocation timed out")),
+            AGENT_TIMEOUT_MS,
+          ),
         ),
       ]);
     } catch (agentError) {
       const errorMsg = (agentError as Error).message;
       console.error(`[AI-Screening] Agent error for company=${company.name}: ${errorMsg}`);
 
-      // Detect rate limit errors from the Anthropic SDK and surface them with 429 status
-      const isRateLimit = errorMsg.includes('rate_limit') || errorMsg.includes('429') || errorMsg.includes('Rate limit');
+      const isRateLimit =
+        errorMsg.includes("rate_limit") ||
+        errorMsg.includes("429") ||
+        errorMsg.includes("Rate limit");
       if (isRateLimit) {
         return NextResponse.json(
           {
@@ -187,13 +182,11 @@ export async function POST(request: NextRequest) {
             result: "error",
             remarks: "Rate limit exceeded. Request will be retried automatically.",
           },
-          { status: 429 }
+          { status: 429 },
         );
       }
 
-      // Return 504 Gateway Timeout for timeout errors so the frontend can detect and retry
-      const isTimeout = errorMsg.includes('timed out');
-      if (isTimeout) {
+      if (errorMsg.includes("timed out")) {
         return NextResponse.json(
           {
             companyId,
@@ -201,42 +194,34 @@ export async function POST(request: NextRequest) {
             result: "error",
             remarks: "Screening timed out. Will be retried automatically.",
           },
-          { status: 504 }
+          { status: 504 },
         );
       }
 
       return NextResponse.json(
-        {
-          companyId,
-          criteriaId,
-          result: "error",
-          remarks: `Agent error: ${errorMsg}`,
-        },
-        { status: 500 }
+        { companyId, criteriaId, result: "error", remarks: `Agent error: ${errorMsg}` },
+        { status: 500 },
       );
     }
 
-    // Extract the last message (AI's final response)
     const messages = result.messages;
     const msg = messages[messages.length - 1];
-    const content = msg ? (typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)) : "";
+    const content = msg
+      ? typeof msg.content === "string"
+        ? msg.content
+        : JSON.stringify(msg.content)
+      : "";
 
     let screeningResult: ScreeningResult;
     try {
-      const parsed = JSON.parse(content);
-      screeningResult = ScreeningResultSchema.parse(parsed);
+      screeningResult = ScreeningResultSchema.parse(JSON.parse(content));
     } catch {
-      // If direct parse fails, try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          screeningResult = ScreeningResultSchema.parse(parsed);
+          screeningResult = ScreeningResultSchema.parse(JSON.parse(jsonMatch[0]));
         } catch {
-          screeningResult = {
-            result: "error",
-            remarks: "Failed to parse AI response",
-          };
+          screeningResult = { result: "error", remarks: "Failed to parse AI response" };
         }
       } else {
         screeningResult = {
@@ -246,13 +231,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[AI-Screening] Result for company=${company.name}, criteria=${criteriaId}: ${screeningResult.result}`);
+    console.log(
+      `[AI-Screening] Result for company=${company.name}, criteria=${criteriaId}: ${screeningResult.result}`,
+    );
 
-    // Capture server-side AI screening completed event
     const posthog = getPostHogClient();
     posthog.capture({
-      distinctId: 'server',
-      event: 'ai_screening_completed',
+      distinctId: "server",
+      event: "ai_screening_completed",
       properties: {
         company_id: companyId,
         company_name: company.name,
@@ -261,24 +247,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      companyId,
-      criteriaId,
-      ...screeningResult,
-    });
+    return NextResponse.json({ companyId, criteriaId, ...screeningResult });
   } catch (error) {
     console.error("AI Screening error:", error);
 
-    // Detect rate limit errors thrown by the Anthropic SDK
     const errorMsg = (error as Error).message || "";
-    const isRateLimit = errorMsg.includes('rate_limit') || errorMsg.includes('429') || errorMsg.includes('Rate limit');
+    const isRateLimit =
+      errorMsg.includes("rate_limit") ||
+      errorMsg.includes("429") ||
+      errorMsg.includes("Rate limit");
     if (isRateLimit) {
       return NextResponse.json(
         {
           result: "error",
           remarks: "Rate limit exceeded. Request will be retried automatically.",
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -288,7 +272,7 @@ export async function POST(request: NextRequest) {
         result: "error",
         remarks: "An error occurred during screening",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -299,20 +283,22 @@ export async function POST(request: NextRequest) {
 function buildCompanyContext(company: CompanyData): string {
   const lines: string[] = [];
 
-
   lines.push(`**Company Name:** ${company.name || "Unknown"}`);
 
   if (company.segment) lines.push(`**Segment:** ${company.segment}`);
-  if (company.segment_related_offerings) lines.push(`**Segment Related Offerings:** ${company.segment_related_offerings}`);
+  if (company.segment_related_offerings)
+    lines.push(`**Segment Related Offerings:** ${company.segment_related_offerings}`);
   if (company.geography) lines.push(`**Geography:** ${company.geography}`);
   if (company.company_focus) lines.push(`**Focus:** ${company.company_focus}`);
   if (company.ownership) lines.push(`**Ownership:** ${company.ownership}`);
   if (company.website) lines.push(`**Website:** ${company.website}`);
-  if (company.combined_segment_revenue) lines.push(`**Combined Segment Revenue:** ${company.combined_segment_revenue}`);
-  if (company.revenue_from_priority_geo_flag) lines.push(`**Revenue from Priority Geo:** ${company.revenue_from_priority_geo_flag}`);
-  if (company.pct_from_domestic != null) lines.push(`**% from Domestic:** ${company.pct_from_domestic}%`);
+  if (company.combined_segment_revenue)
+    lines.push(`**Combined Segment Revenue:** ${company.combined_segment_revenue}`);
+  if (company.revenue_from_priority_geo_flag)
+    lines.push(`**Revenue from Priority Geo:** ${company.revenue_from_priority_geo_flag}`);
+  if (company.pct_from_domestic != null)
+    lines.push(`**% from Domestic:** ${company.pct_from_domestic}%`);
 
-  // Financial data
   const financials: string[] = [];
   if (company.revenue_2022_usd_mn != null) financials.push(`Revenue 2022: $${company.revenue_2022_usd_mn}M`);
   if (company.revenue_2023_usd_mn != null) financials.push(`Revenue 2023: $${company.revenue_2023_usd_mn}M`);
@@ -335,7 +321,6 @@ function buildCompanyContext(company: CompanyData): string {
     lines.push(`**Financials:** No financial data available`);
   }
 
-  // Screening metrics (if available from DB)
   const metrics: string[] = [];
   if (company.l1_revenue_cagr_l3y != null) metrics.push(`Revenue CAGR L3Y: ${company.l1_revenue_cagr_l3y}%`);
   if (company.l1_revenue_cagr_n3y != null) metrics.push(`Revenue CAGR N3Y: ${company.l1_revenue_cagr_n3y}%`);
@@ -353,11 +338,12 @@ function buildCompanyContext(company: CompanyData): string {
   return lines.join("\n");
 }
 
-// Health check endpoint
 export async function GET() {
   const agent = await getAgentGraph();
   return NextResponse.json({
     status: agent ? "ready" : "not_configured",
-    message: agent ? "AI Screening endpoint is ready" : "Agent not available. Check ANTHROPIC_API_KEY.",
+    message: agent
+      ? "AI Screening endpoint is ready"
+      : "Agent not available. Check ANTHROPIC_API_KEY.",
   });
 }

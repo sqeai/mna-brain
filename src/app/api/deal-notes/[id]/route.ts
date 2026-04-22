@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
+import { DealNoteRepository } from '@/lib/repositories';
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const dealNoteRepo = new DealNoteRepository(db);
 
-    const { error } = await supabase.from('deal_notes').delete().eq('id', id);
-    if (error) throw error;
-
+    await dealNoteRepo.delete(id);
     return NextResponse.json({ data: { success: true } });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to delete note' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete note';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

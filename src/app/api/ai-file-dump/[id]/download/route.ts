@@ -1,54 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient } from "@/lib/server/supabase";
+import { FileRepository } from "@/lib/repositories";
 import { getSignedUrl } from "@/lib/s3";
 
-// Create a server-side Supabase client
 /**
  * GET - Generate a pre-signed download URL for a specific file
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: "File ID is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "File ID is required" }, { status: 400 });
     }
 
-    const supabase = createSupabaseClient();
+    const db = createSupabaseClient();
+    const fileRepo = new FileRepository(db);
 
-    // Fetch the file record to get the S3 key and original filename
-    const { data, error } = await supabase
-      .from("files")
-      .select("file_link, file_name")
-      .eq("id", id)
-      .single();
+    const record = await fileRepo.findLinkAndNameById(id);
+    const downloadUrl = await getSignedUrl(record.file_link, 3600, record.file_name);
 
-    if (error || !data) {
-      console.error("Database query error:", error);
-      return NextResponse.json(
-        { error: "File not found" },
-        { status: 404 }
-      );
-    }
-
-    // Generate a pre-signed URL that forces a browser download with the original filename
-    const downloadUrl = await getSignedUrl(data.file_link, 3600, data.file_name);
-
-    return NextResponse.json({
-      success: true,
-      download_url: downloadUrl,
-    });
+    return NextResponse.json({ success: true, download_url: downloadUrl });
   } catch (error) {
     console.error("Generate download URL error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Failed to generate download URL" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

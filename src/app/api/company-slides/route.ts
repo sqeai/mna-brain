@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient } from "@/lib/server/supabase";
+import { CompanySlidesRepository } from "@/lib/repositories";
 
 /**
  * GET: Fetch all slides for a company, ordered by sort_order.
@@ -7,31 +8,25 @@ import { createSupabaseClient } from "@/lib/server/supabase";
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get("companyId");
+    const companyId = new URL(request.url).searchParams.get("companyId");
 
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required query parameter: companyId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("company_slides")
-      .select("*")
-      .eq("company_id", companyId)
-      .order("sort_order", { ascending: true });
+    const db = createSupabaseClient();
+    const slidesRepo = new CompanySlidesRepository(db);
 
-    if (error) throw error;
-
-    return NextResponse.json({ slides: data || [] });
+    const slides = await slidesRepo.findByCompanyId(companyId);
+    return NextResponse.json({ slides });
   } catch (error) {
     console.error("GET company-slides error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -48,30 +43,26 @@ export async function POST(request: NextRequest) {
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required field: companyId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("company_slides")
-      .insert({
-        company_id: companyId,
-        title: title || "Untitled",
-        html: html || "",
-        sort_order: sort_order ?? 0,
-      })
-      .select()
-      .single();
+    const db = createSupabaseClient();
+    const slidesRepo = new CompanySlidesRepository(db);
 
-    if (error) throw error;
+    const slide = await slidesRepo.insert({
+      company_id: companyId,
+      title: title || "Untitled",
+      html: html || "",
+      sort_order: sort_order ?? 0,
+    });
 
-    return NextResponse.json({ slide: data });
+    return NextResponse.json({ slide });
   } catch (error) {
     console.error("POST company-slides error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -88,38 +79,29 @@ export async function PUT(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { error: "Missing required field: id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const updates: Record<string, unknown> = {};
+    const updates: { title?: string; html?: string; sort_order?: number } = {};
     if (title !== undefined) updates.title = title;
     if (html !== undefined) updates.html = html;
     if (sort_order !== undefined) updates.sort_order = sort_order;
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json(
-        { error: "No fields to update" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("company_slides")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
+    const db = createSupabaseClient();
+    const slidesRepo = new CompanySlidesRepository(db);
 
-    if (error) throw error;
-
-    return NextResponse.json({ slide: data });
+    const slide = await slidesRepo.update(id, updates);
+    return NextResponse.json({ slide });
   } catch (error) {
     console.error("PUT company-slides error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -130,30 +112,25 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
+    const id = new URL(request.url).searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(
         { error: "Missing required query parameter: id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const supabase = createSupabaseClient();
-    const { error } = await supabase
-      .from("company_slides")
-      .delete()
-      .eq("id", id);
+    const db = createSupabaseClient();
+    const slidesRepo = new CompanySlidesRepository(db);
 
-    if (error) throw error;
-
+    await slidesRepo.delete(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE company-slides error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

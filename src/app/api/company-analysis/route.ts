@@ -8,10 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgentGraph, HumanMessage } from "@/lib/agent";
 import { getToolDescriptions } from "@/lib/agent/tools";
 import { createSupabaseClient } from "@/lib/server/supabase";
+import { CompanyAnalysisRepository, CompanyRepository } from "@/lib/repositories";
+import type { Tables } from "@/lib/repositories";
 import { z } from "zod";
 
-// Server-side Supabase client
-// Zod schema for the agent's structured response
 const CompanyAnalysisResultSchema = z.object({
   business_overview: z.string(),
   business_model_summary: z.string(),
@@ -19,11 +19,15 @@ const CompanyAnalysisResultSchema = z.object({
   investment_highlights: z.string(),
   investment_risks: z.string(),
   diligence_priorities: z.string(),
-  sources_used: z.array(z.object({
-    type: z.string(),
-    url: z.string().optional(),
-    title: z.string().optional(),
-  })).optional(),
+  sources_used: z
+    .array(
+      z.object({
+        type: z.string(),
+        url: z.string().optional(),
+        title: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 type CompanyAnalysisResult = z.infer<typeof CompanyAnalysisResultSchema>;
@@ -114,32 +118,24 @@ Include ONLY the sources you actually used in \`sources_used\`. Respond with the
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get("companyId");
+    const companyId = new URL(request.url).searchParams.get("companyId");
 
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required query parameter: companyId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("company_analyses")
-      .select("*")
-      .eq("company_id", companyId)
-      .single();
+    const db = createSupabaseClient();
+    const analysisRepo = new CompanyAnalysisRepository(db);
 
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 = "not found" — that's fine, return 404
-      throw error;
-    }
+    const data = await analysisRepo.findByCompanyId(companyId);
 
     if (!data) {
       return NextResponse.json(
         { error: "No analysis found for this company" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -148,7 +144,7 @@ export async function GET(request: NextRequest) {
     console.error("GET company-analysis error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -157,90 +153,59 @@ export async function GET(request: NextRequest) {
  * POST: Generate (or return cached) company analysis.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createSupabaseClient();
+  const db = createSupabaseClient();
+  const analysisRepo = new CompanyAnalysisRepository(db);
+  const companyRepo = new CompanyRepository(db);
   let companyId: string | undefined;
 
   try {
     const body = await request.json();
     companyId = body.companyId;
     const source = body.source;
+
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required field: companyId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Check for existing completed analysis (cache hit)
-    const { data: existing } = await supabase
-      .from("company_analyses")
-      .select("*")
-      .eq("company_id", companyId)
-      .eq("status", "completed")
-      .single();
-
+    const existing = await analysisRepo.findCompletedByCompanyId(companyId);
     if (existing) {
       return NextResponse.json(existing);
     }
 
-    // Fetch company data from DB for context
-    const { data: company, error: companyError } = await supabase
-      .from("companies")
-      .select("*")
-      .eq("id", companyId)
-      .single();
+    const company = await companyRepo.findById(companyId);
 
-    if (companyError || !company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
-    }
+    await analysisRepo.upsertByCompanyId({
+      company_id: companyId,
+      status: "generating",
+      error_message: null,
+    });
 
-    // Upsert analysis record with status: generating
-    await supabase
-      .from("company_analyses")
-      .upsert(
-        {
-          company_id: companyId,
-          status: "generating",
-          error_message: null,
-        },
-        { onConflict: "company_id" }
-      );
-
-    // Get the agent
     const agent = getAgentGraph();
     if (!agent) {
-      await supabase
-        .from("company_analyses")
-        .update({ status: "failed", error_message: "Agent not available. Check ANTHROPIC_API_KEY." })
-        .eq("company_id", companyId);
-
+      await analysisRepo.updateByCompanyId(companyId, {
+        status: "failed",
+        error_message: "Agent not available. Check ANTHROPIC_API_KEY.",
+      });
       return NextResponse.json(
         { error: "Agent not available. Please ensure ANTHROPIC_API_KEY is set." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    // Build company context string
     const companyContext = buildCompanyContext(company);
     const toolDescriptions = getToolDescriptions();
 
-    // Build the prompt
-    const prompt = ANALYSIS_PROMPT_TEMPLATE
-      .replace("{toolDescriptions}", toolDescriptions)
+    const prompt = ANALYSIS_PROMPT_TEMPLATE.replace("{toolDescriptions}", toolDescriptions)
       .replace("{companyName}", company.target || "Unknown")
-      .replace("{companyName}", company.target || "Unknown") // Two occurrences in web_search instruction
+      .replace("{companyName}", company.target || "Unknown")
       .replace("{companyContext}", companyContext)
       .replace("{source}", source || "files");
 
-    // Invoke the agent
-    const result = await agent.invoke({
-      messages: [new HumanMessage(prompt)],
-    });
+    const result = await agent.invoke({ messages: [new HumanMessage(prompt)] });
 
-    // Extract the last AI message content
     const messages = result.messages;
     const lastMsg = messages[messages.length - 1];
     const content = lastMsg
@@ -249,85 +214,58 @@ export async function POST(request: NextRequest) {
         : JSON.stringify(lastMsg.content)
       : "";
 
-    // Parse the structured JSON response
     let analysisResult: CompanyAnalysisResult;
     try {
-      const parsed = JSON.parse(content);
-      analysisResult = CompanyAnalysisResultSchema.parse(parsed);
+      analysisResult = CompanyAnalysisResultSchema.parse(JSON.parse(content));
     } catch {
-      // Fallback: try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          analysisResult = CompanyAnalysisResultSchema.parse(parsed);
+          analysisResult = CompanyAnalysisResultSchema.parse(JSON.parse(jsonMatch[0]));
         } catch {
-          // Update as failed
-          await supabase
-            .from("company_analyses")
-            .update({
-              status: "failed",
-              error_message: "Failed to parse AI response into structured format",
-            })
-            .eq("company_id", companyId);
-
+          await analysisRepo.updateByCompanyId(companyId, {
+            status: "failed",
+            error_message: "Failed to parse AI response into structured format",
+          });
           return NextResponse.json(
             { error: "Failed to parse AI response" },
-            { status: 500 }
+            { status: 500 },
           );
         }
       } else {
-        await supabase
-          .from("company_analyses")
-          .update({
-            status: "failed",
-            error_message: "AI response was not in expected JSON format",
-          })
-          .eq("company_id", companyId);
-
+        await analysisRepo.updateByCompanyId(companyId, {
+          status: "failed",
+          error_message: "AI response was not in expected JSON format",
+        });
         return NextResponse.json(
           { error: "AI response was not in expected format" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
 
-    // Update the record with completed analysis
-    const { data: updated, error: updateError } = await supabase
-      .from("company_analyses")
-      .update({
-        status: "completed",
-        business_overview: analysisResult.business_overview,
-        business_model_summary: analysisResult.business_model_summary,
-        key_takeaways: analysisResult.key_takeaways,
-        investment_highlights: analysisResult.investment_highlights,
-        investment_risks: analysisResult.investment_risks,
-        diligence_priorities: analysisResult.diligence_priorities,
-        sources: analysisResult.sources_used || [],
-        error_message: null,
-      })
-      .eq("company_id", companyId)
-      .select()
-      .single();
-
-    if (updateError) {
-      throw updateError;
-    }
+    const updated = await analysisRepo.updateByCompanyId(companyId, {
+      status: "completed",
+      business_overview: analysisResult.business_overview,
+      business_model_summary: analysisResult.business_model_summary,
+      key_takeaways: analysisResult.key_takeaways,
+      investment_highlights: analysisResult.investment_highlights,
+      investment_risks: analysisResult.investment_risks,
+      diligence_priorities: analysisResult.diligence_priorities,
+      sources: analysisResult.sources_used || [],
+      error_message: null,
+    });
 
     return NextResponse.json(updated);
   } catch (error) {
     console.error("POST company-analysis error:", error);
 
-    // Try to mark as failed in DB
     if (companyId) {
       try {
-        await supabase
-          .from("company_analyses")
-          .update({
-            status: "failed",
-            error_message: (error as Error).message || "Unknown error",
-          })
-          .eq("company_id", companyId);
+        await analysisRepo.updateByCompanyId(companyId, {
+          status: "failed",
+          error_message: (error as Error).message || "Unknown error",
+        });
       } catch {
         // Ignore DB update error in error handler
       }
@@ -335,7 +273,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -345,30 +283,25 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get("companyId");
+    const companyId = new URL(request.url).searchParams.get("companyId");
 
     if (!companyId) {
       return NextResponse.json(
         { error: "Missing required query parameter: companyId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const supabase = createSupabaseClient();
-    const { error } = await supabase
-      .from("company_analyses")
-      .delete()
-      .eq("company_id", companyId);
+    const db = createSupabaseClient();
+    const analysisRepo = new CompanyAnalysisRepository(db);
 
-    if (error) throw error;
-
+    await analysisRepo.deleteByCompanyId(companyId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE company-analysis error:", error);
     return NextResponse.json(
       { error: (error as Error).message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -376,7 +309,7 @@ export async function DELETE(request: NextRequest) {
 /**
  * Build a human-readable context string from company data.
  */
-function buildCompanyContext(company: Record<string, unknown>): string {
+function buildCompanyContext(company: Tables<'companies'>): string {
   const lines: string[] = [];
 
   lines.push(`**Company Name:** ${company.target || "Unknown"}`);
@@ -388,7 +321,6 @@ function buildCompanyContext(company: Record<string, unknown>): string {
   if (company.website) lines.push(`**Website:** ${company.website}`);
   if (company.comments) lines.push(`**Comments:** ${company.comments}`);
 
-  // Financial data
   const financials: string[] = [];
   if (company.revenue_2021_usd_mn != null) financials.push(`Revenue 2021: $${company.revenue_2021_usd_mn}M`);
   if (company.revenue_2022_usd_mn != null) financials.push(`Revenue 2022: $${company.revenue_2022_usd_mn}M`);
@@ -400,7 +332,6 @@ function buildCompanyContext(company: Record<string, unknown>): string {
   if (company.ebitda_2024_usd_mn != null) financials.push(`EBITDA 2024: $${company.ebitda_2024_usd_mn}M`);
   if (company.ev_2024 != null) financials.push(`EV 2024: $${company.ev_2024}M`);
 
-  // Margins
   const margins: string[] = [];
   if (company.ebitda_margin_2021 != null) margins.push(`Margin 2021: ${company.ebitda_margin_2021}%`);
   if (company.ebitda_margin_2022 != null) margins.push(`Margin 2022: ${company.ebitda_margin_2022}%`);
@@ -419,7 +350,6 @@ function buildCompanyContext(company: Record<string, unknown>): string {
     lines.push(margins.join(" | "));
   }
 
-  // L1 screening context
   if (company.l1_screening_result) lines.push(`**L1 Screening Result:** ${company.l1_screening_result}`);
   if (company.l1_rationale) lines.push(`**L1 Rationale:** ${company.l1_rationale}`);
 
