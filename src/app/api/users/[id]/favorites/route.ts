@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { UserRepository } from '@/lib/repositories';
+import { createContainer } from '@/lib/services';
 
 export async function GET(
   _req: NextRequest,
@@ -9,10 +9,9 @@ export async function GET(
   try {
     const { id } = await params;
     const db = createSupabaseClient();
-    const userRepo = new UserRepository(db);
-
-    const favorites = await userRepo.findFavoriteCompanies(id);
-    return NextResponse.json({ data: favorites });
+    const { userService } = createContainer(db);
+    const data = await userService.findFavorites(id);
+    return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch favorites';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -27,17 +26,9 @@ export async function PATCH(
     const { id } = await params;
     const { companyId } = await req.json();
     const db = createSupabaseClient();
-    const userRepo = new UserRepository(db);
-
-    const current = await userRepo.findFavoriteCompanies(id);
-    const isFavorited = current.includes(companyId);
-    const updated = isFavorited
-      ? current.filter((c) => c !== companyId)
-      : [...current, companyId];
-
-    await userRepo.update(id, { favorite_companies: updated });
-
-    return NextResponse.json({ data: updated });
+    const { userService } = createContainer(db);
+    const data = await userService.toggleFavorite(id, companyId);
+    return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update favorites';
     return NextResponse.json({ error: message }, { status: 500 });

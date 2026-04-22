@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { CompanyRepository } from '@/lib/repositories';
+import { createContainer } from '@/lib/services';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const db = createSupabaseClient();
-    const companyRepo = new CompanyRepository(db);
-
-    const data = await companyRepo.findDetails(id);
+    const { companyService } = createContainer(db);
+    const data = await companyService.findDetails(id);
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch details';

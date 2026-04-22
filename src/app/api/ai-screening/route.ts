@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph } from '@/lib/agent';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { dispatchJob } from '@/lib/jobs/dispatch';
-import {
-  AI_SCREENING_TIMEOUT_SECONDS,
-  runAIScreening,
-  type AIScreeningPayload,
-} from '@/lib/jobs/handlers/aiScreening';
+import { createContainer } from '@/lib/services';
+import type { AIScreeningPayload } from '@/lib/jobs/handlers/aiScreening';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,23 +11,14 @@ export async function POST(request: NextRequest) {
 
     if (!companyId || !criteriaId || !criteriaPrompt || !company || !screeningId) {
       return NextResponse.json(
-        {
-          error:
-            'Missing required fields: companyId, criteriaId, criteriaPrompt, company, screeningId',
-        },
+        { error: 'Missing required fields: companyId, criteriaId, criteriaPrompt, company, screeningId' },
         { status: 400 },
       );
     }
 
     const db = createSupabaseClient();
-    const { jobId } = await dispatchJob({
-      db,
-      createDb: createSupabaseClient,
-      type: 'ai_screening',
-      payload: body as unknown as Record<string, unknown>,
-      timeoutSeconds: AI_SCREENING_TIMEOUT_SECONDS,
-      work: ({ db: runDb, job }) => runAIScreening(body, { db: runDb, job }),
-    });
+    const { aiScreeningService } = createContainer(db);
+    const { jobId } = await aiScreeningService.dispatch(body);
 
     return NextResponse.json({ jobId }, { status: 202 });
   } catch (error) {

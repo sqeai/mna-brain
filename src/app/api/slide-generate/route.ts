@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { dispatchJob } from '@/lib/jobs/dispatch';
-import {
-  SLIDE_GENERATION_TIMEOUT_SECONDS,
-  runSlideGeneration,
-  type SlideGenerationPayload,
-} from '@/lib/jobs/handlers/slideGeneration';
+import { createContainer } from '@/lib/services';
+import type { SlideGenerationPayload } from '@/lib/jobs/handlers/slideGeneration';
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SlideGenerationPayload;
-
     if (!body.instruction) {
       return NextResponse.json(
         { error: 'Missing required field: instruction' },
@@ -19,14 +14,8 @@ export async function POST(request: NextRequest) {
     }
 
     const db = createSupabaseClient();
-    const { jobId } = await dispatchJob({
-      db,
-      createDb: createSupabaseClient,
-      type: 'slide_generation',
-      payload: body as unknown as Record<string, unknown>,
-      timeoutSeconds: SLIDE_GENERATION_TIMEOUT_SECONDS,
-      work: async () => runSlideGeneration(body),
-    });
+    const { slideService } = createContainer(db);
+    const { jobId } = await slideService.generateDispatch(body);
 
     return NextResponse.json({ jobId }, { status: 202 });
   } catch (error) {
