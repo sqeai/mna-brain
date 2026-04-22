@@ -61,3 +61,7 @@ test_files/
 
 sqemnabrain/
 .env.local
+
+# Playwright
+playwright-report/
+test-results/

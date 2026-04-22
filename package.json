@@ -15,7 +15,9 @@
     "db:stop": "npx supabase stop",
     "db:status": "npx supabase status",
     "db:migration:new": "npx supabase migration new",
-    "db:types-generate": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public,auth,storage > src/integrations/supabase/types.ts"
+    "db:types-generate": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public,auth,storage > src/integrations/supabase/types.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@ai-sdk/langchain": "^2.0.72",
@@ -102,6 +104,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/typography": "^0.5.16",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/node": "^22.19.17",
