@@ -148,6 +148,8 @@ export async function POST(request: NextRequest) {
             state: "pending",
           });
 
+          // The ai-screening job writes the screening row's final state
+          // server-side, so we just need to dispatch and ignore the 202.
           fetch(`${baseUrl}/api/ai-screening`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -155,29 +157,20 @@ export async function POST(request: NextRequest) {
               companyId: company.id,
               criteriaId: criterion.id,
               criteriaPrompt: criterion.prompt,
+              screeningId: screeningEntry.id,
               company: companyData,
             }),
-          })
-            .then(async (response) => {
-              const data = await response.json();
-              const newState = data.result === "error" ? "failed" : "completed";
-              await screeningRepo.update(screeningEntry.id, {
-                state: newState,
-                result: data.result,
-                remarks: data.remarks,
-              });
-            })
-            .catch(async (err) => {
-              console.error(
-                `Error triggering ai-screening for criterion ${criterion.id}:`,
-                err,
-              );
-              await screeningRepo.update(screeningEntry.id, {
-                state: "failed",
-                result: "error",
-                remarks: "API call failed",
-              });
+          }).catch(async (err) => {
+            console.error(
+              `Error triggering ai-screening for criterion ${criterion.id}:`,
+              err,
+            );
+            await screeningRepo.update(screeningEntry.id, {
+              state: "failed",
+              result: "error",
+              remarks: "API call failed",
             });
+          });
         }
       } catch (err) {
         console.error("Error in ai-screening flow:", err);

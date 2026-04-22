@@ -10,4 +10,5 @@ export * from './dealDocumentRepository';
 export * from './dealLinkRepository';
 export * from './dealNoteRepository';
 export * from './investmentThesisRepository';
+export * from './jobRepository';
 export * from './userRepository';
