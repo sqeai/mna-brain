@@ -175,3 +175,43 @@ To run from source:
 # Go >= 1.22
 go run . help
 ```
+
+## End-to-end tests
+
+E2E tests live in `./e2e` and run with [Playwright](https://playwright.dev) against a Next.js dev server. `playwright.config.ts` launches `pnpm dev` automatically and reuses an existing server if one is already running on `http://localhost:3000`.
+
+### First-time setup
+
+Install the Playwright browser binaries once per machine:
+
+```bash
+pnpm exec playwright install
+```
+
+### Run the tests
+
+```bash
+# all tests, headless
+pnpm test:e2e
+
+# interactive UI mode (watch, re-run, time-travel)
+pnpm test:e2e:ui
+
+# a specific spec file
+pnpm exec playwright test e2e/dashboard.spec.ts
+
+# a single test by name
+pnpm exec playwright test -g "paginates at 10 items per page"
+
+# headed / debug
+pnpm exec playwright test --headed
+pnpm exec playwright test --debug
+```
+
+### View the report
+
+After a run, open the HTML report:
+
+```bash
+pnpm exec playwright show-report
+```
