@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
 import { UserRepository } from '@/lib/repositories';
+import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,7 +9,8 @@ export async function POST(req: NextRequest) {
     const db = createSupabaseClient();
     const userRepo = new UserRepository(db);
 
-    const user = await userRepo.findByEmailAndPassword(email, password);
+    const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
+    const user = await userRepo.findByEmailAndPassword(email, hashedPassword);
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
