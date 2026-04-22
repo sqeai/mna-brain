@@ -18,7 +18,6 @@ import {
   getCriterias,
   prepareScreenings,
   updateCriteria,
-  updateScreening,
 } from '@/lib/api/pipeline';
 
 interface Company {
@@ -209,58 +208,43 @@ export default function AIScreeningDialog({
       onOpenChange(false);
       onComplete();
 
-      // Step 2: Fire off AI API calls in the background (don't await)
-      screeningEntries.forEach(async (entry) => {
+      // Step 2: Dispatch one job per (company, criteria) pair. The job handler
+      // writes the screening row's final state on completion; we don't poll
+      // here — the pipeline view re-reads screenings after onComplete().
+      screeningEntries.forEach((entry) => {
         const company = companies.find((c) => c.id === entry.company_id);
         const criterion = criteria.find((c) => c.id === entry.criteria_id);
 
         if (!company || !criterion) return;
 
-        try {
-          const response = await fetch('/api/ai-screening', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              companyId: company.id,
-              criteriaId: criterion.id,
-              criteriaPrompt: criterion.prompt,
-              company: {
-                id: company.id,
-                name: company.target || company.name,
-                segment: company.segment,
-                geography: company.geography,
-                company_focus: company.company_focus,
-                ownership: company.ownership,
-                website: company.website,
-                revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-                revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-                revenue_2024_usd_mn: company.revenue_2024_usd_mn,
-                ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-                ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-                ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-                ev_2024: company.ev_2024,
-              },
-            }),
-          });
-
-          const data = await response.json();
-
-          // Update screening entry in database
-          const newState = data.result === 'error' ? 'failed' : 'completed';
-          await updateScreening(entry.id, {
-            state: newState,
-            result: data.result,
-            remarks: data.remarks,
-          });
-        } catch (error) {
-          console.error(`Screening error for ${company.id}/${criterion.id}:`, error);
-          // Update as failed in database
-          await updateScreening(entry.id, {
-            state: 'failed',
-            result: 'error',
-            remarks: 'API call failed',
-          });
-        }
+        void fetch('/api/ai-screening', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: company.id,
+            criteriaId: criterion.id,
+            criteriaPrompt: criterion.prompt,
+            screeningId: entry.id,
+            company: {
+              id: company.id,
+              name: company.target || company.name,
+              segment: company.segment,
+              geography: company.geography,
+              company_focus: company.company_focus,
+              ownership: company.ownership,
+              website: company.website,
+              revenue_2022_usd_mn: company.revenue_2022_usd_mn,
+              revenue_2023_usd_mn: company.revenue_2023_usd_mn,
+              revenue_2024_usd_mn: company.revenue_2024_usd_mn,
+              ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
+              ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
+              ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
+              ev_2024: company.ev_2024,
+            },
+          }),
+        }).catch((err) => {
+          console.error(`Failed to dispatch screening ${company.id}/${criterion.id}:`, err);
+        });
       });
     } catch (error: any) {
       console.error('Screening error:', error);

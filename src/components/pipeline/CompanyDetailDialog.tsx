@@ -364,6 +364,7 @@ export default function CompanyDetailDialog({
 
   const generateAnalysis = async () => {
     setAnalysisGenerating(true);
+    let dispatched = false;
     try {
       const res = await fetch('/api/company-analysis', {
         method: 'POST',
@@ -377,6 +378,11 @@ export default function CompanyDetailDialog({
       }
 
       const data = await res.json();
+      if (res.status === 202 || data.jobId) {
+        dispatched = true;
+        pollAnalysis();
+        return;
+      }
       setAnalysis(data);
       toast.success('AI Company Card generated successfully');
     } catch (error) {
@@ -384,7 +390,7 @@ export default function CompanyDetailDialog({
       toast.error((error as Error).message || 'Failed to generate AI Company Card');
       fetchAnalysis();
     } finally {
-      setAnalysisGenerating(false);
+      if (!dispatched) setAnalysisGenerating(false);
     }
   };
 
