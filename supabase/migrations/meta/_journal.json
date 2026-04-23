@@ -1,0 +1,188 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1704067200000,
+      "tag": "20240101000000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769126400000,
+      "tag": "20260123000000_new_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769126401000,
+      "tag": "20260123000001_company_logs_full_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769126402000,
+      "tag": "20260123000002_add_pipeline_stage",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769126403000,
+      "tag": "20260123000003_create_market_screening_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769126404000,
+      "tag": "20260123000004_create_investment_thesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769126405000,
+      "tag": "20260123000005_add_email_to_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769126406000,
+      "tag": "20260123000006_create_past_acquisitions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1769472000000,
+      "tag": "20260127000000_create_deal_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1769472001000,
+      "tag": "20260127000001_create_screenings",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1769558401000,
+      "tag": "20260128000001_add_thesis_to_screening_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1769558402000,
+      "tag": "20260128000002_extend_market_screening_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1769644800000,
+      "tag": "20260129000000_create_inven_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1769680800000,
+      "tag": "20260129100000_create_minutes_of_meeting",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1769684400000,
+      "tag": "20260129110000_update_minutes_of_meeting_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1769731200000,
+      "tag": "20260130000000_add_file_date_to_meeting_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1770595200000,
+      "tag": "20260209000000_rename_minutes_of_meeting_to_files",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770595201000,
+      "tag": "20260209000001_add_remarks_to_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770595202000,
+      "tag": "20260209000002_create_company_analyses",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1770595203000,
+      "tag": "20260209000003_remove_market_screening_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770768000000,
+      "tag": "20260211000000_add_source_to_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1770804001000,
+      "tag": "20260211100001_add_status_to_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1772755200000,
+      "tag": "20260306000000_create_company_slides",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1773100800000,
+      "tag": "20260310000000_add_favorite_companies_to_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776816000000,
+      "tag": "20260422000000_create_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776816001000,
+      "tag": "20260422000001_link_jobs_to_domain_tables",
+      "breakpoints": true
+    }
+  ]
+}

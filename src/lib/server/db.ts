@@ -10,6 +10,9 @@ if (!connectionString) {
 // PgBouncer transaction mode (Supabase pooler @ 6543) can't reuse prepared
 // statement names across connections — disable prepare and cap app-side pool to 1.
 const isPooler = connectionString.includes(':6543');
+// Local Supabase / dev Postgres don't need TLS; managed Postgres (RDS,
+// Supabase cloud, Neon, etc.) usually require it. Auto-detect from the host.
+const isLocal = /127\.0\.0\.1|localhost/.test(connectionString);
 
 type PgClient = ReturnType<typeof postgres>;
 const globalForDb = globalThis as unknown as { __pg?: PgClient };
@@ -21,6 +24,7 @@ const client: PgClient =
     max: isPooler ? 1 : 10,
     idle_timeout: 20,
     connect_timeout: 10,
+    ssl: isLocal ? false : 'require',
   });
 
 // Note on timestamp shape: Drizzle's `timestamp({ mode: 'string' })` returns the

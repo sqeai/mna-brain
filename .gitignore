@@ -56,7 +56,6 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
-scripts/
 test_files/
 
 sqemnabrain/
