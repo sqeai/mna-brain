@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ key });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to generate reset token';
-    const status = message === 'Email not found' ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -28,6 +28,10 @@ headers:
   name: Accept
   value: application/json
   id: null
+- enabled: true
+  name: X-Api-Secret
+  value: ${[apiSharedSecret]}
+  id: null
 method: POST
 name: Sign up
 sortPriority: 1.0

@@ -743,10 +743,6 @@ export const resetPasswordTokens = pgTable("reset_password_tokens", {
 			foreignColumns: [users.id],
 			name: "reset_password_tokens_user_id_fkey"
 		}).onDelete("cascade"),
-		allowDeleteAccessOnResetPasswordTokens: pgPolicy("Allow delete access on reset_password_tokens", { as: "permissive", for: "delete", to: ["public"], using: sql`true` }),
-		allowUpdateAccessOnResetPasswordTokens: pgPolicy("Allow update access on reset_password_tokens", { as: "permissive", for: "update", to: ["public"] }),
-		allowInsertAccessOnResetPasswordTokens: pgPolicy("Allow insert access on reset_password_tokens", { as: "permissive", for: "insert", to: ["public"] }),
-		allowReadAccessOnResetPasswordTokens: pgPolicy("Allow read access on reset_password_tokens", { as: "permissive", for: "select", to: ["public"] }),
 	}
 });
 

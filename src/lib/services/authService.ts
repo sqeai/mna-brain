@@ -28,8 +28,11 @@ export class AuthService {
   async forgetPassword(email: string): Promise<string> {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await this.userRepo.findByEmail(normalizedEmail);
-    if (!user) throw new Error('Email not found');
+    // Always return a token-shaped string to avoid leaking which emails are
+    // registered. If the user doesn't exist, the returned token is random and
+    // never stored — it will fail validation on /reset-password.
     const token = randomBytes(24).toString('hex');
+    if (!user) return token;
     const validUntil = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
     await this.resetTokenRepo.create({
       token,
