@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: mna
     ports:
-      - "5432:5432"
+      - "5440:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
     env_file:
       - .env.local
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mna
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5440/mna
       NODE_ENV: development
     ports:
       - "3000:3000"
