@@ -1,0 +1,34 @@
+type: http_request
+model: http_request
+id: rq_BrainReset01
+createdAt: 2026-04-23T00:00:00.000000
+updatedAt: 2026-04-23T00:00:00.000000
+workspaceId: wk_4yBsWJ5Tuh
+folderId: fl_Brain2Auth0
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "key": "abc123abc123",
+      "password": "new-password"
+    }
+bodyType: application/json
+description: |-
+  Reset the user's password using a key obtained from POST /api/auth/forget-password.
+
+  Response: { "error": null } on success.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Accept
+  value: application/json
+  id: null
+method: POST
+name: Reset password
+sortPriority: 3.0
+url: http://localhost:3000/api/auth/reset-password
+urlParameters: []

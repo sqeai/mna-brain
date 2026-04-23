@@ -1,0 +1,34 @@
+type: http_request
+model: http_request
+id: rq_BrainForget1
+createdAt: 2026-04-23T00:00:00.000000
+updatedAt: 2026-04-23T00:00:00.000000
+workspaceId: wk_4yBsWJ5Tuh
+folderId: fl_Brain2Auth0
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "email": "dicki.sujadi@sqe.co.id"
+    }
+bodyType: application/json
+description: |-
+  Request a password reset token.
+
+  Response: { "key": "<token>" }. Use the returned key with POST /api/auth/reset-password.
+  Token is valid for 1 hour.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: Accept
+  value: application/json
+  id: null
+method: POST
+name: Forget password
+sortPriority: 2.0
+url: http://localhost:3000/api/auth/forget-password
+urlParameters: []
