@@ -1,4 +1,4 @@
-import { getSupabaseStorageClient } from '@/lib/server/supabase-storage';
+import { deleteFile } from '@/lib/s3';
 import type {
   CompanyRepository,
   CompanyFilters,
@@ -64,8 +64,7 @@ export class CompanyService {
   async delete(id: string) {
     const filePaths = await this.dealDocRepo.findFilePathsByDealId(id);
     if (filePaths.length > 0) {
-      const storage = getSupabaseStorageClient();
-      await storage.storage.from('deal-documents').remove(filePaths);
+      await Promise.all(filePaths.map((p) => deleteFile(p)));
     }
     await this.companyRepo.delete(id);
   }
