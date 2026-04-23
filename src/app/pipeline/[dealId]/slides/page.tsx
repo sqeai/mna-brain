@@ -30,6 +30,29 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { getCompanies } from '@/lib/api/pipeline';
+import { waitForJob } from '@/lib/jobs/useJob';
+
+async function generateSlideHtml(body: {
+  instruction: string;
+  currentHtml?: string;
+  companyContext?: string;
+  slideTitle?: string;
+}): Promise<string> {
+  const res = await fetch('/api/slide-generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`slide-generate failed: ${res.status}`);
+  const { jobId } = (await res.json()) as { jobId: string };
+  const job = await waitForJob(jobId);
+  if (job.status !== 'completed') {
+    throw new Error(job.error || `Slide generation ${job.status}`);
+  }
+  const result = (job.result ?? {}) as { html?: string };
+  if (!result.html) throw new Error('Slide generation produced no HTML');
+  return result.html;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -490,15 +513,11 @@ export default function SlidesPage() {
       let html = blankSlideHtml(def.title);
 
       try {
-        const res = await fetch('/api/slide-generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ instruction: def.instruction, companyContext: ctx, slideTitle: def.title }),
+        html = await generateSlideHtml({
+          instruction: def.instruction,
+          companyContext: ctx,
+          slideTitle: def.title,
         });
-        if (res.ok) {
-          const data = await res.json();
-          html = data.html;
-        }
       } catch { /* use placeholder */ }
 
       const row = await dbCreateSlide(def.title, html, i);
@@ -543,19 +562,12 @@ export default function SlidesPage() {
 
     setGenerating(true);
     try {
-      const res = await fetch('/api/slide-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instruction,
-          currentHtml: selectedSlide.html,
-          companyContext: ctx,
-          slideTitle: selectedSlide.title,
-        }),
+      const newHtml = await generateSlideHtml({
+        instruction,
+        currentHtml: selectedSlide.html,
+        companyContext: ctx,
+        slideTitle: selectedSlide.title,
       });
-      if (!res.ok) throw new Error('Failed to generate');
-      const data = await res.json();
-      const newHtml = data.html as string;
 
       // Update local state immediately
       setSlides((prev) =>

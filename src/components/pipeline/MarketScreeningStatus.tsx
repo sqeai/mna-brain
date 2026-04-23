@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, Settings, Radar, Play, Sparkles, EyeOff, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 import { getActiveInvestmentThesis, saveInvestmentThesis } from '@/lib/api/pipeline';
+import { waitForJob } from '@/lib/jobs/useJob';
 
 interface InvestmentThesis {
   id: string;
@@ -145,13 +146,24 @@ export default function MarketScreeningStatus({ onScanComplete, newCandidatesCou
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to run market screening');
+      if (!response.ok || !data.jobId) {
+        throw new Error(data.error || 'Failed to start market screening');
       }
 
-      toast.success(`Found ${data.count} matching companies`);
-      fetchThesis();
-      onScanComplete();
+      const job = await waitForJob(data.jobId);
+
+      if (job.status === 'completed') {
+        const result = (job.result ?? {}) as { count?: number; message?: string };
+        if (result.count && result.count > 0) {
+          toast.success(`Found ${result.count} matching companies`);
+        } else {
+          toast.info(result.message || 'No new companies found');
+        }
+        fetchThesis();
+        onScanComplete();
+      } else {
+        throw new Error(job.error || `Market screening ${job.status}`);
+      }
     } catch (error: any) {
       console.error('Error running scan:', error);
       toast.error(error.message || 'Failed to run market screening');

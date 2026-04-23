@@ -379,6 +379,7 @@ export default function CompanyDetailPage() {
     if (!companyId) return;
     setAnalysisGenerating(true);
 
+    let dispatched = false;
     try {
       const res = await fetch('/api/company-analysis', {
         method: 'POST',
@@ -392,6 +393,12 @@ export default function CompanyDetailPage() {
       }
 
       const data = await res.json();
+      // 202 → job dispatched; pollAnalysis watches the company_analyses row.
+      if (res.status === 202 || data.jobId) {
+        dispatched = true;
+        pollAnalysis();
+        return;
+      }
       setAnalysis(data);
       toast.success('AI Company Card generated successfully');
     } catch (error) {
@@ -400,7 +407,7 @@ export default function CompanyDetailPage() {
       // Re-fetch to get the latest status (might be 'failed')
       fetchAnalysis();
     } finally {
-      setAnalysisGenerating(false);
+      if (!dispatched) setAnalysisGenerating(false);
     }
   };
 

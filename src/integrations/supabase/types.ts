@@ -1199,6 +1199,7 @@ export type Database = {
           id: string
           investment_highlights: string | null
           investment_risks: string | null
+          job_id: string | null
           key_takeaways: string | null
           sources: Json | null
           status: string
@@ -1214,6 +1215,7 @@ export type Database = {
           id?: string
           investment_highlights?: string | null
           investment_risks?: string | null
+          job_id?: string | null
           key_takeaways?: string | null
           sources?: Json | null
           status?: string
@@ -1229,6 +1231,7 @@ export type Database = {
           id?: string
           investment_highlights?: string | null
           investment_risks?: string | null
+          job_id?: string | null
           key_takeaways?: string | null
           sources?: Json | null
           status?: string
@@ -1242,6 +1245,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "company_analyses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
         ]
       }
       company_slides: {
@@ -1251,6 +1261,7 @@ export type Database = {
           title: string
           html: string
           sort_order: number
+          job_id: string | null
           created_at: string
           updated_at: string
         }
@@ -1260,6 +1271,7 @@ export type Database = {
           title?: string
           html?: string
           sort_order?: number
+          job_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1269,6 +1281,7 @@ export type Database = {
           title?: string
           html?: string
           sort_order?: number
+          job_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1278,6 +1291,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_slides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -2097,6 +2117,86 @@ export type Database = {
         }
         Relationships: []
       }
+      job_logs: {
+        Row: {
+          created_at: string
+          from_status: Database["public"]["Enums"]["job_status"] | null
+          id: string
+          job_id: string
+          message: string | null
+          metadata: Json | null
+          to_status: Database["public"]["Enums"]["job_status"]
+        }
+        Insert: {
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["job_status"] | null
+          id?: string
+          job_id: string
+          message?: string | null
+          metadata?: Json | null
+          to_status: Database["public"]["Enums"]["job_status"]
+        }
+        Update: {
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["job_status"] | null
+          id?: string
+          job_id?: string
+          message?: string | null
+          metadata?: Json | null
+          to_status?: Database["public"]["Enums"]["job_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json
+          result: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          timeout_seconds: number
+          type: Database["public"]["Enums"]["job_type"]
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          result?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          timeout_seconds?: number
+          type: Database["public"]["Enums"]["job_type"]
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          result?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          timeout_seconds?: number
+          type?: Database["public"]["Enums"]["job_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       past_acquisitions: {
         Row: {
           assumption: string | null
@@ -2319,6 +2419,7 @@ export type Database = {
           created_at: string | null
           criteria_id: string
           id: string
+          job_id: string | null
           remarks: string | null
           result: string | null
           state: Database["public"]["Enums"]["screening_state"]
@@ -2329,6 +2430,7 @@ export type Database = {
           created_at?: string | null
           criteria_id: string
           id?: string
+          job_id?: string | null
           remarks?: string | null
           result?: string | null
           state?: Database["public"]["Enums"]["screening_state"]
@@ -2339,6 +2441,7 @@ export type Database = {
           created_at?: string | null
           criteria_id?: string
           id?: string
+          job_id?: string | null
           remarks?: string | null
           result?: string | null
           state?: Database["public"]["Enums"]["screening_state"]
@@ -2357,6 +2460,13 @@ export type Database = {
             columns: ["criteria_id"]
             isOneToOne: false
             referencedRelation: "criterias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screenings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -2399,6 +2509,17 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      job_status:
+        | "pending"
+        | "running"
+        | "completed"
+        | "failed"
+        | "timed_out"
+      job_type:
+        | "slide_generation"
+        | "market_screening"
+        | "ai_screening"
+        | "company_analysis"
       screening_state: "pending" | "completed" | "failed"
     }
     CompositeTypes: {

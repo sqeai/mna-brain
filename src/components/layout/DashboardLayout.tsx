@@ -70,9 +70,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <ProtectedRoute>
       <LivingBackground variant="default" />
-      <div className="animated-bg">
-        <div className="grain" />
-      </div>
       <SidebarProvider>
         <div className="relative z-10 flex min-h-screen w-full">
           <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-white/70 dark:bg-[hsl(220,20%,8%)]/70 backdrop-blur-xl">
