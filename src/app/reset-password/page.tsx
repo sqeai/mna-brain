@@ -136,20 +136,6 @@ export default function ResetPasswordPage() {
             ) : (
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-key" className="text-sm text-black/80 dark:text-white/80">
-                    Reset Key
-                  </Label>
-                  <Input
-                    id="reset-key"
-                    type="text"
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 focus-visible:ring-black/30 dark:focus-visible:ring-white/30 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="new-password" className="text-sm text-black/80 dark:text-white/80">
                     New Password
                   </Label>
