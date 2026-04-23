@@ -1,0 +1,29 @@
+node_modules
+.next
+.git
+.github
+.vscode
+.idea
+.DS_Store
+
+# Build artefacts / logs
+build
+dist
+out
+*.log
+build.log
+coverage
+playwright-report
+test-results
+tsconfig.tsbuildinfo
+
+# Env (compose injects via env_file / environment instead)
+.env
+.env.*.local
+.env.local
+
+# Terraform / tooling not needed in the image
+terraform
+.terraform
+yaak
+test_files
