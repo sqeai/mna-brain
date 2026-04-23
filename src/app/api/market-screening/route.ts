@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph } from '@/lib/agent';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { dispatchJob } from '@/lib/jobs/dispatch';
-import {
-  MARKET_SCREENING_TIMEOUT_SECONDS,
-  runMarketScreening,
-  type MarketScreeningPayload,
-} from '@/lib/jobs/handlers/marketScreening';
+import { createContainer } from '@/lib/services';
+import type { MarketScreeningPayload } from '@/lib/jobs/handlers/marketScreening';
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as MarketScreeningPayload;
-
     if (!body.thesis) {
       return NextResponse.json({ error: 'Investment thesis is required' }, { status: 400 });
     }
 
     const db = createSupabaseClient();
-    const { jobId } = await dispatchJob({
-      db,
-      createDb: createSupabaseClient,
-      type: 'market_screening',
-      payload: body as unknown as Record<string, unknown>,
-      timeoutSeconds: MARKET_SCREENING_TIMEOUT_SECONDS,
-      work: ({ db: runDb }) => runMarketScreening(body, { db: runDb }),
-    });
+    const { marketScreeningService } = createContainer(db);
+    const { jobId } = await marketScreeningService.dispatch(body);
 
     return NextResponse.json({ jobId }, { status: 202 });
   } catch (error: unknown) {

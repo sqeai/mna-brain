@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { ScreeningRepository } from '@/lib/repositories';
+import { createContainer } from '@/lib/services';
 
 export async function POST(req: NextRequest) {
   try {
     const db = createSupabaseClient();
-    const screeningRepo = new ScreeningRepository(db);
+    const { screeningService } = createContainer(db);
     const { companyIds, criteriaIds } = await req.json();
 
     if (!Array.isArray(companyIds) || !Array.isArray(criteriaIds)) {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await screeningRepo.upsertOrReset(companyIds, criteriaIds);
+    const data = await screeningService.prepare(companyIds, criteriaIds);
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to prepare screenings';

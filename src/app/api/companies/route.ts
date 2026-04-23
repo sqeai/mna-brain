@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/server/supabase';
-import { CompanyRepository, CompanyLogRepository, DealDocumentRepository } from '@/lib/repositories';
+import { createContainer } from '@/lib/services';
 
 function parseBool(value: string | null) {
   return value === 'true' || value === '1';
@@ -9,7 +9,7 @@ function parseBool(value: string | null) {
 export async function GET(req: NextRequest) {
   try {
     const db = createSupabaseClient();
-    const companyRepo = new CompanyRepository(db);
+    const { companyService } = createContainer(db);
     const params = req.nextUrl.searchParams;
 
     const id = params.get('id') ?? undefined;
@@ -26,32 +26,16 @@ export async function GET(req: NextRequest) {
     const countOnly = parseBool(params.get('countOnly'));
 
     if (countOnly) {
-      const count = await companyRepo.count({
-        id,
-        stage,
-        stageIn,
-        excludeStage,
-        stageNotNull,
-        createdAfter,
-      });
+      const count = await companyService.count({ id, stage, stageIn, excludeStage, stageNotNull, createdAfter });
       return NextResponse.json({ data: { count } });
     }
 
     if (id) {
-      const data = await companyRepo.findById(id);
+      const data = await companyService.findById(id);
       return NextResponse.json({ data });
     }
 
-    const data = await companyRepo.findAll({
-      stage,
-      stageIn,
-      excludeStage,
-      stageNotNull,
-      createdAfter,
-      orderBy,
-      orderDir,
-      limit,
-    });
+    const data = await companyService.list({ stage, stageIn, excludeStage, stageNotNull, createdAfter, orderBy, orderDir, limit });
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch companies';
@@ -62,17 +46,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = createSupabaseClient();
-    const companyRepo = new CompanyRepository(db);
-    const companyLogRepo = new CompanyLogRepository(db);
-    const body = await req.json();
-    const { company, logAction } = body;
-
-    const data = await companyRepo.insert(company);
-
-    if (logAction) {
-      await companyLogRepo.insert({ company_id: data.id, action: logAction });
-    }
-
+    const { companyService } = createContainer(db);
+    const { company, logAction } = await req.json();
+    const data = await companyService.create(company, logAction);
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to create company';
@@ -83,25 +59,16 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const db = createSupabaseClient();
-    const companyRepo = new CompanyRepository(db);
-    const companyLogRepo = new CompanyLogRepository(db);
-    const body = await req.json();
-    const { id, ids, updates, logAction } = body;
+    const { companyService } = createContainer(db);
+    const { id, ids, updates, logAction } = await req.json();
 
     if (!updates || (!id && (!Array.isArray(ids) || ids.length === 0))) {
       return NextResponse.json({ error: 'Missing id/ids or updates' }, { status: 400 });
     }
 
     const data = id
-      ? await companyRepo.update(id, updates)
-      : await companyRepo.updateMany(ids, updates);
-
-    if (logAction) {
-      const companyIds: string[] = id ? [id] : ids;
-      await companyLogRepo.insertMany(
-        companyIds.map((companyId: string) => ({ company_id: companyId, action: logAction })),
-      );
-    }
+      ? await companyService.update(id, updates, logAction)
+      : await companyService.updateMany(ids, updates, logAction);
 
     return NextResponse.json({ data });
   } catch (error: unknown) {
@@ -112,21 +79,12 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
-    const companyRepo = new CompanyRepository(db);
-    const dealDocRepo = new DealDocumentRepository(db);
     const id = req.nextUrl.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing company id' }, { status: 400 });
 
-    if (!id) {
-      return NextResponse.json({ error: 'Missing company id' }, { status: 400 });
-    }
-
-    const filePaths = await dealDocRepo.findFilePathsByDealId(id);
-    if (filePaths.length > 0) {
-      await db.storage.from('deal-documents').remove(filePaths);
-    }
-
-    await companyRepo.delete(id);
+    const db = createSupabaseClient();
+    const { companyService } = createContainer(db);
+    await companyService.delete(id);
     return NextResponse.json({ data: { success: true } });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete company';
