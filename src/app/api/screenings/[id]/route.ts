@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const updates = await req.json();
-    const db = createSupabaseClient();
+    const db = createDb();
     const { screeningService } = createContainer(db);
     const data = await screeningService.update(id, updates);
     return NextResponse.json({ data });

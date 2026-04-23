@@ -1,49 +1,45 @@
+import { eq } from 'drizzle-orm';
+import { dealDocuments } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert } from './types';
 
 export class DealDocumentRepository {
   constructor(private readonly db: DbClient) {}
 
   async findById(id: string): Promise<Tables<'deal_documents'>> {
-    const { data, error } = await this.db
-      .from('deal_documents')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db
+      .select()
+      .from(dealDocuments)
+      .where(eq(dealDocuments.id, id))
+      .limit(1);
+    if (!row) throw new Error(`Deal document ${id} not found`);
+    return row;
   }
 
   async findPathAndNameById(
     id: string,
   ): Promise<Pick<Tables<'deal_documents'>, 'file_path' | 'file_name'>> {
-    const { data, error } = await this.db
-      .from('deal_documents')
-      .select('file_path, file_name')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db
+      .select({ file_path: dealDocuments.file_path, file_name: dealDocuments.file_name })
+      .from(dealDocuments)
+      .where(eq(dealDocuments.id, id))
+      .limit(1);
+    if (!row) throw new Error(`Deal document ${id} not found`);
+    return row;
   }
 
   async findFilePathsByDealId(dealId: string): Promise<string[]> {
-    const { data, error } = await this.db
-      .from('deal_documents')
-      .select('file_path')
-      .eq('deal_id', dealId);
-
-    if (error) throw error;
-    return (data ?? []).map((d) => d.file_path).filter(Boolean);
+    const rows = await this.db
+      .select({ file_path: dealDocuments.file_path })
+      .from(dealDocuments)
+      .where(eq(dealDocuments.deal_id, dealId));
+    return rows.map((d) => d.file_path).filter(Boolean);
   }
 
   async insert(data: TablesInsert<'deal_documents'>): Promise<void> {
-    const { error } = await this.db.from('deal_documents').insert(data);
-    if (error) throw error;
+    await this.db.insert(dealDocuments).values(data);
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.db.from('deal_documents').delete().eq('id', id);
-    if (error) throw error;
+    await this.db.delete(dealDocuments).where(eq(dealDocuments.id, id));
   }
 }

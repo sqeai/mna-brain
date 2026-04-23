@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 function parseBool(value: string | null) {
@@ -8,7 +8,7 @@ function parseBool(value: string | null) {
 
 export async function GET(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyService } = createContainer(db);
     const params = req.nextUrl.searchParams;
 
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyService } = createContainer(db);
     const { company, logAction } = await req.json();
     const data = await companyService.create(company, logAction);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyService } = createContainer(db);
     const { id, ids, updates, logAction } = await req.json();
 
@@ -82,7 +82,7 @@ export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing company id' }, { status: 400 });
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyService } = createContainer(db);
     await companyService.delete(id);
     return NextResponse.json({ data: { success: true } });

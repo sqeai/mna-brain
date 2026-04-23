@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { slideService } = createContainer(db);
     const slides = await slideService.findByCompanyId(companyId);
     return NextResponse.json({ slides });
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: companyId' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { slideService } = createContainer(db);
     const slide = await slideService.create({
       company_id: companyId,
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { slideService } = createContainer(db);
     const slide = await slideService.update(id, updates);
     return NextResponse.json({ slide });
@@ -91,7 +91,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { slideService } = createContainer(db);
     await slideService.delete(id);
     return NextResponse.json({ success: true });

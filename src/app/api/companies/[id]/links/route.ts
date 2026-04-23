@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { url, title, stage } = await req.json();
-    const db = createSupabaseClient();
+    const db = createDb();
     const { dealLinkService } = createContainer(db);
     const data = await dealLinkService.create(id, url, title, stage);
     return NextResponse.json({ data });

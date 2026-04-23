@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph, AIMessage } from '@/lib/agent';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 import { BaseMessage } from '@langchain/core/messages';
 import { toUIMessageStream, toBaseMessages } from '@ai-sdk/langchain';
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const returnIntermediateSteps = body.show_intermediate_steps;
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { chatService } = createContainer(db);
     const contextData = await chatService.buildContext();
 

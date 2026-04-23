@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { screeningService } = createContainer(db);
     const params = req.nextUrl.searchParams;
     const companyId = params.get('companyId') ?? undefined;
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { screeningService } = createContainer(db);
     const body = await req.json();
     const data = await screeningService.create(body);

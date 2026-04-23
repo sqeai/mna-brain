@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { fileService } = createContainer(db);
     const data = await fileService.processUpload(key, fileName, contentType, userRawNotes);
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const raw = request.nextUrl.searchParams.get("file_type");
     const fileType = raw === "" ? "mom" : (raw ?? undefined);
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { fileService } = createContainer(db);
     const data = await fileService.findAll(fileType);
     return NextResponse.json({ success: true, data });
@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'File ID is required' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { fileService } = createContainer(db);
     const data = await fileService.update(id, updates);
     return NextResponse.json({ success: true, data });

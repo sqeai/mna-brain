@@ -1,5 +1,5 @@
+import { getSupabaseStorageClient } from '@/lib/server/supabase-storage';
 import type {
-  DbClient,
   CompanyRepository,
   CompanyFilters,
   CompanyLogRepository,
@@ -12,7 +12,6 @@ import type {
 
 export class CompanyService {
   constructor(
-    private readonly db: DbClient,
     private readonly companyRepo: CompanyRepository,
     private readonly companyLogRepo: CompanyLogRepository,
     private readonly dealDocRepo: DealDocumentRepository,
@@ -65,7 +64,8 @@ export class CompanyService {
   async delete(id: string) {
     const filePaths = await this.dealDocRepo.findFilePathsByDealId(id);
     if (filePaths.length > 0) {
-      await this.db.storage.from('deal-documents').remove(filePaths);
+      const storage = getSupabaseStorageClient();
+      await storage.storage.from('deal-documents').remove(filePaths);
     }
     await this.companyRepo.delete(id);
   }

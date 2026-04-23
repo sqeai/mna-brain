@@ -1,9 +1,6 @@
 import levenshtein from 'fast-levenshtein';
-import { createSupabaseClient } from "@/lib/server/supabase";
-
-function getSupabaseClient() {
-  return createSupabaseClient();
-}
+import { createDb } from '@/lib/server/db';
+import { CompanyRepository, PastAcquisitionRepository } from '@/lib/repositories';
 
 interface MatchResult {
   id: string;
@@ -20,71 +17,73 @@ interface MatchResult {
  */
 export async function findBestCompanyMatch(
   searchName: string,
-  threshold: number = 0.3
+  threshold: number = 0.3,
 ): Promise<MatchResult | null> {
-  const supabase = getSupabaseClient();
+  const db = createDb();
+  const companyRepo = new CompanyRepository(db);
+  const pastRepo = new PastAcquisitionRepository(db);
+
   const normalizedSearch = searchName.toLowerCase().trim();
-
-  // 1. Fetch all candidate names from companies
-  const { data: companies } = await supabase
-    .from('companies')
-    .select('id, target');
-
-  // 2. Fetch all candidate names from past_acquisitions
-  const { data: pastDeals } = await supabase
-    .from('past_acquisitions')
-    .select('id, project_name');
+  const [companies, pastDeals] = await Promise.all([
+    companyRepo.findAllIdAndTarget(),
+    pastRepo.findAllIdAndName(),
+  ]);
 
   let bestMatch: MatchResult | null = null;
   let minDistance = Infinity;
 
-  // Process companies
-  if (companies) {
-    for (const company of companies) {
-      if (!company.target) continue;
-      const targetName = company.target.toLowerCase().trim();
+  for (const company of companies) {
+    if (!company.target) continue;
+    const targetName = company.target.toLowerCase().trim();
 
-      // Early exit for exact match
-      if (normalizedSearch === targetName) {
-        return { id: company.id, name: company.target, type: 'company', similarity: 1 };
-      }
+    if (normalizedSearch === targetName) {
+      return { id: company.id, name: company.target, type: 'company', similarity: 1 };
+    }
 
-      const distance = levenshtein.get(normalizedSearch, targetName);
-      const relativeDistance = distance / Math.max(normalizedSearch.length, targetName.length);
+    const distance = levenshtein.get(normalizedSearch, targetName);
+    const relativeDistance = distance / Math.max(normalizedSearch.length, targetName.length);
 
-      if (relativeDistance < minDistance) {
-        minDistance = relativeDistance;
-        bestMatch = { id: company.id, name: company.target, type: 'company', similarity: 1 - relativeDistance };
-      }
+    if (relativeDistance < minDistance) {
+      minDistance = relativeDistance;
+      bestMatch = {
+        id: company.id,
+        name: company.target,
+        type: 'company',
+        similarity: 1 - relativeDistance,
+      };
     }
   }
 
-  // Process past deals
-  if (pastDeals) {
-    for (const deal of pastDeals) {
-      if (!deal.project_name) continue;
-      const targetName = deal.project_name.toLowerCase().trim();
+  for (const deal of pastDeals) {
+    if (!deal.project_name) continue;
+    const targetName = deal.project_name.toLowerCase().trim();
 
-      // Early exit for exact match
-      if (normalizedSearch === targetName) {
-        return { id: deal.id, name: deal.project_name, type: 'past_acquisition', similarity: 1 };
-      }
+    if (normalizedSearch === targetName) {
+      return {
+        id: deal.id,
+        name: deal.project_name,
+        type: 'past_acquisition',
+        similarity: 1,
+      };
+    }
 
-      const distance = levenshtein.get(normalizedSearch, targetName);
-      const relativeDistance = distance / Math.max(normalizedSearch.length, targetName.length);
+    const distance = levenshtein.get(normalizedSearch, targetName);
+    const relativeDistance = distance / Math.max(normalizedSearch.length, targetName.length);
 
-      if (relativeDistance < minDistance) {
-        minDistance = relativeDistance;
-        bestMatch = { id: deal.id, name: deal.project_name, type: 'past_acquisition', similarity: 1 - relativeDistance };
-      }
+    if (relativeDistance < minDistance) {
+      minDistance = relativeDistance;
+      bestMatch = {
+        id: deal.id,
+        name: deal.project_name,
+        type: 'past_acquisition',
+        similarity: 1 - relativeDistance,
+      };
     }
   }
 
-  // Check if best match is within threshold
-  if (bestMatch && (1 - bestMatch.similarity) <= threshold) {
+  if (bestMatch && 1 - bestMatch.similarity <= threshold) {
     return bestMatch;
   }
-
 
   return null;
 }
@@ -94,44 +93,35 @@ export async function findBestCompanyMatch(
  * Usage: Inject this list into the LLM context so it knows what companies exist.
  */
 export async function getAllCompanyReferences(): Promise<MatchResult[]> {
-  const supabase = getSupabaseClient();
+  const db = createDb();
+  const companyRepo = new CompanyRepository(db);
+  const pastRepo = new PastAcquisitionRepository(db);
 
-  // 1. Fetch all candidate names from companies
-  const { data: companies } = await supabase
-    .from('companies')
-    .select('id, target');
-
-  // 2. Fetch all candidate names from past_acquisitions
-  const { data: pastDeals } = await supabase
-    .from('past_acquisitions')
-    .select('id, project_name');
+  const [companies, pastDeals] = await Promise.all([
+    companyRepo.findAllIdAndTarget(),
+    pastRepo.findAllIdAndName(),
+  ]);
 
   const matches: MatchResult[] = [];
 
-  // Add companies
-  if (companies) {
-    for (const company of companies) {
-      if (!company.target) continue;
-      matches.push({
-        id: company.id,
-        name: company.target,
-        type: 'company',
-        similarity: 1
-      });
-    }
+  for (const company of companies) {
+    if (!company.target) continue;
+    matches.push({
+      id: company.id,
+      name: company.target,
+      type: 'company',
+      similarity: 1,
+    });
   }
 
-  // Add past deals
-  if (pastDeals) {
-    for (const deal of pastDeals) {
-      if (!deal.project_name) continue;
-      matches.push({
-        id: deal.id,
-        name: deal.project_name,
-        type: 'past_acquisition',
-        similarity: 1
-      });
-    }
+  for (const deal of pastDeals) {
+    if (!deal.project_name) continue;
+    matches.push({
+      id: deal.id,
+      name: deal.project_name,
+      type: 'past_acquisition',
+      similarity: 1,
+    });
   }
 
   return matches;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { dealDocumentService } = createContainer(db);
     await dealDocumentService.register({
       deal_id: dealId,
@@ -42,7 +42,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { dealDocumentService } = createContainer(db);
     await dealDocumentService.delete(id);
 

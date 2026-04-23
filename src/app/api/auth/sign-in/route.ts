@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
-    const db = createSupabaseClient();
+    const db = createDb();
     const { authService } = createContainer(db);
     const data = await authService.signIn(email, password);
     return NextResponse.json({ data });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph } from '@/lib/agent';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 import type { MarketScreeningPayload } from '@/lib/jobs/handlers/marketScreening';
 
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Investment thesis is required' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { marketScreeningService } = createContainer(db);
     const { jobId } = await marketScreeningService.dispatch(body);
 

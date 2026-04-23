@@ -1,3 +1,5 @@
+import { and, desc, eq } from 'drizzle-orm';
+import { companies, criterias, screenings } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
 type ScreeningWithRelations = Pick<
@@ -17,46 +19,68 @@ export class ScreeningRepository {
     companyId?: string;
     onlyL0?: boolean;
   } = {}): Promise<ScreeningWithRelations[]> {
-    let query = this.db
-      .from('screenings')
-      .select(
-        'id, company_id, criteria_id, state, result, remarks, created_at, updated_at, company:companies(target, pipeline_stage), criterias(id, name, prompt)',
-      )
-      .order('created_at', { ascending: false });
+    const whereExpr = opts.companyId ? eq(screenings.company_id, opts.companyId) : undefined;
 
-    if (opts.companyId) query = query.eq('company_id', opts.companyId);
+    const rows = await this.db
+      .select({
+        id: screenings.id,
+        company_id: screenings.company_id,
+        criteria_id: screenings.criteria_id,
+        state: screenings.state,
+        result: screenings.result,
+        remarks: screenings.remarks,
+        created_at: screenings.created_at,
+        updated_at: screenings.updated_at,
+        company_target: companies.target,
+        company_pipeline_stage: companies.pipeline_stage,
+        criteria_id_inner: criterias.id,
+        criteria_name: criterias.name,
+        criteria_prompt: criterias.prompt,
+      })
+      .from(screenings)
+      .leftJoin(companies, eq(companies.id, screenings.company_id))
+      .leftJoin(criterias, eq(criterias.id, screenings.criteria_id))
+      .where(whereExpr)
+      .orderBy(desc(screenings.created_at));
 
-    const { data, error } = await query;
-    if (error) throw error;
+    const mapped: ScreeningWithRelations[] = rows.map((r) => ({
+      id: r.id,
+      company_id: r.company_id,
+      criteria_id: r.criteria_id,
+      state: r.state,
+      result: r.result,
+      remarks: r.remarks,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      company:
+        r.company_target === null && r.company_pipeline_stage === null
+          ? null
+          : { target: r.company_target, pipeline_stage: r.company_pipeline_stage },
+      criterias:
+        r.criteria_id_inner === null
+          ? null
+          : { id: r.criteria_id_inner, name: r.criteria_name!, prompt: r.criteria_prompt! },
+    }));
 
-    const rows = (data ?? []) as ScreeningWithRelations[];
     if (opts.onlyL0) {
-      return rows.filter((row) => row.company?.pipeline_stage === 'L0');
+      return mapped.filter((row) => row.company?.pipeline_stage === 'L0');
     }
-    return rows;
+    return mapped;
   }
 
   async insert(data: TablesInsert<'screenings'>): Promise<Tables<'screenings'>> {
-    const { data: result, error } = await this.db
-      .from('screenings')
-      .insert(data)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return result;
+    const [row] = await this.db.insert(screenings).values(data).returning();
+    return row;
   }
 
   async update(id: string, updates: TablesUpdate<'screenings'>): Promise<Tables<'screenings'>> {
-    const { data, error } = await this.db
-      .from('screenings')
-      .update(updates)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db
+      .update(screenings)
+      .set(updates)
+      .where(eq(screenings.id, id))
+      .returning();
+    if (!row) throw new Error(`Screening ${id} not found`);
+    return row;
   }
 
   /**
@@ -71,32 +95,43 @@ export class ScreeningRepository {
 
     for (const companyId of companyIds) {
       for (const criteriaId of criteriaIds) {
-        const { data: existing } = await this.db
-          .from('screenings')
-          .select('id, company_id, criteria_id')
-          .eq('company_id', companyId)
-          .eq('criteria_id', criteriaId)
-          .maybeSingle();
+        const [existing] = await this.db
+          .select({
+            id: screenings.id,
+            company_id: screenings.company_id,
+            criteria_id: screenings.criteria_id,
+          })
+          .from(screenings)
+          .where(
+            and(eq(screenings.company_id, companyId), eq(screenings.criteria_id, criteriaId)),
+          )
+          .limit(1);
 
         if (existing) {
-          const { data: updated, error } = await this.db
-            .from('screenings')
-            .update({ state: 'pending', result: null, remarks: null })
-            .eq('id', existing.id)
-            .select('id, company_id, criteria_id')
-            .single();
-
-          if (error) throw error;
-          entries.push(updated as PreparedScreening);
+          const [updated] = await this.db
+            .update(screenings)
+            .set({ state: 'pending', result: null, remarks: null } as TablesUpdate<'screenings'>)
+            .where(eq(screenings.id, existing.id))
+            .returning({
+              id: screenings.id,
+              company_id: screenings.company_id,
+              criteria_id: screenings.criteria_id,
+            });
+          entries.push(updated);
         } else {
-          const { data: inserted, error } = await this.db
-            .from('screenings')
-            .insert({ company_id: companyId, criteria_id: criteriaId, state: 'pending' })
-            .select('id, company_id, criteria_id')
-            .single();
-
-          if (error) throw error;
-          entries.push(inserted as PreparedScreening);
+          const [inserted] = await this.db
+            .insert(screenings)
+            .values({
+              company_id: companyId,
+              criteria_id: criteriaId,
+              state: 'pending',
+            } as TablesInsert<'screenings'>)
+            .returning({
+              id: screenings.id,
+              company_id: screenings.company_id,
+              criteria_id: screenings.criteria_id,
+            });
+          entries.push(inserted);
         }
       }
     }

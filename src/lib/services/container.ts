@@ -1,4 +1,4 @@
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import type { DbClient } from '@/lib/repositories';
 import {
   CompanyRepository,
@@ -53,7 +53,7 @@ export interface Container {
 }
 
 export function createContainer(db: DbClient): Container {
-  const jobDispatcher = new JobDispatcher(db, createSupabaseClient);
+  const jobDispatcher = new JobDispatcher(db, createDb);
 
   const companyRepo = new CompanyRepository(db);
   const companyLogRepo = new CompanyLogRepository(db);
@@ -85,7 +85,6 @@ export function createContainer(db: DbClient): Container {
   const slideService = new SlideService(companySlidesRepo, jobDispatcher);
 
   const companyService = new CompanyService(
-    db,
     companyRepo,
     companyLogRepo,
     dealDocRepo,

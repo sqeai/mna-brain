@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 interface RouteContext {
@@ -13,7 +13,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'File ID is required' }, { status: 400 });
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { fileService } = createContainer(db);
     await fileService.delete(id);
 

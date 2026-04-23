@@ -12,3 +12,5 @@ export * from './dealNoteRepository';
 export * from './investmentThesisRepository';
 export * from './jobRepository';
 export * from './userRepository';
+export * from './pastAcquisitionRepository';
+export * from './invenCacheRepository';
