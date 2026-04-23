@@ -24,12 +24,16 @@ export async function POST(request: NextRequest) {
       { error: (error as Error).message || 'Failed to upload file' },
       { status: 500 },
     );
-}
+  }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const fileType = request.nextUrl.searchParams.get('file_type') ?? undefined;
+    // The UI sends `?file_type` (empty string) as the "MoM" sentinel, `?file_type=prospectus|other`
+    // to pick a specific bucket, and param-absent to mean "no filter" for non-UI callers.
+    const raw = request.nextUrl.searchParams.get("file_type");
+    const fileType = raw === "" ? "mom" : (raw ?? undefined);
+
     const db = createSupabaseClient();
     const { fileService } = createContainer(db);
     const data = await fileService.findAll(fileType);

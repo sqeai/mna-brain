@@ -230,8 +230,14 @@ export async function processFileContent(
       // Post-Processing: Client-side ID match
       // Map detected strings back to IDs
       const finalMatchedCompanies: any[] = [];
-      const companiesDetected = parsed.companies_detected ||
-        (parsed.file_type === 'prospectus' && parsed.prospectus_summary?.target) ? [parsed.prospectus_summary?.target] : [];
+      // Prefer the agent's detected list. For prospectus files, fall back to the
+      // extracted target only when no companies were detected.
+      let companiesDetected: string[] = Array.isArray(parsed.companies_detected)
+        ? parsed.companies_detected.filter((n: unknown): n is string => typeof n === 'string' && n.length > 0)
+        : [];
+      if (companiesDetected.length === 0 && parsed.file_type === 'prospectus' && parsed.prospectus_summary?.target) {
+        companiesDetected = [parsed.prospectus_summary.target];
+      }
 
       for (const detectedName of companiesDetected) {
         // Find exact match in allReferences (case-insensitive search if needed, but agent should be exact)
