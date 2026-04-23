@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const expected = process.env.NEXT_PUBLIC_API_SHARED_SECRET;
   const provided = req.headers.get('x-api-secret');
   if (!expected || provided !== expected) {
