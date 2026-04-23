@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function GET() {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { investmentThesisService } = createContainer(db);
     const data = await investmentThesisService.findActive();
     return NextResponse.json({ data });
@@ -16,7 +16,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { investmentThesisService } = createContainer(db);
     const body = await req.json();
     const data = await investmentThesisService.upsert(body);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 import type { CompanyAnalysisPayload } from '@/lib/jobs/handlers/companyAnalysis';
 
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyAnalysisService } = createContainer(db);
     const data = await companyAnalysisService.findByCompanyId(companyId);
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyAnalysisService } = createContainer(db);
     const result = await companyAnalysisService.dispatch(body);
 
@@ -69,7 +69,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { companyAnalysisService } = createContainer(db);
     await companyAnalysisService.delete(companyId);
     return NextResponse.json({ success: true });

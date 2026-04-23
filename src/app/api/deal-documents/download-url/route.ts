@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseClient } from "@/lib/server/supabase";
+import { createDb } from "@/lib/server/db";
 import { DealDocumentRepository } from "@/lib/repositories";
 import { getSignedUrl } from "@/lib/s3";
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const dealDocRepo = new DealDocumentRepository(db);
 
     const row = await dealDocRepo.findPathAndNameById(id);

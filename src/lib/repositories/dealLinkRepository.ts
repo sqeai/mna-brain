@@ -1,32 +1,24 @@
+import { desc, eq } from 'drizzle-orm';
+import { dealLinks } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert } from './types';
 
 export class DealLinkRepository {
   constructor(private readonly db: DbClient) {}
 
   async findByDealId(dealId: string): Promise<Tables<'deal_links'>[]> {
-    const { data, error } = await this.db
-      .from('deal_links')
-      .select('*')
-      .eq('deal_id', dealId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data ?? [];
+    return this.db
+      .select()
+      .from(dealLinks)
+      .where(eq(dealLinks.deal_id, dealId))
+      .orderBy(desc(dealLinks.created_at));
   }
 
   async insert(data: TablesInsert<'deal_links'>): Promise<Tables<'deal_links'>> {
-    const { data: result, error } = await this.db
-      .from('deal_links')
-      .insert(data)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return result;
+    const [row] = await this.db.insert(dealLinks).values(data).returning();
+    return row;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.db.from('deal_links').delete().eq('id', id);
-    if (error) throw error;
+    await this.db.delete(dealLinks).where(eq(dealLinks.id, id));
   }
 }

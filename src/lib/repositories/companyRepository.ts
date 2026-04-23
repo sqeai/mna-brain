@@ -1,3 +1,30 @@
+import {
+  and,
+  asc,
+  count as drizzleCount,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import {
+  companies,
+  companyLogs,
+  criterias,
+  dealDocuments,
+  dealLinks,
+  dealNotes,
+  files,
+  screenings,
+} from '@/lib/db/schema';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
 export interface CompanyFilters {
@@ -9,6 +36,18 @@ export interface CompanyFilters {
   createdAfter?: string;
   orderBy?: string;
   orderDir?: 'asc' | 'desc';
+  limit?: number;
+}
+
+/** Filters used by AI-agent tool calls (queryCompanies in src/lib/agent/tools.ts). */
+export interface CompanyAgentFilters {
+  segment?: string;
+  geography?: string;
+  watchlistStatus?: string;
+  minRevenue?: number;
+  maxRevenue?: number;
+  minEbitda?: number;
+  searchTerm?: string;
   limit?: number;
 }
 
@@ -36,169 +75,229 @@ export type CompanyDetails = {
   matchedFiles: MatchedFile[];
 };
 
+const ORDERABLE_COLUMNS: Record<string, AnyPgColumn> = {
+  created_at: companies.created_at,
+  updated_at: companies.updated_at,
+  entry_id: companies.entry_id,
+};
+
+function buildFilterWhere(filters: CompanyFilters): SQL | undefined {
+  const conditions: (SQL | undefined)[] = [];
+  if (filters.id) conditions.push(eq(companies.id, filters.id));
+  if (filters.stage) conditions.push(eq(companies.pipeline_stage, filters.stage));
+  if (filters.stageIn && filters.stageIn.length > 0) {
+    conditions.push(inArray(companies.pipeline_stage, filters.stageIn));
+  }
+  if (filters.excludeStage) conditions.push(ne(companies.pipeline_stage, filters.excludeStage));
+  if (filters.stageNotNull) conditions.push(isNotNull(companies.pipeline_stage));
+  if (filters.createdAfter) conditions.push(gte(companies.created_at, filters.createdAfter));
+  if (conditions.length === 0) return undefined;
+  return and(...conditions);
+}
+
 export class CompanyRepository {
   constructor(private readonly db: DbClient) {}
 
   async findById(id: string): Promise<Tables<'companies'>> {
-    const { data, error } = await this.db
-      .from('companies')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, id))
+      .limit(1);
+    if (!row) throw new Error(`Company ${id} not found`);
+    return row;
   }
 
   async findAll(filters: CompanyFilters = {}): Promise<Tables<'companies'>[]> {
     const {
-      id,
-      stage,
-      stageIn,
-      excludeStage,
-      stageNotNull,
-      createdAfter,
       orderBy = 'updated_at',
       orderDir = 'desc',
       limit,
     } = filters;
+    const where = buildFilterWhere(filters);
+    const orderCol = ORDERABLE_COLUMNS[orderBy] ?? companies.updated_at;
+    const orderExpr = orderDir === 'asc' ? asc(orderCol) : desc(orderCol);
 
-    let query = this.db.from('companies').select('*');
-
-    if (id) query = query.eq('id', id);
-    if (stage) query = query.eq('pipeline_stage', stage);
-    if (stageIn && stageIn.length > 0) query = query.in('pipeline_stage', stageIn);
-    if (excludeStage) query = query.neq('pipeline_stage', excludeStage);
-    if (stageNotNull) query = query.not('pipeline_stage', 'is', null);
-    if (createdAfter) query = query.gte('created_at', createdAfter);
-    query = query.order(orderBy as keyof Tables<'companies'>, { ascending: orderDir === 'asc' });
-    if (limit) query = query.limit(limit);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data ?? [];
+    const query = this.db.select().from(companies).where(where).orderBy(orderExpr);
+    return limit ? query.limit(limit) : query;
   }
 
   async count(filters: Omit<CompanyFilters, 'orderBy' | 'orderDir' | 'limit'> = {}): Promise<number> {
-    const { id, stage, stageIn, excludeStage, stageNotNull, createdAfter } = filters;
+    const where = buildFilterWhere(filters);
+    const [row] = await this.db.select({ value: drizzleCount() }).from(companies).where(where);
+    return Number(row?.value ?? 0);
+  }
 
-    let query = this.db.from('companies').select('*', { head: true, count: 'exact' });
-
-    if (id) query = query.eq('id', id);
-    if (stage) query = query.eq('pipeline_stage', stage);
-    if (stageIn && stageIn.length > 0) query = query.in('pipeline_stage', stageIn);
-    if (excludeStage) query = query.neq('pipeline_stage', excludeStage);
-    if (stageNotNull) query = query.not('pipeline_stage', 'is', null);
-    if (createdAfter) query = query.gte('created_at', createdAfter);
-
-    const { count, error } = await query;
-    if (error) throw error;
-    return count ?? 0;
+  async countAll(): Promise<number> {
+    return this.count({});
   }
 
   async findTargetNames(): Promise<string[]> {
-    const { data, error } = await this.db.from('companies').select('target');
-    if (error) throw error;
-    return (data ?? []).map((c) => c.target ?? '').filter(Boolean);
+    const rows = await this.db.select({ target: companies.target }).from(companies);
+    return rows.map((c) => c.target ?? '').filter(Boolean);
+  }
+
+  async findAllIdAndTarget(): Promise<Array<{ id: string; target: string | null }>> {
+    return this.db.select({ id: companies.id, target: companies.target }).from(companies);
+  }
+
+  async findByNameFuzzy(namePart: string): Promise<Tables<'companies'> | null> {
+    const [row] = await this.db
+      .select()
+      .from(companies)
+      .where(ilike(companies.target, `%${namePart}%`))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async searchForAgent(filters: CompanyAgentFilters): Promise<Tables<'companies'>[]> {
+    const conditions: (SQL | undefined)[] = [];
+    if (filters.segment) conditions.push(ilike(companies.segment, `%${filters.segment}%`));
+    if (filters.geography) conditions.push(ilike(companies.geography, `%${filters.geography}%`));
+    if (filters.watchlistStatus) {
+      conditions.push(ilike(companies.watchlist_status, `%${filters.watchlistStatus}%`));
+    }
+    if (filters.minRevenue !== undefined) {
+      conditions.push(gte(companies.revenue_2024_usd_mn, filters.minRevenue));
+    }
+    if (filters.maxRevenue !== undefined) {
+      conditions.push(lte(companies.revenue_2024_usd_mn, filters.maxRevenue));
+    }
+    if (filters.minEbitda !== undefined) {
+      conditions.push(gte(companies.ebitda_2024_usd_mn, filters.minEbitda));
+    }
+    if (filters.searchTerm) {
+      const term = `%${filters.searchTerm}%`;
+      conditions.push(
+        or(
+          ilike(companies.target, term),
+          ilike(companies.segment, term),
+          ilike(companies.geography, term),
+        ),
+      );
+    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const limit = Math.min(filters.limit ?? 50, 50);
+    return this.db.select().from(companies).where(where).limit(limit);
   }
 
   async insert(company: TablesInsert<'companies'>): Promise<Tables<'companies'>> {
-    const { data, error } = await this.db
-      .from('companies')
-      .insert(company)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db.insert(companies).values(company).returning();
+    return row;
   }
 
-  async insertMany(companies: TablesInsert<'companies'>[]): Promise<void> {
-    const { error } = await this.db.from('companies').insert(companies);
-    if (error) throw error;
+  async insertMany(list: TablesInsert<'companies'>[]): Promise<void> {
+    if (list.length === 0) return;
+    await this.db.insert(companies).values(list);
   }
 
   async update(id: string, updates: TablesUpdate<'companies'>): Promise<Tables<'companies'>[]> {
-    const { data, error } = await this.db
-      .from('companies')
-      .update(updates)
-      .eq('id', id)
-      .select('*');
-
-    if (error) throw error;
-    return data ?? [];
+    return this.db
+      .update(companies)
+      .set(updates)
+      .where(eq(companies.id, id))
+      .returning();
   }
 
-  async updateMany(ids: string[], updates: TablesUpdate<'companies'>): Promise<Tables<'companies'>[]> {
-    const { data, error } = await this.db
-      .from('companies')
-      .update(updates)
-      .in('id', ids)
-      .select('*');
-
-    if (error) throw error;
-    return data ?? [];
+  async updateMany(
+    ids: string[],
+    updates: TablesUpdate<'companies'>,
+  ): Promise<Tables<'companies'>[]> {
+    if (ids.length === 0) return [];
+    return this.db
+      .update(companies)
+      .set(updates)
+      .where(inArray(companies.id, ids))
+      .returning();
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.db.from('companies').delete().eq('id', id);
-    if (error) throw error;
+    await this.db.delete(companies).where(eq(companies.id, id));
   }
 
   async runL1Filters(id: string): Promise<unknown> {
-    // run_l1_filters is a custom RPC not reflected in the generated types
-    const { data, error } = await (this.db as unknown as {
-      rpc: (fn: string, args: Record<string, string>) => Promise<{ data: unknown; error: Error | null }>;
-    }).rpc('run_l1_filters', { deal_id_param: id });
-
-    if (error) throw error;
-    return data;
+    // Use named-arg syntax to match the original Supabase `.rpc()` calling
+    // convention (`deal_id_param`), so behavior is identical if the prod
+    // function is declared with strict named-only semantics or defaults on
+    // other positional parameters.
+    const result = await this.db.execute<{ run_l1_filters: unknown }>(
+      sql`SELECT run_l1_filters(deal_id_param => ${id}) AS run_l1_filters`,
+    );
+    return result[0]?.run_l1_filters ?? null;
   }
 
   async findDetails(id: string): Promise<CompanyDetails> {
-    const filesQuery = this.db
-      .from('files')
-      .select('id, file_name, file_link, file_date, created_at')
-      .filter('matched_companies', 'cs', JSON.stringify([{ id }]))
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const [logsRes, notesRes, linksRes, docsRes, screeningsRes, matchedFilesRes] =
+      await Promise.all([
+        this.db
+          .select({
+            id: companyLogs.id,
+            action: companyLogs.action,
+            created_at: companyLogs.created_at,
+          })
+          .from(companyLogs)
+          .where(eq(companyLogs.company_id, id))
+          .orderBy(asc(companyLogs.created_at)),
 
-    const [logsRes, notesRes, linksRes, docsRes, screeningsRes, filesRes] = await Promise.all([
-      this.db
-        .from('company_logs')
-        .select('id, action, created_at')
-        .eq('company_id', id)
-        .order('created_at', { ascending: true }),
-      this.db
-        .from('deal_notes')
-        .select('*')
-        .eq('deal_id', id)
-        .order('created_at', { ascending: false }),
-      this.db
-        .from('deal_links')
-        .select('*')
-        .eq('deal_id', id)
-        .order('created_at', { ascending: false }),
-      this.db
-        .from('deal_documents')
-        .select('*')
-        .eq('deal_id', id)
-        .order('created_at', { ascending: false }),
-      this.db
-        .from('screenings')
-        .select('*, criterias(id, name, prompt)')
-        .eq('company_id', id)
-        .order('created_at', { ascending: false }),
-      filesQuery,
-    ]);
+        this.db
+          .select()
+          .from(dealNotes)
+          .where(eq(dealNotes.deal_id, id))
+          .orderBy(desc(dealNotes.created_at)),
+
+        this.db
+          .select()
+          .from(dealLinks)
+          .where(eq(dealLinks.deal_id, id))
+          .orderBy(desc(dealLinks.created_at)),
+
+        this.db
+          .select()
+          .from(dealDocuments)
+          .where(eq(dealDocuments.deal_id, id))
+          .orderBy(desc(dealDocuments.created_at)),
+
+        this.db
+          .select({
+            screening: screenings,
+            criteria_id_inner: criterias.id,
+            criteria_name: criterias.name,
+            criteria_prompt: criterias.prompt,
+          })
+          .from(screenings)
+          .leftJoin(criterias, eq(criterias.id, screenings.criteria_id))
+          .where(eq(screenings.company_id, id))
+          .orderBy(desc(screenings.created_at)),
+
+        this.db
+          .select({
+            id: files.id,
+            file_name: files.file_name,
+            file_link: files.file_link,
+            file_date: files.file_date,
+            created_at: files.created_at,
+          })
+          .from(files)
+          .where(sql`${files.matched_companies} @> ${JSON.stringify([{ id }])}::jsonb`)
+          .orderBy(desc(files.created_at))
+          .limit(100),
+      ]);
+
+    const mappedScreenings: ScreeningWithCriteria[] = screeningsRes.map((r) => ({
+      ...r.screening,
+      criterias:
+        r.criteria_id_inner === null
+          ? null
+          : { id: r.criteria_id_inner, name: r.criteria_name!, prompt: r.criteria_prompt! },
+    }));
 
     return {
-      logs: (logsRes.data ?? []) as CompanyLogRow[],
-      notes: notesRes.data ?? [],
-      links: linksRes.data ?? [],
-      documents: docsRes.data ?? [],
-      screenings: (screeningsRes.data ?? []) as ScreeningWithCriteria[],
-      matchedFiles: (filesRes.data ?? []) as MatchedFile[],
+      logs: logsRes,
+      notes: notesRes,
+      links: linksRes,
+      documents: docsRes,
+      screenings: mappedScreenings,
+      matchedFiles: matchedFilesRes,
     };
   }
 }

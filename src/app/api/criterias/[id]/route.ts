@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { name, prompt } = await req.json();
-    const db = createSupabaseClient();
+    const db = createDb();
     const { criteriaService } = createContainer(db);
     const data = await criteriaService.update(id, name, prompt);
     return NextResponse.json({ data });
@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const db = createSupabaseClient();
+    const db = createDb();
     const { criteriaService } = createContainer(db);
     await criteriaService.delete(id);
     return NextResponse.json({ data: { success: true } });

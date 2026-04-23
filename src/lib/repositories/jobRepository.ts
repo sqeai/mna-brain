@@ -1,8 +1,10 @@
-import type { DbClient, Tables, TablesInsert } from './types';
+import { asc, eq } from 'drizzle-orm';
+import { jobs, jobLogs } from '@/lib/db/schema';
+import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
 type Job = Tables<'jobs'>;
 type JobLog = Tables<'job_logs'>;
-type JobStatus = Tables<'jobs'>['status'];
+type JobStatus = Job['status'];
 
 export type JobWithLogs = Job & { logs: JobLog[] };
 
@@ -10,39 +12,26 @@ export class JobRepository {
   constructor(private readonly db: DbClient) {}
 
   async create(input: TablesInsert<'jobs'>): Promise<Job> {
-    const { data, error } = await this.db
-      .from('jobs')
-      .insert(input)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db.insert(jobs).values(input).returning();
+    return row;
   }
 
   async findById(id: string): Promise<Job | null> {
-    const { data, error } = await this.db
-      .from('jobs')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ?? null;
+    const [row] = await this.db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
+    return row ?? null;
   }
 
   async findByIdWithLogs(id: string): Promise<JobWithLogs | null> {
     const job = await this.findById(id);
     if (!job) return null;
 
-    const { data, error } = await this.db
-      .from('job_logs')
-      .select('*')
-      .eq('job_id', id)
-      .order('created_at', { ascending: true });
+    const logs = await this.db
+      .select()
+      .from(jobLogs)
+      .where(eq(jobLogs.job_id, id))
+      .orderBy(asc(jobLogs.created_at));
 
-    if (error) throw error;
-    return { ...job, logs: data ?? [] };
+    return { ...job, logs };
   }
 
   async markRunning(id: string): Promise<Job> {
@@ -84,15 +73,13 @@ export class JobRepository {
     const job = await this.findById(jobId);
     if (!job) throw new Error(`Job ${jobId} not found`);
 
-    const { error } = await this.db.from('job_logs').insert({
+    await this.db.insert(jobLogs).values({
       job_id: jobId,
       from_status: job.status,
       to_status: job.status,
       message: entry.message ?? null,
       metadata: (entry.metadata ?? null) as JobLog['metadata'],
-    });
-
-    if (error) throw error;
+    } as TablesInsert<'job_logs'>);
   }
 
   private async updateStatus(
@@ -105,14 +92,12 @@ export class JobRepository {
       error?: string | null;
     },
   ): Promise<Job> {
-    const { data, error } = await this.db
-      .from('jobs')
-      .update(patch)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return data;
+    const [row] = await this.db
+      .update(jobs)
+      .set(patch as TablesUpdate<'jobs'>)
+      .where(eq(jobs.id, id))
+      .returning();
+    if (!row) throw new Error(`Job ${id} not found`);
+    return row;
   }
 }

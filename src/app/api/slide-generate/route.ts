@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 import type { SlideGenerationPayload } from '@/lib/jobs/handlers/slideGeneration';
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { slideService } = createContainer(db);
     const { jobId } = await slideService.generateDispatch(body);
 

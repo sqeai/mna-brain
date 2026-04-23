@@ -6,11 +6,13 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "./logger";
-import { createSupabaseClient } from "@/lib/server/supabase";
-
-function getSupabaseClient() {
-  return createSupabaseClient();
-}
+import { createDb } from "@/lib/server/db";
+import {
+  CompanyRepository,
+  FileRepository,
+  InvenCacheRepository,
+  PastAcquisitionRepository,
+} from "@/lib/repositories";
 
 const PROJECT_CODENAME_PATTERN = /\bProject\s+[A-Za-z0-9][A-Za-z0-9\-]*(?:\s+[A-Za-z0-9][A-Za-z0-9\-]*){0,3}\b/gi;
 
@@ -28,11 +30,11 @@ async function resolveProjectCodenamesForWebSearch(query: string): Promise<{
     return { resolvedQuery: query, replacements: [], removed: [] };
   }
 
-  let supabase;
+  let pastRepo: PastAcquisitionRepository;
   try {
-    supabase = getSupabaseClient();
+    pastRepo = new PastAcquisitionRepository(createDb());
   } catch (error) {
-    logger.warn(`Supabase not configured for codename resolution: ${(error as Error).message}`);
+    logger.warn(`DB not configured for codename resolution: ${(error as Error).message}`);
     return { resolvedQuery: query, replacements: [], removed: [] };
   }
 
@@ -42,19 +44,15 @@ async function resolveProjectCodenamesForWebSearch(query: string): Promise<{
   const removed: string[] = [];
 
   for (const codename of uniqueMatches) {
-    const { data, error } = await supabase
-      .from("past_acquisitions")
-      .select("project_name,target_co_partner")
-      .ilike("project_name", codename)
-      .limit(1);
-
-    if (error) {
-      logger.error(`Codename lookup failed for '${codename}': ${error.message}`);
+    let match;
+    try {
+      match = await pastRepo.findByCodename(codename);
+    } catch (error) {
+      logger.error(`Codename lookup failed for '${codename}': ${(error as Error).message}`);
       continue;
     }
 
-    const match = data?.find((row) => row.target_co_partner && row.target_co_partner.trim().length > 0);
-    if (match) {
+    if (match?.target_co_partner && match.target_co_partner.trim().length > 0) {
       const companyName = match.target_co_partner.trim();
       resolvedQuery = resolvedQuery.replaceAll(codename, companyName);
       replacements.push({ codename, companyName });
@@ -142,14 +140,11 @@ export const getDataSchema = tool(
   async () => {
     logger.debug("🔧 TOOL CALLED: get_data_schema()");
 
-    // Get row count from Supabase
+    // Get row count from DB
     let rowCount = 0;
     try {
-      const supabase = getSupabaseClient();
-      const { count } = await supabase
-        .from("companies")
-        .select("*", { count: "exact", head: true });
-      rowCount = count || 0;
+      const companyRepo = new CompanyRepository(createDb());
+      rowCount = await companyRepo.countAll();
     } catch (error) {
       logger.error(`Error getting row count: ${(error as Error).message}`);
     }
@@ -209,59 +204,17 @@ export const queryCompanies = tool(
     );
 
     try {
-      const supabase = getSupabaseClient();
-
-      let query = supabase
-        .from("companies")
-        .select(
-          `
-          id,
-          entry_id,
-          target,
-          segment,
-          geography,
-          watchlist_status,
-          pipeline_stage,
-          revenue_2024_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          ebitda_margin_2024,
-          ev_ebitda_2024
-        `
-        )
-        .limit(Math.min(limit, 50));
-
-      // Apply filters
-      if (segment) {
-        query = query.ilike("segment", `%${segment}%`);
-      }
-      if (geography) {
-        query = query.ilike("geography", `%${geography}%`);
-      }
-      if (watchlist_status) {
-        query = query.ilike("watchlist_status", `%${watchlist_status}%`);
-      }
-      if (min_revenue !== undefined) {
-        query = query.gte("revenue_2024_usd_mn", min_revenue);
-      }
-      if (max_revenue !== undefined) {
-        query = query.lte("revenue_2024_usd_mn", max_revenue);
-      }
-      if (min_ebitda !== undefined) {
-        query = query.gte("ebitda_2024_usd_mn", min_ebitda);
-      }
-      if (search_term) {
-        query = query.or(
-          `target.ilike.%${search_term}%,segment.ilike.%${search_term}%,company_focus.ilike.%${search_term}%`
-        );
-      }
-
-      const { data: companies, error } = await query;
-
-      if (error) {
-        logger.error(`Query error: ${error.message}`);
-        return `**Query Error:** ${error.message}`;
-      }
+      const companyRepo = new CompanyRepository(createDb());
+      const companies = await companyRepo.searchForAgent({
+        segment,
+        geography,
+        watchlistStatus: watchlist_status,
+        minRevenue: min_revenue,
+        maxRevenue: max_revenue,
+        minEbitda: min_ebitda,
+        searchTerm: search_term,
+        limit,
+      });
 
       if (!companies || companies.length === 0) {
         return "No companies found matching your criteria.";
@@ -329,27 +282,8 @@ export const getCompanyStats = tool(
     logger.debug(`🔧 TOOL CALLED: get_company_stats(group_by='${group_by}')`);
 
     try {
-      const supabase = getSupabaseClient();
-
-      // Get all companies for aggregation
-      const { data: companies, error } = await supabase
-        .from("companies")
-        .select(
-          `
-          segment,
-          geography,
-          watchlist_status,
-          revenue_2024_usd_mn,
-          ebitda_2024_usd_mn,
-          ev_2024,
-          ebitda_margin_2024
-        `
-        );
-
-      if (error) {
-        return `**Error:** ${error.message}`;
-      }
-
+      const companyRepo = new CompanyRepository(createDb());
+      const companies = await companyRepo.findAll();
       if (!companies || companies.length === 0) {
         return "No companies in the database.";
       }
@@ -466,23 +400,12 @@ export const getCompanyDetails = tool(
     logger.debug(`🔧 TOOL CALLED: get_company_details(company_name='${company_name}')`);
 
     try {
-      const supabase = getSupabaseClient();
+      const companyRepo = new CompanyRepository(createDb());
+      const c = await companyRepo.findByNameFuzzy(company_name);
 
-      const { data: companies, error } = await supabase
-        .from("companies")
-        .select("*")
-        .ilike("target", `%${company_name}%`)
-        .limit(1);
-
-      if (error) {
-        return `**Error:** ${error.message}`;
-      }
-
-      if (!companies || companies.length === 0) {
+      if (!c) {
         return `No company found matching "${company_name}". Try a different search term or use query_companies to browse available companies.`;
       }
-
-      const c = companies[0];
 
       const result = `## Company Details: ${c.target || "Unknown"}
 
@@ -698,61 +621,16 @@ export const queryPastAcquisitions = tool(
     );
 
     try {
-      const supabase = getSupabaseClient();
-
-      let query = supabase
-        .from("past_acquisitions")
-        .select(
-          `
-          id,
-          no,
-          project_name,
-          project_type,
-          target_co_partner,
-          seller,
-          country,
-          sector,
-          ev_100_pct_usd_m,
-          revenue_usd_m,
-          ebitda_usd_m,
-          ebitda_margin_pct,
-          status,
-          internal_stage,
-          year,
-          pass_l0_screening,
-          pass_all_5_l1_criteria
-        `
-        )
-        .limit(Math.min(limit, 50));
-
-      // Apply filters
-      if (sector) {
-        query = query.ilike("sector", `%${sector}%`);
-      }
-      if (country) {
-        query = query.ilike("country", `%${country}%`);
-      }
-      if (status) {
-        query = query.ilike("status", `%${status}%`);
-      }
-      if (project_type) {
-        query = query.ilike("project_type", `%${project_type}%`);
-      }
-      if (year) {
-        query = query.eq("year", year);
-      }
-      if (search_term) {
-        query = query.or(
-          `project_name.ilike.%${search_term}%,target_co_partner.ilike.%${search_term}%,sector.ilike.%${search_term}%`
-        );
-      }
-
-      const { data: acquisitions, error } = await query;
-
-      if (error) {
-        logger.error(`Query error: ${error.message}`);
-        return `**Query Error:** ${error.message}`;
-      }
+      const pastRepo = new PastAcquisitionRepository(createDb());
+      const acquisitions = await pastRepo.searchForAgent({
+        sector,
+        country,
+        status,
+        projectType: project_type,
+        year,
+        searchTerm: search_term,
+        limit,
+      });
 
       if (!acquisitions || acquisitions.length === 0) {
         return "No past acquisitions found matching your criteria.";
@@ -836,18 +714,8 @@ export const compareWithPastAcquisitions = tool(
     );
 
     try {
-      const supabase = getSupabaseClient();
-
-      // Get all past acquisitions for comparison
-      const { data: acquisitions, error } = await supabase
-        .from("past_acquisitions")
-        .select("*");
-
-      if (error) {
-        logger.error(`Query error: ${error.message}`);
-        return `**Query Error:** ${error.message}`;
-      }
-
+      const pastRepo = new PastAcquisitionRepository(createDb());
+      const acquisitions = await pastRepo.findAll();
       if (!acquisitions || acquisitions.length === 0) {
         return "No past acquisitions data available for comparison.";
       }
@@ -1066,23 +934,11 @@ export const getPastAcquisitionDetails = tool(
     logger.debug(`🔧 TOOL CALLED: get_past_acquisition_details(project_name='${project_name}')`);
 
     try {
-      const supabase = getSupabaseClient();
-
-      const { data: acquisitions, error } = await supabase
-        .from("past_acquisitions")
-        .select("*")
-        .ilike("project_name", `%${project_name}%`)
-        .limit(1);
-
-      if (error) {
-        return `**Error:** ${error.message}`;
-      }
-
-      if (!acquisitions || acquisitions.length === 0) {
+      const pastRepo = new PastAcquisitionRepository(createDb());
+      const a = await pastRepo.findByNameFuzzy(project_name);
+      if (!a) {
         return `No past acquisition found matching "${project_name}". Try a different search term or use query_past_acquisitions to browse available deals.`;
       }
-
-      const a = acquisitions[0];
 
       const result = `## Past Acquisition Details: ${a.project_name || "Unknown"}
 
@@ -1276,16 +1132,17 @@ export const invenPaidDataSourceSearch = tool(
     );
 
     try {
-      const supabase = getSupabaseClient();
+      const invenRepo = new InvenCacheRepository(createDb());
 
       // First, check cache for matching companies
-      const { data: cachedResults, error: cacheError } = await supabase
-        .from("inven_cache")
-        .select("inven_company_id, domain, inven_company_name, website")
-        .or(`inven_company_name.ilike.%${search_prompt}%,description.ilike.%${search_prompt}%`)
-        .limit(number_of_results);
+      let cachedResults: Awaited<ReturnType<typeof invenRepo.searchByNameOrDescription>> = [];
+      try {
+        cachedResults = await invenRepo.searchByNameOrDescription(search_prompt, number_of_results);
+      } catch (cacheError) {
+        logger.warn(`Inven cache lookup failed: ${(cacheError as Error).message}`);
+      }
 
-      if (!cacheError && cachedResults && cachedResults.length > 0) {
+      if (cachedResults.length > 0) {
         logger.debug(`✓ Found ${cachedResults.length} cached results`);
 
         const rows = cachedResults.map((c) =>
@@ -1440,7 +1297,7 @@ export const invenPaidDataSourceEnrichment = tool(
     }
 
     try {
-      const supabase = getSupabaseClient();
+      const invenRepo = new InvenCacheRepository(createDb());
       const apiKey = process.env.INVEN_API_KEY;
 
       if (!apiKey) {
@@ -1519,14 +1376,11 @@ export const invenPaidDataSourceEnrichment = tool(
           updated_at: new Date().toISOString(),
         };
 
-        const { error: upsertError } = await supabase
-          .from("inven_cache")
-          .upsert(cacheRecord, { onConflict: "inven_company_id" });
-
-        if (upsertError) {
-          logger.error(`Cache upsert error for ${basic.companyId}: ${upsertError.message}`);
-        } else {
+        try {
+          await invenRepo.upsert(cacheRecord);
           logger.debug(`✓ Cached company ${basic.companyId}`);
+        } catch (upsertError) {
+          logger.error(`Cache upsert error for ${basic.companyId}: ${(upsertError as Error).message}`);
         }
 
         enrichedCompanies.push({
@@ -1604,35 +1458,13 @@ export const queryMeetingNotes = tool(
     );
 
     try {
-      const supabase = getSupabaseClient();
-
-      let query = supabase
-        .from("files")
-        .select("*")
-        .order('file_date', { ascending: false })
-        .limit(Math.min(limit, 20));
-
-      // Apply filters
-      if (company_name) {
-        query = query.or(`raw_notes.ilike.%${company_name}%,structured_notes.ilike.%${company_name}%`);
-      }
-
-      if (tag) {
-        query = query.contains('tags', [tag]);
-      }
-
-      if (search_term) {
-        query = query.or(
-          `file_name.ilike.%${search_term}%,raw_notes.ilike.%${search_term}%,structured_notes.ilike.%${search_term}%`
-        );
-      }
-
-      const { data: notes, error } = await query;
-
-      if (error) {
-        logger.error(`Query error: ${error.message}`);
-        return `**Query Error:** ${error.message}`;
-      }
+      const fileRepo = new FileRepository(createDb());
+      const notes = await fileRepo.searchForAgent({
+        companyName: company_name,
+        tag,
+        searchTerm: search_term,
+        limit,
+      });
 
       if (!notes || notes.length === 0) {
         return "No files found matching your criteria.";

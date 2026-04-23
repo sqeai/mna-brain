@@ -2,11 +2,8 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { findBestCompanyMatch } from "../fuzzySearch";
 import { logger } from "../agent/logger";
-import { createSupabaseClient } from "@/lib/server/supabase";
-
-function getSupabaseClient() {
-  return createSupabaseClient();
-}
+import { createDb } from "@/lib/server/db";
+import { DealNoteRepository, PastAcquisitionRepository } from "@/lib/repositories";
 
 /**
  * Tool for fuzzy searching companies or past acquisitions.
@@ -49,38 +46,20 @@ export const addCompanyNoteTool = tool(
   async ({ id, type, content, stage }: { id: string, type: 'company' | 'past_acquisition', content: string, stage?: string }) => {
     logger.debug(`🔧 TOOL CALLED: add_company_note(id='${id}', type='${type}')`);
     try {
-      const supabase = getSupabaseClient();
+      const db = createDb();
 
       if (type === 'company') {
-        const { error } = await supabase
-          .from('deal_notes')
-          .insert({
-            deal_id: id,
-            content: content,
-            stage: stage || 'File'
-          });
-
-        if (error) throw error;
+        const dealNoteRepo = new DealNoteRepository(db);
+        await dealNoteRepo.insert({
+          deal_id: id,
+          content,
+          stage: stage || 'File',
+        });
       } else {
-        // For past acquisitions, update the 'notes' column
-        // First get existing notes
-        const { data: deal } = await supabase
-          .from('past_acquisitions')
-          .select('notes')
-          .eq('id', id)
-          .single();
-
-        const existingNotes = deal?.notes || '';
-        const updatedNotes = existingNotes
-          ? `${existingNotes}\n---\n${content}`
-          : content;
-
-        const { error } = await supabase
-          .from('past_acquisitions')
-          .update({ notes: updatedNotes })
-          .eq('id', id);
-
-        if (error) throw error;
+        const pastRepo = new PastAcquisitionRepository(db);
+        const existingNotes = (await pastRepo.findNotesById(id)) ?? '';
+        const updatedNotes = existingNotes ? `${existingNotes}\n---\n${content}` : content;
+        await pastRepo.updateNotes(id, updatedNotes);
       }
 
       return `Successfully added note to ${type} ${id}`;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentGraph } from '@/lib/agent';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 import type { AIScreeningPayload } from '@/lib/jobs/handlers/aiScreening';
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = createSupabaseClient();
+    const db = createDb();
     const { aiScreeningService } = createContainer(db);
     const { jobId } = await aiScreeningService.dispatch(body);
 

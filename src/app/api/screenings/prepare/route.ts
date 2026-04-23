@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/server/supabase';
+import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
 export async function POST(req: NextRequest) {
   try {
-    const db = createSupabaseClient();
+    const db = createDb();
     const { screeningService } = createContainer(db);
     const { companyIds, criteriaIds } = await req.json();
 

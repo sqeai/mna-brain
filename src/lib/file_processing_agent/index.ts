@@ -4,7 +4,8 @@ import { createAgent } from "langchain";
 import { logger } from "../agent/logger";
 import { getAllCompanyReferences } from "../fuzzySearch";
 import { splitPdf } from "../pdf";
-import type { DbClient } from "@/lib/server/supabase";
+import type { DbClient } from "@/lib/server/db";
+import { CompanyRepository } from "@/lib/repositories";
 
 const generateSystemPrompt = (companies_list, userRawNotes) => `You are a specialized M&A File Processing Assistant. Your task is to analyze raw text extracted from meeting documents (like PPTX slides) and transform it into a highly structured format.
 
@@ -286,15 +287,12 @@ export async function processFileContent(
               remarks: parsed?.prospectus_summary?.remarks || null,
               source: 'inbound',
             }
-            const { data: insertedCompany, error: insertError } = await supabase
-              .from('companies')
-              .insert(insertData)
-              .select()
-              .single();
-            if (insertError) {
+            try {
+              const companyRepo = new CompanyRepository(supabase);
+              company = await companyRepo.insert(insertData);
+            } catch {
               logger.error('Error inserting companies results:');
             }
-            company = insertedCompany;
           }
 
           finalMatchedCompanies.push({
