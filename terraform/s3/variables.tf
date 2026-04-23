@@ -9,12 +9,13 @@ variable "tags" {
 }
 
 variable "cors_allowed_origins" {
-  description = "Origins allowed for browser uploads/downloads"
   type        = list(string)
-  default = [
-    "http://localhost:3000",
-    "http://localhost:5173"
-  ]
+  default     = []
+}
+
+variable "cors_additional_origins" {
+  type        = list(string)
+  default     = []
 }
 
 data "aws_caller_identity" "current" {}
@@ -50,4 +51,18 @@ locals {
   current_config   = lookup(local.workspace_config, terraform.workspace, local.workspace_config["dev"])
   environment_tags = merge(local.current_config.tags, var.tags)
   bucket_name      = "mna-app-data-${local.current_config.environment}"
+
+  mna_cors_baseline = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://mna-stg.sqe.co.id",
+    "https://mna.sqe.co.id",
+    "https://*.vercel.app",
+  ]
+
+  s3_cors_allowed_origins = distinct(concat(
+    local.mna_cors_baseline,
+    var.cors_allowed_origins,
+    var.cors_additional_origins,
+  ))
 }
