@@ -22,6 +22,7 @@ type TableMap = {
   jobs: typeof schema.jobs;
   job_logs: typeof schema.jobLogs;
   past_acquisitions: typeof schema.pastAcquisitions;
+  reset_password_tokens: typeof schema.resetPasswordTokens;
   screenings: typeof schema.screenings;
   users: typeof schema.users;
 };

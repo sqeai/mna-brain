@@ -730,6 +730,22 @@ export const invenCache = pgTable("inven_cache", {
 	}
 });
 
+export const resetPasswordTokens = pgTable("reset_password_tokens", {
+	token: text().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	valid_until: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => {
+	return {
+		idxResetPasswordTokensUserId: index("idx_reset_password_tokens_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+		resetPasswordTokensUserIdFkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "reset_password_tokens_user_id_fkey"
+		}).onDelete("cascade"),
+	}
+});
+
 export const files = pgTable("files", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	file_name: text().notNull(),

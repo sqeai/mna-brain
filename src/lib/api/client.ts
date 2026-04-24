@@ -8,11 +8,14 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
+const SHARED_SECRET = process.env.NEXT_PUBLIC_API_SHARED_SECRET;
+
 export async function apiRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(SHARED_SECRET ? { 'X-Api-Secret': SHARED_SECRET } : {}),
       ...(init?.headers || {}),
     },
   });

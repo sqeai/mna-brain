@@ -13,6 +13,7 @@ import {
   FileRepository,
   InvestmentThesisRepository,
   JobRepository,
+  ResetPasswordTokenRepository,
   UserRepository,
 } from '@/lib/repositories';
 import { JobDispatcher } from './jobDispatcher';
@@ -68,6 +69,7 @@ export function createContainer(db: DbClient): Container {
   const thesisRepo = new InvestmentThesisRepository(db);
   const jobRepo = new JobRepository(db);
   const userRepo = new UserRepository(db);
+  const resetTokenRepo = new ResetPasswordTokenRepository(db);
 
   const criteriaService = new CriteriaService(criteriaRepo);
   const screeningService = new ScreeningService(screeningRepo);
@@ -75,7 +77,7 @@ export function createContainer(db: DbClient): Container {
   const dealNoteService = new DealNoteService(dealNoteRepo);
   const dealLinkService = new DealLinkService(dealLinkRepo);
   const jobService = new JobService(jobRepo);
-  const authService = new AuthService(userRepo);
+  const authService = new AuthService(userRepo, resetTokenRepo);
   const userService = new UserService(userRepo);
   const chatService = new ChatService(thesisRepo, criteriaRepo);
 
