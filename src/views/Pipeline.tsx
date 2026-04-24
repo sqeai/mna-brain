@@ -78,6 +78,7 @@ interface PipelineCompany {
   id: string;
   target: string;
   segment: string;
+  geo: string | null;
   website: string | null;
   watchlist_status: string | null;
   revenue_2021_usd_mn: number | null;
@@ -237,6 +238,7 @@ export default function Pipeline() {
         id: company.id,
         target: company.target || '',
         segment: company.segment || '',
+        geo: company.geography || company.geo || null,
         website: company.website ?? null,
         watchlist_status: company.watchlist_status,
         revenue_2021_usd_mn: company.revenue_2021_usd_mn,
@@ -725,6 +727,7 @@ export default function Pipeline() {
                                             <SortIcon field="sector" />
                                           </button>
                                         </TableHead>
+                                        <TableHead>Geo</TableHead>
                                         <TableHead>PIC</TableHead>
                                         <TableHead className="text-right">Revenue 2023</TableHead>
                                         <TableHead className="text-right">Revenue 2024</TableHead>
@@ -819,6 +822,11 @@ export default function Pipeline() {
                                           </TableCell>
                                           <TableCell>
                                             <span className="text-muted-foreground">{company.segment}</span>
+                                          </TableCell>
+                                          <TableCell>
+                                            <span className="text-sm text-muted-foreground">
+                                              {company.geo || '-'}
+                                            </span>
                                           </TableCell>
                                           <TableCell>
                                             <span className="text-sm text-muted-foreground">
@@ -1044,6 +1052,7 @@ export default function Pipeline() {
                                       <SortIcon field="sector" />
                                     </button>
                                   </TableHead>
+                                  <TableHead>Geo</TableHead>
                                   <TableHead>PIC</TableHead>
                                   <TableHead className="text-right">Rev 2023</TableHead>
                                   <TableHead className="text-right">Rev 2024</TableHead>
@@ -1123,6 +1132,11 @@ export default function Pipeline() {
                                       </TableCell>
                                       <TableCell>
                                         <Badge variant="outline">{company.segment}</Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-sm text-muted-foreground">
+                                          {company.geo || '-'}
+                                        </span>
                                       </TableCell>
                                       <TableCell>
                                         <span className="text-sm text-muted-foreground">
