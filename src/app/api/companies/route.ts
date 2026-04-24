@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (id) {
-      const data = await companyService.findById(id);
+      const data = await companyService.findByIdDTO(id);
       return NextResponse.json({ data });
     }
 
-    const data = await companyService.list({ stage, stageIn, excludeStage, stageNotNull, createdAfter, orderBy, orderDir, limit });
+    const data = await companyService.listDTO({ stage, stageIn, excludeStage, stageNotNull, createdAfter, orderBy, orderDir, limit });
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch companies';
@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
     const db = createDb();
     const { companyService } = createContainer(db);
     const { company, logAction } = await req.json();
-    const data = await companyService.create(company, logAction);
+    // `company` is a flat CompanyDTOInput — split across companies +
+    // company_financials + company_fx_adjustments + company_screening_derived.
+    const data = await companyService.createFromDTO(company, logAction);
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to create company';
@@ -66,10 +68,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Missing id/ids or updates' }, { status: 400 });
     }
 
-    const data = id
-      ? await companyService.update(id, updates, logAction)
-      : await companyService.updateMany(ids, updates, logAction);
-
+    if (id) {
+      // Single-target patch accepts a flat CompanyDTOInput and splits writes.
+      const data = await companyService.updateFromDTO(id, updates, logAction);
+      return NextResponse.json({ data });
+    }
+    // Bulk patches only touch the slim `companies` row (wide-column bulk edits
+    // haven't been used by the FE). Extend if a caller needs bulk DTO writes.
+    const data = await companyService.updateMany(ids, updates, logAction);
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update company';

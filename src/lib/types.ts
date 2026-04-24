@@ -192,9 +192,9 @@ export type DealOrigin = 'inbound' | 'outbound';
 export type L1Result = 'pass' | 'fail' | 'inconclusive';
 
 // ============================================
-// L1 Status Enum (legacy — UI values, kept for backwards compat)
+// L1 Status Enum (capitalized form of L1Result returned by the API DTO)
 // ============================================
-export type L1Status = 'Pass' | 'No' | 'Exception' | 'WatchList' | 'TBC' | 'Duplicate';
+export type L1Status = 'Pass' | 'Fail' | 'Inconclusive';
 
 // ============================================
 // Company Insert/Update Types

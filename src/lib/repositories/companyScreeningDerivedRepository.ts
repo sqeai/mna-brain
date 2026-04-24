@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { companyScreeningDerived } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert } from './types';
 
@@ -14,6 +14,16 @@ export class CompanyScreeningDerivedRepository {
       .where(eq(companyScreeningDerived.company_id, companyId))
       .limit(1);
     return row ?? null;
+  }
+
+  async findByCompanies(
+    companyIds: string[],
+  ): Promise<Tables<'company_screening_derived'>[]> {
+    if (companyIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(companyScreeningDerived)
+      .where(inArray(companyScreeningDerived.company_id, companyIds));
   }
 
   async upsertByCompany(data: TablesInsert<'company_screening_derived'>): Promise<void> {

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { companyFxAdjustments } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert } from './types';
 
@@ -10,6 +10,15 @@ export class CompanyFxAdjustmentRepository {
       .select()
       .from(companyFxAdjustments)
       .where(eq(companyFxAdjustments.company_id, companyId))
+      .orderBy(companyFxAdjustments.fiscal_year);
+  }
+
+  async findByCompanies(companyIds: string[]): Promise<Tables<'company_fx_adjustments'>[]> {
+    if (companyIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(companyFxAdjustments)
+      .where(inArray(companyFxAdjustments.company_id, companyIds))
       .orderBy(companyFxAdjustments.fiscal_year);
   }
 

@@ -329,7 +329,7 @@ export default function CompanyDetailDialog({
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
-        if (data.status === 'generating') {
+        if (data.status === 'processing') {
           setAnalysisGenerating(true);
           pollAnalysis();
         }
@@ -346,7 +346,7 @@ export default function CompanyDetailDialog({
         if (res.ok) {
           const data = await res.json();
           setAnalysis(data);
-          if (data.status !== 'generating') {
+          if (data.status !== 'processing') {
             setAnalysisGenerating(false);
             clearInterval(interval);
           }
@@ -924,7 +924,7 @@ export default function CompanyDetailDialog({
 
             {/* AI Company Card Summary in Overview */}
             <div ref={aiCardSectionRef}>
-            {analysisGenerating && !analysis?.business_overview ? (
+            {analysisGenerating ? (
               <AICompanyCardLoading />
             ) : analysis?.status === 'failed' ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 flex flex-col items-center justify-center gap-3">
