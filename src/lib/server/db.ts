@@ -10,13 +10,9 @@ if (!connectionString) {
 // PgBouncer transaction mode (Supabase pooler @ 6543) can't reuse prepared
 // statement names across connections — disable prepare and cap app-side pool to 1.
 const isPooler = connectionString.includes(':6543');
-// Local / docker-internal Postgres doesn't speak TLS; managed Postgres (RDS,
-// Supabase cloud, Neon, etc.) requires it. Auto-detect from the host:
-//   - 127.0.0.1 / localhost → local
-//   - bare hostname with no dot (e.g. "postgres", "db") → docker network, local
-//   - anything with a dot → treat as FQDN, assume managed, require TLS
-const host = new URL(connectionString).hostname;
-const isLocal = /@(127\.0\.0\.1|localhost|postgres)[:/]/.test
+// Local Supabase / dev Postgres don't need TLS; managed Postgres (RDS,
+// Supabase cloud, Neon, etc.) usually require it. Auto-detect from the host.
+const isLocal = /127\.0\.0\.1|localhost|postgres/.test(connectionString);
 
 type PgClient = ReturnType<typeof postgres>;
 const globalForDb = globalThis as unknown as { __pg?: PgClient };
