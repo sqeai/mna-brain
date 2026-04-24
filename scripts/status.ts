@@ -6,7 +6,7 @@ import 'dotenv/config';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import postgres from 'postgres';
+import { createPostgresClientFromEnv } from '../src/lib/server/db';
 
 const MIGRATIONS_DIR = './supabase/migrations';
 
@@ -17,11 +17,7 @@ function hashFile(path: string): string {
 }
 
 async function main() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL not set');
-
-  const isLocal = /127\.0\.0\.1|localhost/.test(url);
-  const c = postgres(url, { max: 1, prepare: false, ssl: isLocal ? false : 'require' });
+  const c = createPostgresClientFromEnv({ prepare: false });
 
   try {
     const applied = await c<{ hash: string }[]>`
@@ -30,7 +26,8 @@ async function main() {
     const appliedHashes = new Set(applied.map((r) => r.hash));
 
     const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
-    console.log(`DB: ${new URL(url).host}`);
+    const hostLabel = `${process.env.DB_HOST}:${process.env.DB_PORT ?? '5432'}/${process.env.DB_NAME}`;
+    console.log(`DB: ${hostLabel}`);
     console.log(`Applied: ${appliedHashes.size}   On disk: ${files.length}\n`);
 
     for (const f of files) {

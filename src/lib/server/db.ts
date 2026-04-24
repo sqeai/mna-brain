@@ -3,38 +3,36 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/lib/db/schema';
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not configured');
-}
+export type PostgresClientFromEnvOptions = {
+  onnotice?: () => void;
+  connect_timeout?: number;
+  /** Override prepared statements (migrations often use prepare: false). */
+  prepare?: boolean;
+};
 
 function rdsIamDbAuthFromEnv(): boolean {
   const v = process.env.RDS_IAM_DB_AUTH;
   return v === '1' || v === 'true' || v === 'yes';
 }
 
-/** Parse postgresql URL for host/port/db/user; password in URL is ignored when using IAM auth. */
-function parsePostgresUrl(url: string): { host: string; port: number; database: string; user: string } {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error('DATABASE_URL is not a valid URL');
+function parseExplicitDbFromEnv(): {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string;
+} | null {
+  const host = process.env.DB_HOST?.trim();
+  if (!host) return null;
+  const port = Number(process.env.DB_PORT ?? '5432') || 5432;
+  const database = process.env.DB_NAME?.trim();
+  const user = process.env.DB_USER?.trim();
+  if (!database || !user) {
+    throw new Error('When DB_HOST is set, DB_NAME and DB_USER are required.');
   }
-  if (parsed.protocol !== 'postgresql:' && parsed.protocol !== 'postgres:') {
-    throw new Error('DATABASE_URL must use postgresql:// (or postgres://)');
-  }
-  const path = parsed.pathname.replace(/^\//, '');
-  const database = path.split('/')[0] ?? '';
-  if (!database) {
-    throw new Error('DATABASE_URL must include a database name in the path');
-  }
-  const user = decodeURIComponent(parsed.username);
-  if (!user) {
-    throw new Error('DATABASE_URL must include a username (use the IAM DB role, e.g. mna_iam)');
-  }
-  const port = parsed.port ? Number(parsed.port) : 5432;
-  return { host: parsed.hostname, port, database, user };
+  const rawPw = process.env.DB_PASSWORD;
+  const password = rawPw === undefined || rawPw === '' ? undefined : rawPw;
+  return { host, port, database, user, password };
 }
 
 async function rdsIamAuthToken(host: string, port: number, username: string): Promise<string> {
@@ -42,25 +40,50 @@ async function rdsIamAuthToken(host: string, port: number, username: string): Pr
   if (!region) {
     throw new Error('Set AWS_REGION (or AWS_DEFAULT_REGION) for RDS IAM database authentication');
   }
-  const signer = new Signer({
-    hostname: host,
-    port,
-    region,
-    username,
-  });
+  const signer = new Signer({ hostname: host, port, region, username });
   return signer.getAuthToken();
 }
 
-const isPooler = connectionString.includes(':6543');
-const isLocal = /127\.0\.0\.1|localhost/.test(connectionString);
-const useRdsIamDbAuth = rdsIamDbAuthFromEnv();
+/** Postgres client from DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD (+ optional RDS_IAM_DB_AUTH). */
+export function createPostgresClientFromEnv(
+  extra: PostgresClientFromEnvOptions = {},
+): ReturnType<typeof postgres> {
+  const explicitDb = parseExplicitDbFromEnv();
+  if (!explicitDb) {
+    throw new Error(
+      'Database not configured: set DB_HOST, DB_NAME, DB_USER, and DB_PORT (DB_PASSWORD empty when RDS_IAM_DB_AUTH=true).',
+    );
+  }
 
-type PgClient = ReturnType<typeof postgres>;
-const globalForDb = globalThis as unknown as { __pg?: PgClient };
+  const useIam = rdsIamDbAuthFromEnv();
 
-function createPostgresClient(): PgClient {
-  if (useRdsIamDbAuth) {
-    const { host, port, database, user } = parsePostgresUrl(connectionString);
+  if (useIam && explicitDb.password) {
+    throw new Error('With RDS_IAM_DB_AUTH, leave DB_PASSWORD empty; the app uses an IAM token instead.');
+  }
+  if (!useIam && explicitDb.password === undefined) {
+    throw new Error('Without RDS_IAM_DB_AUTH, set DB_PASSWORD for the database user.');
+  }
+
+  const common = {
+    prepare: true,
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 15,
+  } as const;
+
+  const isPooler = explicitDb.port === 6543;
+  const poolCommon = {
+    ...common,
+    prepare: extra.prepare ?? !isPooler,
+    max: isPooler ? 1 : 10,
+    connect_timeout: extra.connect_timeout ?? 10,
+    ...(extra.onnotice ? { onnotice: extra.onnotice } : {}),
+  };
+
+  const { host, port, database, user, password } = explicitDb;
+  const isLocal = /^(127\.0\.0\.1|localhost)$/i.test(host);
+
+  if (useIam) {
     return postgres({
       host,
       port,
@@ -68,22 +91,25 @@ function createPostgresClient(): PgClient {
       user,
       password: () => rdsIamAuthToken(host, port, user),
       ssl: 'require',
-      prepare: !isPooler,
-      max: isPooler ? 1 : 10,
-      idle_timeout: 20,
-      connect_timeout: 10,
+      ...poolCommon,
     });
   }
-  return postgres(connectionString, {
-    prepare: !isPooler,
-    max: isPooler ? 1 : 10,
-    idle_timeout: 20,
-    connect_timeout: 10,
+
+  return postgres({
+    host,
+    port,
+    database,
+    user,
+    password: password!,
     ssl: isLocal ? false : 'require',
+    ...poolCommon,
   });
 }
 
-const client: PgClient = globalForDb.__pg ?? createPostgresClient();
+type PgClient = ReturnType<typeof postgres>;
+const globalForDb = globalThis as unknown as { __pg?: PgClient };
+
+const client: PgClient = globalForDb.__pg ?? createPostgresClientFromEnv();
 
 // Note on timestamp shape: Drizzle's `timestamp({ mode: 'string' })` returns the
 // raw Postgres textual form (e.g. "2026-04-22 12:40:36.427054+00") rather than

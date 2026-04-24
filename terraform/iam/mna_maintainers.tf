@@ -24,23 +24,13 @@ resource "aws_iam_group_policy" "mna_maintainer_policy" {
           "elasticloadbalancing:*",
           "cloudwatch:*",
           "cloudshell:*",
-          "ecr:*",
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "bedrock:*",
           "ecs:*",
           "events:*",
           "iam:ListAttachedRolePolicies",
           "iam:ListInstanceProfiles",
           "iam:ListRoles",
-          "lambda:*",
           "logs:*",
           "rds:*",
-          "sns:*",
-          "wafv2:*",
-          "waf:*",
           "ec2:*",
           "s3:*",
           "backup:*",
@@ -66,86 +56,9 @@ resource "aws_iam_group_policy" "mna_maintainer_policy" {
           "xray:BatchGetTraces",
           "xray:GetTraceGraph",
           "xray:GetServiceGraph",
-          "tag:GetResources",
-          "appconfig:ListApplications",
-          "appconfig:CreateApplication",
-          "appconfig:CreateEnvironment",
-          "appconfig:GetApplication",
-          "appconfig:ListEnvironments",
-          "appconfig:GetEnvironment",
-          "appconfig:ListConfigurationProfiles",
-          "appconfig:GetConfigurationProfile",
-          "appconfig:ListDeployments",
-          "appconfig:GetDeployment",
-          "appconfig:GetHostedConfigurationVersion",
-          "appconfig:CreateHostedConfigurationVersion",
-          "appconfig:StartDeployment",
-          "appconfig:StopDeployment",
-          "appconfig:ValidateConfiguration",
-          "appconfig:StartConfigurationSession",
-          "appconfig:GetLatestConfiguration"
+          "tag:GetResources"
         ],
         Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_group_policy" "mna_maintainer_lambda_development_access" {
-  count = local.environment == "dev" ? 0 : 1
-  name  = "mna_maintainer_lambda_development_access"
-  group = aws_iam_group.mna_maintainers[0].name
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "cloudformation:DescribeStacks",
-          "cloudformation:ListStackResources",
-          "cloudwatch:ListMetrics",
-          "cloudwatch:GetMetricData",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeVpcs",
-          "kms:ListAliases",
-          "iam:GetPolicy",
-          "iam:GetPolicyVersion",
-          "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListAttachedRolePolicies",
-          "iam:ListRolePolicies",
-          "iam:ListRoles",
-          "lambda:*",
-          "logs:DescribeLogGroups",
-          "states:DescribeStateMachine",
-          "states:ListStateMachines",
-          "tag:GetResources",
-          "xray:GetTraceSummaries",
-          "xray:BatchGetTraces"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow",
-        Action   = "iam:PassRole",
-        Resource = "*",
-        Condition = {
-          StringEquals = {
-            "iam:PassedToService" = "lambda.amazonaws.com"
-          }
-        }
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "logs:DescribeLogStreams",
-          "logs:GetLogEvents",
-          "logs:FilterLogEvents",
-          "logs:StartLiveTail",
-          "logs:StopLiveTail"
-        ],
-        Resource = "arn:aws:logs:*:*:log-group:/aws/lambda/*"
       }
     ]
   })
