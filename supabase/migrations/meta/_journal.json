@@ -183,6 +183,13 @@
       "when": 1776816001000,
       "tag": "20260422000001_link_jobs_to_domain_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776988800000,
+      "tag": "20260424000000_add_stuck_cleanup_job_type",
+      "breakpoints": true
     }
   ]
 }
