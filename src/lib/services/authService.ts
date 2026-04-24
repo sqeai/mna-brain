@@ -6,6 +6,7 @@ export class AuthService {
   async signIn(email: string, password: string) {
     const user = await this.userRepo.findByEmailAndPassword(email, password);
     if (!user) throw new Error('Invalid email or password');
-    return user;
+    const { password: _omit, ...safe } = user;
+    return safe;
   }
 }
