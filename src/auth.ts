@@ -3,7 +3,18 @@ import Credentials from 'next-auth/providers/credentials';
 import { createDb } from '@/lib/server/db';
 import { createContainer } from '@/lib/services';
 
+/** Auth.js requires a secret; use AUTH_SECRET in all real environments. */
+function resolveAuthSecret(): string | undefined {
+  if (process.env.AUTH_SECRET?.trim()) return process.env.AUTH_SECRET.trim();
+  if (process.env.NODE_ENV === 'development') {
+    // Local-only fallback so `pnpm dev` works without .env.local; never used in production.
+    return 'local-dev-auth-secret-min-32-chars-do-not-use-in-prod';
+  }
+  return undefined;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: resolveAuthSecret(),
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [

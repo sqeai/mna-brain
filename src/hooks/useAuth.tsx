@@ -8,6 +8,7 @@ import {
   useSession,
 } from 'next-auth/react';
 import posthog from 'posthog-js';
+import { isPosthogBrowserConfigured } from '@/lib/posthog-browser';
 
 export { SessionProvider as AuthProvider };
 
@@ -38,8 +39,10 @@ export function useAuth() {
   }, []);
 
   const signOut = useCallback(async () => {
-    posthog.capture('user_signed_out');
-    posthog.reset();
+    if (isPosthogBrowserConfigured()) {
+      posthog.capture('user_signed_out');
+      posthog.reset();
+    }
     await nextAuthSignOut({ redirect: false });
   }, []);
 

@@ -14,6 +14,7 @@ import { LivingBackground } from '@/components/LivingBackground';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle } from 'lucide-react';
 import posthog from 'posthog-js';
+import { isPosthogBrowserConfigured } from '@/lib/posthog-browser';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,12 +44,14 @@ export default function LoginPage() {
       setIsLoading(false);
     } else {
       const normalizedEmail = email.toLowerCase().trim();
-      posthog.identify(normalizedEmail, {
-        email: normalizedEmail,
-      });
-      posthog.capture('user_signed_in', {
-        email: normalizedEmail,
-      });
+      if (isPosthogBrowserConfigured()) {
+        posthog.identify(normalizedEmail, {
+          email: normalizedEmail,
+        });
+        posthog.capture('user_signed_in', {
+          email: normalizedEmail,
+        });
+      }
       router.push('/dashboard');
     }
   };
@@ -82,7 +85,8 @@ export default function LoginPage() {
               alt="Brain 2.0"
               width={120}
               height={56}
-              className="h-14 w-auto object-contain rounded-2xl"
+              className="max-h-14 w-auto object-contain rounded-2xl"
+              style={{ width: 'auto', height: 'auto' }}
               priority
             />
           </div>
