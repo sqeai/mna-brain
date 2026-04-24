@@ -41,7 +41,7 @@ variable "rds_public_ingress_cidrs" {
 }
 
 variable "rds_iam_database_authentication_enabled" {
-  description = "When true, enables RDS IAM DB authentication (password + IAM). Engineers use AWS CLI/SDK to generate a ~15m auth token for DBeaver; create the DB user and GRANT rds_iam once (see output iam_db_auth_bootstrap_sql)."
+  description = "When true, enables RDS IAM DB authentication (password + IAM). Workspaces staging and production always use true (see local.rds_iam_db_auth_enabled). Dev falls back to this variable."
   type        = bool
   default     = true
 }
@@ -64,6 +64,19 @@ variable "iam_db_auth_attach_roles" {
   default     = []
 }
 
+variable "create_vercel_rds_iam_db_user" {
+  description = "When true (and RDS IAM DB auth is enabled), create an IAM user scoped only for rds-db:connect. Put a one-time access key in Vercel as AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (create key outside Terraform to keep secrets out of tfstate)."
+  type        = bool
+  default     = true
+}
+
+variable "vercel_rds_iam_user_name" {
+  description = "Override IAM username for Vercel; default mna-<env>-vercel-rds-iam"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -71,7 +84,9 @@ locals {
 
   workspace_config = {
     dev = {
-      environment = "dev"
+      environment                             = "dev"
+      rds_iam_database_authentication_enabled = var.rds_iam_database_authentication_enabled
+      rds_apply_immediately = true
       tags = {
         Environment = "dev"
         Project     = "MnA"
@@ -79,7 +94,9 @@ locals {
       }
     }
     staging = {
-      environment = "staging"
+      environment                             = "staging"
+      rds_iam_database_authentication_enabled = true
+      rds_apply_immediately                   = true
       tags = {
         Environment = "staging"
         Project     = "MnA"
@@ -87,7 +104,10 @@ locals {
       }
     }
     production = {
-      environment = "production"
+      environment                             = "production"
+      rds_iam_database_authentication_enabled = true
+      # Safer default: defer instance changes to maintenance window unless you reboot or use -var.
+      rds_apply_immediately = false
       tags = {
         Environment = "production"
         Project     = "MnA"
@@ -96,8 +116,10 @@ locals {
     }
   }
 
-  current_config   = lookup(local.workspace_config, terraform.workspace, local.workspace_config["dev"])
-  environment_tags = merge(local.current_config.tags, var.tags)
+  current_config          = lookup(local.workspace_config, terraform.workspace, local.workspace_config["dev"])
+  environment_tags        = merge(local.current_config.tags, var.tags)
+  rds_iam_db_auth_enabled = local.current_config.rds_iam_database_authentication_enabled
+  rds_apply_immediately   = local.current_config.rds_apply_immediately
 
   # Official RDS global CA bundle (download into your app or CI; too large for SSM).
   rds_global_tls_ca_bundle_url = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"

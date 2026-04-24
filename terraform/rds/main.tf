@@ -82,7 +82,9 @@ resource "aws_db_instance" "mna" {
   publicly_accessible    = var.rds_publicly_accessible
   multi_az               = local.current_config.environment == "production"
 
-  iam_database_authentication_enabled = var.rds_iam_database_authentication_enabled
+  apply_immediately = local.rds_apply_immediately
+
+  iam_database_authentication_enabled = local.rds_iam_db_auth_enabled
 
   backup_retention_period   = 7
   backup_window             = "18:00-19:00"
@@ -132,7 +134,7 @@ resource "aws_ssm_parameter" "db_master_connection" {
     useTls               = true
     rdsForceSslParameter = true
     rdsTlsCaBundleUrl    = local.rds_global_tls_ca_bundle_url
-    iamDbAuthEnabled     = var.rds_iam_database_authentication_enabled
+    iamDbAuthEnabled     = local.rds_iam_db_auth_enabled
     iamDbAuthUsername    = var.iam_db_auth_username
     notes                = "Master auth: SSM master-password. IAM DB auth: use CLI generate-db-auth-token as password for iamDbAuthUsername (~15m TTL); run bootstrap SQL once (terraform output iam_db_auth_bootstrap_sql). TLS: download rdsTlsCaBundleUrl for verify-full."
   })

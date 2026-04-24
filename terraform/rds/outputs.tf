@@ -41,7 +41,7 @@ output "iam_db_auth_username" {
 
 output "iam_db_connect_policy_arn" {
   description = "Attach this policy (or use attachments from variables) so principals can call generate-db-auth-token for this DB user"
-  value       = var.rds_iam_database_authentication_enabled ? aws_iam_policy.rds_iam_db_connect[0].arn : null
+  value       = local.rds_iam_db_auth_enabled ? aws_iam_policy.rds_iam_db_connect[0].arn : null
 }
 
 output "iam_db_auth_bootstrap_sql" {
@@ -58,10 +58,20 @@ output "iam_db_auth_bootstrap_sql" {
 
 output "generate_db_auth_token_cli" {
   description = "Bash/Git Bash/PowerShell: run this, paste the printed string as DBeaver password (SSL on). Token ~15m. Same command in all shells."
-  value       = var.rds_iam_database_authentication_enabled ? "aws rds generate-db-auth-token --hostname ${aws_db_instance.mna.address} --port ${aws_db_instance.mna.port} --region ${var.aws_region} --username ${var.iam_db_auth_username}" : "(IAM DB auth disabled)"
+  value       = local.rds_iam_db_auth_enabled ? "aws rds generate-db-auth-token --hostname ${aws_db_instance.mna.address} --port ${aws_db_instance.mna.port} --region ${var.aws_region} --username ${var.iam_db_auth_username}" : "(IAM DB auth disabled)"
 }
 
 output "generate_db_auth_token_cli_with_profile_example" {
   description = "Example with named AWS CLI profile (adjust profile name)"
-  value       = var.rds_iam_database_authentication_enabled ? "aws rds generate-db-auth-token --hostname ${aws_db_instance.mna.address} --port ${aws_db_instance.mna.port} --region ${var.aws_region} --username ${var.iam_db_auth_username} --profile MNA-STAGING" : "(IAM DB auth disabled)"
+  value       = local.rds_iam_db_auth_enabled ? "aws rds generate-db-auth-token --hostname ${aws_db_instance.mna.address} --port ${aws_db_instance.mna.port} --region ${var.aws_region} --username ${var.iam_db_auth_username} --profile MNA-STAGING" : "(IAM DB auth disabled)"
+}
+
+output "vercel_rds_iam_user_name" {
+  description = "IAM user for Vercel (set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY from a one-time access key for this user). Null if not created."
+  value       = try(aws_iam_user.vercel_rds_iam[0].name, null)
+}
+
+output "vercel_rds_iam_user_arn" {
+  description = "ARN of the Vercel RDS IAM user (null if not created)"
+  value       = try(aws_iam_user.vercel_rds_iam[0].arn, null)
 }
