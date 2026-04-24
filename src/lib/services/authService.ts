@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import type { ResetPasswordTokenRepository, UserRepository } from '@/lib/repositories';
+import { hashPassword, verifyPassword } from './password';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -10,8 +11,10 @@ export class AuthService {
   ) {}
 
   async signIn(email: string, password: string) {
-    const user = await this.userRepo.findByEmailAndPassword(email, password);
+    const user = await this.userRepo.findByEmail(email);
     if (!user) throw new Error('Invalid email or password');
+    const ok = await verifyPassword(password, user.password);
+    if (!ok) throw new Error('Invalid email or password');
     return user;
   }
 
@@ -22,7 +25,8 @@ export class AuthService {
     }
     const existing = await this.userRepo.findByEmail(normalizedEmail);
     if (existing) throw new Error('Email already registered');
-    await this.userRepo.create({ email: normalizedEmail, name, password });
+    const passwordHash = await hashPassword(password);
+    await this.userRepo.create({ email: normalizedEmail, name, password: passwordHash });
   }
 
   async forgetPassword(email: string): Promise<string> {
@@ -46,7 +50,8 @@ export class AuthService {
     if (!key || !password) throw new Error('Key and password are required');
     const row = await this.resetTokenRepo.findValidByToken(key);
     if (!row) throw new Error('Invalid or expired reset token');
-    await this.userRepo.update(row.user_id, { password });
+    const passwordHash = await hashPassword(password);
+    await this.userRepo.update(row.user_id, { password: passwordHash });
     await this.resetTokenRepo.deleteByToken(key);
   }
 }
