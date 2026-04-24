@@ -12,7 +12,10 @@ if (!connectionString) {
 const isPooler = connectionString.includes(':6543');
 // Local Supabase / dev Postgres don't need TLS; managed Postgres (RDS,
 // Supabase cloud, Neon, etc.) usually require it. Auto-detect from the host.
-const isLocal = /127\.0\.0\.1|localhost|postgres/.test(connectionString);
+// Match only the host portion (after @) to avoid matching "postgres://" scheme.
+// "postgres" is the docker-compose service hostname; 127.0.0.1 / localhost are
+// native dev. Everything else (RDS, Neon, etc.) gets ssl: 'require'.
+const isLocal = /@(127\.0\.0\.1|localhost|postgres)[:/]/.test(connectionString);
 
 type PgClient = ReturnType<typeof postgres>;
 const globalForDb = globalThis as unknown as { __pg?: PgClient };
