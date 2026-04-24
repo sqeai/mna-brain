@@ -1,10 +1,12 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 import { jobs, jobLogs } from '@/lib/db/schema';
+import { DEFAULT_STUCK_BUFFER_SECONDS, isStuckJob } from '@/lib/jobs/stuck';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
 type Job = Tables<'jobs'>;
 type JobLog = Tables<'job_logs'>;
 type JobStatus = Job['status'];
+type JobType = Job['type'];
 
 export type JobWithLogs = Job & { logs: JobLog[] };
 
@@ -64,6 +66,46 @@ export class JobRepository {
       completed_at: new Date().toISOString(),
       error,
     });
+  }
+
+  async findMostRecentByType(type: JobType, sinceIso: string): Promise<Job | null> {
+    const [row] = await this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.type, type), gte(jobs.created_at, sinceIso)))
+      .orderBy(desc(jobs.created_at))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findStuck(bufferSeconds: number = DEFAULT_STUCK_BUFFER_SECONDS): Promise<Job[]> {
+    const rows = await this.db
+      .select()
+      .from(jobs)
+      .where(inArray(jobs.status, ['pending', 'running']));
+    const now = Date.now();
+    return rows.filter((row) => isStuckJob(row, now, bufferSeconds));
+  }
+
+  async markStuckAsTimedOut(id: string, reason: string): Promise<Job> {
+    const existing = await this.findById(id);
+    if (!existing) throw new Error(`Job ${id} not found`);
+
+    const updated = await this.updateStatus(id, {
+      status: 'timed_out',
+      completed_at: new Date().toISOString(),
+      error: reason,
+    });
+
+    await this.db.insert(jobLogs).values({
+      job_id: id,
+      from_status: existing.status,
+      to_status: 'timed_out',
+      message: reason,
+      metadata: { reason: 'stuck_cleanup' } as JobLog['metadata'],
+    } as TablesInsert<'job_logs'>);
+
+    return updated;
   }
 
   async appendLog(

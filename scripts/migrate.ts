@@ -6,7 +6,11 @@
  *
  * Usage: pnpm tsx scripts/migrate.ts
  */
-import 'dotenv/config';
+import { config } from 'dotenv';
+// Load .env.local first (if present), then .env as a fallback. dotenv won't
+// overwrite variables that are already set, so .env.local takes precedence.
+config({ path: '.env.local' });
+config();
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';

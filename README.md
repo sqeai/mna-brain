@@ -1,18 +1,3 @@
-# Supabase CLI
-
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=develop)](https://coveralls.io/github/supabase/cli?branch=develop) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
-
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
-
-This repository contains all the functionality for Supabase CLI.
-
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
-
 ## Getting started
 
 ### Install the CLI
@@ -214,4 +199,65 @@ After a run, open the HTML report:
 
 ```bash
 pnpm exec playwright show-report
+```
+
+## Unit tests
+
+Unit tests for backend code under `src/lib` use [Vitest](https://vitest.dev). Files
+colocated next to the code they cover with a `.test.ts` suffix.
+
+```bash
+pnpm test          # run once
+pnpm test:watch    # watch mode
+```
+
+## Async jobs
+
+Long-running work (AI screening, company analysis, market screening, slide
+generation) is dispatched via `JobDispatcher`/`dispatchJob`, which inserts a row
+into the `jobs` table and schedules the work via Next.js `after()`. The runner
+transitions the row through `pending → running → completed | failed | timed_out`,
+and every state change is appended to `job_logs`.
+
+### Stuck-job cleanup scheduler
+
+If a request is aborted before `after()` fires, a job can get stuck in `pending`
+forever; if the runner process crashes mid-work, a job can get stuck in
+`running`. A background sweep (`JobService.cleanupStuckJobs`) transitions any
+`pending` or `running` rows whose age exceeds `timeout_seconds + buffer` into
+`timed_out`, writing a `job_logs` entry that records the forced transition.
+
+The sweep runs in-process via `src/lib/jobs/scheduler.ts`. `setInterval` isn't
+viable on serverless (the function freezes between requests), so the scheduler
+is triggered by two request-adjacent hooks:
+
+1. **Cold start** — `src/instrumentation.ts` fires `runSchedulerIfDue` once per
+   Node runtime init. Fire-and-forget so cold-start latency is unaffected.
+2. **Job dispatch** — `dispatchJob` schedules a second `after()` that calls
+   the same function. Guarantees the sweep runs even if cold starts are rare.
+
+Every trigger is gated by a 24h DB window: `runSchedulerIfDue` queries the
+most recent `stuck_cleanup` job row and skips if one was created within the
+last 24h. Each sweep that actually runs is itself inserted as a
+`stuck_cleanup` job, producing standard `job_logs` transitions
+(`pending → running → completed`) for observability. A per-process
+`inFlight` promise coalesces concurrent triggers.
+
+Trade-offs:
+
+- If the deployment has no cold starts and no job dispatches for 24h, no sweep
+  runs. That's fine: no activity ⇒ no new stuck jobs.
+- Multi-instance deployments can race — two cold starts within a few ms of
+  each other could both see "no recent sweep" and both dispatch. Cleanup is
+  idempotent, so at worst two sweeps run in the same window.
+
+There's also a manual trigger at `GET /api/cron/cleanup-jobs` (useful for ops
+or incident response). Pass `?force=true` to bypass the 24h window. Protect
+it by setting `CRON_SECRET` and sending `Authorization: Bearer $CRON_SECRET`.
+
+```bash
+# respects the 24h window
+curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/cron/cleanup-jobs
+# force an immediate sweep
+curl -H "Authorization: Bearer $CRON_SECRET" "https://<host>/api/cron/cleanup-jobs?force=true"
 ```
