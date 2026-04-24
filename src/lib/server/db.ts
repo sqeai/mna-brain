@@ -16,7 +16,7 @@ const isPooler = connectionString.includes(':6543');
 //   - bare hostname with no dot (e.g. "postgres", "db") → docker network, local
 //   - anything with a dot → treat as FQDN, assume managed, require TLS
 const host = new URL(connectionString).hostname;
-const isLocal = host === 'localhost' || host === '127.0.0.1' || !host.includes('.');
+const isLocal = /@(127\.0\.0\.1|localhost|postgres)[:/]/.test
 
 type PgClient = ReturnType<typeof postgres>;
 const globalForDb = globalThis as unknown as { __pg?: PgClient };
