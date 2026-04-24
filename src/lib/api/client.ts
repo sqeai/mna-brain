@@ -8,21 +8,25 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
-const SHARED_SECRET = process.env.NEXT_PUBLIC_API_SHARED_SECRET;
+const SHARED_SECRET = process.env.PASSWORD_SALT_SECRET;
 
-export async function apiRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+export async function apiRequest<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<T> {
   const res = await fetch(input, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
-      ...(SHARED_SECRET ? { 'X-Api-Secret': SHARED_SECRET } : {}),
+      "Content-Type": "application/json",
+      ...(SHARED_SECRET ? { "X-Api-Secret": SHARED_SECRET } : {}),
       ...(init?.headers || {}),
     },
   });
 
   const payload = await parseJsonSafe(res);
   if (!res.ok) {
-    const message = payload?.error || payload?.message || `Request failed (${res.status})`;
+    const message =
+      payload?.error || payload?.message || `Request failed (${res.status})`;
     throw new Error(message);
   }
 
