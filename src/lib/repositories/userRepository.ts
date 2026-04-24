@@ -1,20 +1,22 @@
-import { and, eq, ilike } from 'drizzle-orm';
+import { eq, ilike } from 'drizzle-orm';
 import { users } from '@/lib/db/schema';
-import type { DbClient, Tables, TablesUpdate } from './types';
+import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
 export class UserRepository {
   constructor(private readonly db: DbClient) {}
 
-  async findByEmailAndPassword(
-    email: string,
-    password: string,
-  ): Promise<Tables<'users'> | null> {
+  async findByEmail(email: string): Promise<Tables<'users'> | null> {
     const [row] = await this.db
       .select()
       .from(users)
-      .where(and(ilike(users.email, email.toLowerCase().trim()), eq(users.password, password)))
+      .where(ilike(users.email, email.toLowerCase().trim()))
       .limit(1);
     return row ?? null;
+  }
+
+  async create(row: TablesInsert<'users'>): Promise<Tables<'users'>> {
+    const [created] = await this.db.insert(users).values(row).returning();
+    return created;
   }
 
   async findFavoriteCompanies(id: string): Promise<string[]> {

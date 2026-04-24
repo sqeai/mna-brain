@@ -2,13 +2,17 @@
  * Show migration status: what's applied, what's pending, what's on disk.
  * Usage: pnpm db:status
  */
-import 'dotenv/config';
+import { config } from 'dotenv';
+// Load .env.local first (if present), then .env as a fallback. dotenv won't
+// overwrite variables that are already set, so .env.local takes precedence.
+config({ path: '.env.local' });
+config();
 import { readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { createPostgresClientFromEnv } from '../src/lib/server/db';
 
-const MIGRATIONS_DIR = './supabase/migrations';
+const MIGRATIONS_DIR = './drizzle/migrations';
 
 function hashFile(path: string): string {
   // drizzle computes sha256 over the file content with Unix line endings

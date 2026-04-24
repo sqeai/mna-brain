@@ -44,6 +44,14 @@ async function rdsIamAuthToken(host: string, port: number, username: string): Pr
   return signer.getAuthToken();
 }
 
+/** True for local / docker-style hosts that typically do not use TLS. */
+function isLocalPostgresHost(host: string): boolean {
+  return (
+    /^(127\.0\.0\.1|localhost)$/i.test(host) ||
+    (host.length > 0 && !host.includes('.')) // e.g. service name "postgres" on docker network
+  );
+}
+
 /** Postgres client from DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD (+ optional RDS_IAM_DB_AUTH). */
 export function createPostgresClientFromEnv(
   extra: PostgresClientFromEnvOptions = {},
@@ -71,7 +79,8 @@ export function createPostgresClientFromEnv(
     connect_timeout: 15,
   } as const;
 
-  const isPooler = explicitDb.port === 6543;
+  const { host, port, database, user, password } = explicitDb;
+  const isPooler = port === 6543;
   const poolCommon = {
     ...common,
     prepare: extra.prepare ?? !isPooler,
@@ -79,9 +88,6 @@ export function createPostgresClientFromEnv(
     connect_timeout: extra.connect_timeout ?? 10,
     ...(extra.onnotice ? { onnotice: extra.onnotice } : {}),
   };
-
-  const { host, port, database, user, password } = explicitDb;
-  const isLocal = /^(127\.0\.0\.1|localhost)$/i.test(host);
 
   if (useIam) {
     return postgres({
@@ -95,13 +101,15 @@ export function createPostgresClientFromEnv(
     });
   }
 
+  const useSsl = isLocalPostgresHost(host) ? false : 'require';
+
   return postgres({
     host,
     port,
     database,
     user,
     password: password!,
-    ssl: isLocal ? false : 'require',
+    ssl: useSsl,
     ...poolCommon,
   });
 }

@@ -1,5 +1,5 @@
 /**
- * Generate drizzle-kit's migration journal from the supabase/migrations folder.
+ * Generate drizzle-kit's migration journal from the drizzle/migrations folder.
  *
  * Drizzle's migrator reads `meta/_journal.json` (ordered list of migration tags)
  * to decide what to run; Supabase authors SQL files with timestamp-prefixed
@@ -12,7 +12,7 @@
 import { readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const MIGRATIONS_DIR = './supabase/migrations';
+const MIGRATIONS_DIR = './drizzle/migrations';
 const META_DIR = join(MIGRATIONS_DIR, 'meta');
 
 type JournalEntry = {

@@ -1,12 +1,16 @@
 /**
  * Programmatic migrate runner — bypass drizzle-kit CLI to get reliable SSL +
  * error reporting. Uses DB_* env via createPostgresClientFromEnv (TLS for RDS).
- * hosts, applies everything in supabase/migrations/ that isn't already in
+ * Applies everything in drizzle/migrations/ that isn't already in
  * drizzle.__drizzle_migrations.
  *
  * Usage: pnpm tsx scripts/migrate.ts
  */
-import 'dotenv/config';
+import { config } from 'dotenv';
+// Load .env.local first (if present), then .env as a fallback. dotenv won't
+// overwrite variables that are already set, so .env.local takes precedence.
+config({ path: '.env.local' });
+config();
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { createPostgresClientFromEnv } from '../src/lib/server/db';
@@ -23,7 +27,7 @@ async function main() {
   console.log(`connecting to ${hostHint}...`);
   try {
     await migrate(db, {
-      migrationsFolder: './supabase/migrations',
+      migrationsFolder: './drizzle/migrations',
       migrationsTable: '__drizzle_migrations',
       migrationsSchema: 'drizzle',
     });

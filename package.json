@@ -7,18 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:push": "npx supabase db push",
-    "db:pull": "npx supabase db pull",
-    "db:reset": "npx supabase db reset",
-    "db:diff": "npx supabase db diff",
-    "db:start": "npx supabase start",
-    "db:stop": "npx supabase stop",
-    "db:status": "npx supabase status",
-    "db:migration:new": "npx supabase migration new",
-    "db:types-generate": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public,auth,storage > src/integrations/supabase/types.ts",
     "db:journal": "tsx scripts/build-drizzle-journal.ts",
     "db:migrate": "tsx scripts/build-drizzle-journal.ts && tsx scripts/migrate.ts",
     "db:migrate:status": "tsx scripts/status.ts",
+    "db:migration:new": "tsx scripts/new-migration.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -61,7 +56,6 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@supabase/supabase-js": "^2.91.0",
     "@tanstack/react-query": "^5.83.0",
     "ai": "^6.0.62",
     "better-sqlite3": "^11.7.0",
@@ -86,6 +80,7 @@
     "mammoth": "^1.11.0",
     "mupdf": "^1.27.0",
     "next": "^16.1.6",
+    "next-auth": "5.0.0-beta.31",
     "next-themes": "^0.3.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.4",
@@ -122,14 +117,9 @@
     "eslint": "^9.32.0",
     "eslint-config-next": "^15.1.0",
     "postcss": "^8.5.6",
-    "supabase": "^2.87.2",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",
-    "typescript": "^5.8.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "supabase"
-    ]
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.5"
   }
 }

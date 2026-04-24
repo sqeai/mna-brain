@@ -2,7 +2,7 @@ import { pgTable, index, pgPolicy, uuid, jsonb, text, integer, timestamp, foreig
 import { sql } from "drizzle-orm"
 
 export const jobStatus = pgEnum("job_status", ['pending', 'running', 'completed', 'failed', 'timed_out'])
-export const jobType = pgEnum("job_type", ['slide_generation', 'market_screening', 'ai_screening', 'company_analysis'])
+export const jobType = pgEnum("job_type", ['slide_generation', 'market_screening', 'ai_screening', 'company_analysis', 'stuck_cleanup'])
 export const screeningState = pgEnum("screening_state", ['pending', 'completed', 'failed'])
 
 
@@ -727,6 +727,22 @@ export const invenCache = pgTable("inven_cache", {
 		allowUpdateAccessOnInvenCache: pgPolicy("Allow update access on inven_cache", { as: "permissive", for: "update", to: ["public"] }),
 		allowInsertAccessOnInvenCache: pgPolicy("Allow insert access on inven_cache", { as: "permissive", for: "insert", to: ["public"] }),
 		allowReadAccessOnInvenCache: pgPolicy("Allow read access on inven_cache", { as: "permissive", for: "select", to: ["public"] }),
+	}
+});
+
+export const resetPasswordTokens = pgTable("reset_password_tokens", {
+	token: text().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	valid_until: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => {
+	return {
+		idxResetPasswordTokensUserId: index("idx_reset_password_tokens_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+		resetPasswordTokensUserIdFkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "reset_password_tokens_user_id_fkey"
+		}).onDelete("cascade"),
 	}
 });
 

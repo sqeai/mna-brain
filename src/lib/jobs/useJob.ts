@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Database } from '@/integrations/supabase/types';
+import type { Tables } from '@/lib/repositories';
 
-export type Job = Database['public']['Tables']['jobs']['Row'];
-export type JobLog = Database['public']['Tables']['job_logs']['Row'];
-export type JobStatus = Database['public']['Enums']['job_status'];
+export type Job = Tables<'jobs'>;
+export type JobLog = Tables<'job_logs'>;
+export type JobStatus = Job['status'];
 
 export type JobWithLogs = Job & { logs: JobLog[] };
 

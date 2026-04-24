@@ -1,12 +1,5 @@
 import { apiRequest } from '@/lib/api/client';
 
-export async function signInWithPassword(email: string, password: string) {
-  return apiRequest<any>('/api/auth/sign-in', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-}
-
 export async function getCompanies(params: {
   id?: string;
   stage?: string;
