@@ -1,19 +1,19 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export function proxy(req: NextRequest) {
-  const expected = process.env.NEXT_PUBLIC_API_SHARED_SECRET;
-  const provided = req.headers.get('x-api-secret');
+  const expected = process.env.PASSWORD_SALT_SECRET;
+  const provided = req.headers.get("x-api-secret");
   if (!expected || provided !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/api/auth/signup',
-    '/api/auth/forget-password',
-    '/api/auth/reset-password',
+    "/api/auth/signup",
+    "/api/auth/forget-password",
+    "/api/auth/reset-password",
   ],
 };
