@@ -433,6 +433,7 @@ export default function MasterData() {
                       <TableHead>Company</TableHead>
                       <TableHead>Sector</TableHead>
                       <TableHead>Source</TableHead>
+                      <TableHead>Geo</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>PIC</TableHead>
                       <TableHead className="text-right">Rev Y1</TableHead>
@@ -445,7 +446,6 @@ export default function MasterData() {
                       <TableHead className="text-right">Valuation</TableHead>
                       <TableHead>Added</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
-                      <TableHead>Geo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -472,6 +472,11 @@ export default function MasterData() {
                             <Badge variant="secondary" className="capitalize">
                               {company.source}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {company.geo || '-'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             {displayStage ? (
@@ -571,11 +576,6 @@ export default function MasterData() {
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {company.geo || '-'}
-                            </span>
                           </TableCell>
                         </TableRow>
                       );
