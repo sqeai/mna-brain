@@ -7,10 +7,13 @@ export type { DbClient };
 // Drizzle schema exports.
 type TableMap = {
   companies: typeof schema.companies;
-  company_logs: typeof schema.companyLogs;
   company_analyses: typeof schema.companyAnalyses;
-  company_slides: typeof schema.companySlides;
   company_criterias: typeof schema.companyCriterias;
+  company_financials: typeof schema.companyFinancials;
+  company_fx_adjustments: typeof schema.companyFxAdjustments;
+  company_logs: typeof schema.companyLogs;
+  company_screening_derived: typeof schema.companyScreeningDerived;
+  company_slides: typeof schema.companySlides;
   criterias: typeof schema.criterias;
   deal_documents: typeof schema.dealDocuments;
   deal_links: typeof schema.dealLinks;
@@ -24,6 +27,7 @@ type TableMap = {
   past_acquisitions: typeof schema.pastAcquisitions;
   reset_password_tokens: typeof schema.resetPasswordTokens;
   screenings: typeof schema.screenings;
+  user_company_favorites: typeof schema.userCompanyFavorites;
   users: typeof schema.users;
 };
 

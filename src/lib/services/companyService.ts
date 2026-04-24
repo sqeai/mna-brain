@@ -1,4 +1,5 @@
 import { deleteFile } from '@/lib/s3';
+import type { DealStage } from '@/lib/types';
 import type {
   CompanyRepository,
   CompanyFilters,
@@ -64,7 +65,7 @@ export class CompanyService {
   async delete(id: string) {
     const filePaths = await this.dealDocRepo.findFilePathsByDealId(id);
     if (filePaths.length > 0) {
-      await Promise.all(filePaths.map((p) => deleteFile(p)));
+      await Promise.all(filePaths.map((key) => deleteFile(key)));
     }
     await this.companyRepo.delete(id);
   }
@@ -77,7 +78,7 @@ export class CompanyService {
     linkUrl?: string,
     linkTitle?: string,
   ) {
-    await this.companyRepo.update(id, { pipeline_stage: nextStage });
+    await this.companyRepo.update(id, { pipeline_stage: nextStage as DealStage });
     await this.companyLogRepo.insert({
       company_id: id,
       action: currentStage

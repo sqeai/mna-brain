@@ -5,7 +5,7 @@ export interface User {
   id: string;
   name: string;
   password: string;
-  favorite_companies: string[] | null;
+  email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,10 +15,10 @@ export interface User {
 // ============================================
 export interface Company {
   id: string;
-  
+
   // Pipeline Stage
   pipeline_stage: DealStage;
-  
+
   // Details Section
   entry_id: number | null;
   watchlist_id: number | null;
@@ -31,99 +31,102 @@ export interface Company {
   comments: string | null;
   ownership: string | null;
   geography: string | null;
-  
-  // Revenue Section (USD Mn)
-  revenue_2021_usd_mn: number | null;
-  revenue_2022_usd_mn: number | null;
-  revenue_2023_usd_mn: number | null;
-  revenue_2024_usd_mn: number | null;
-  
-  // EBITDA Section (USD Mn)
-  ebitda_2021_usd_mn: number | null;
-  ebitda_2022_usd_mn: number | null;
-  ebitda_2023_usd_mn: number | null;
-  ebitda_2024_usd_mn: number | null;
-  
-  // EV Section
-  ev_2024: number | null;
-  
-  // Revenue CAGR
-  revenue_cagr_2021_2022: number | null;
-  revenue_cagr_2022_2023: number | null;
-  revenue_cagr_2023_2024: number | null;
-  
-  // EBITDA Margin
-  ebitda_margin_2021: number | null;
-  ebitda_margin_2022: number | null;
-  ebitda_margin_2023: number | null;
-  ebitda_margin_2024: number | null;
-  
-  // EV/EBITDA
-  ev_ebitda_2024: number | null;
-  
-  // Segment Details
+
+  // Status / source (nullable enum)
+  source: DealOrigin | null;
+  status: CompanyStatus | null;
+
+  // AI Market Screening Remarks (cross-matched with thesis)
+  remarks: string | null;
+
+  // Market Screening Fields
+  thesis_content: string | null;
+
+  // Metadata
+  created_at: string;
+  updated_at: string;
+
+  // Relations
+  criterias?: CompanyCriteria[];
+  financials?: CompanyFinancial[];
+  fx_adjustments?: CompanyFxAdjustment[];
+  screening_derived?: CompanyScreeningDerived | null;
+  favorited_by?: string[];
+}
+
+// ============================================
+// Company Financial (per-year)
+// ============================================
+export interface CompanyFinancial {
+  id: string;
+  company_id: string;
+  fiscal_year: number;
+  revenue_usd_mn: number | null;
+  ebitda_usd_mn: number | null;
+  ev_usd_mn: number | null;
+  ebitda_margin: number | null;
+  ev_ebitda: number | null;
+  revenue_cagr_vs_prior: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// Company FX Adjustment (per-year)
+// ============================================
+export interface CompanyFxAdjustment {
+  company_id: string;
+  fiscal_year: number;
+  currency: string;
+  revenue_local: number | null;
+  assumed_forex: number | null;
+  forex_change_vs_prior: number | null;
+  revenue_cagr_domestic: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// Company Screening Derived (1:1 with companies)
+// ============================================
+export interface CompanyScreeningDerived {
+  company_id: string;
+
+  // L0
   segment_revenue: number | null;
   segment_ebitda: number | null;
   segment_revenue_total_ratio: number | null;
-  
-  // L0 Screening Details
   l0_ebitda_2024_usd_mn: number | null;
   l0_ev_2024_usd_mn: number | null;
   l0_revenue_2024_usd_mn: number | null;
   l0_ev_ebitda_2024: number | null;
   segment_specific_revenue_pct: number | null;
   combined_segment_revenue: string | null;
-  revenue_from_priority_geo_flag: string | null;
   pct_from_domestic: number | null;
   l0_ev_usd_mn: number | null;
-  
-  // L1 Analysis
+  revenue_from_priority_geo: boolean | null;
+
+  // L1
   l1_revenue_cagr_l3y: number | null;
   l1_revenue_drop_count: number | null;
   l1_ebitda_below_threshold_count: number | null;
   l1_revenue_cagr_n3y: number | null;
-  l1_vision_fit: string | null;
-  l1_priority_geo_flag: string | null;
-  l1_ev_below_threshold: string | null;
-  
-  // L1 Screening
+  l1_vision_fit: boolean | null;
+  l1_priority_geo: boolean | null;
+  l1_ev_below_threshold: boolean | null;
+  l1_revenue_no_consecutive_drop: boolean | null;
   l1_rationale: string | null;
-  l1_revenue_no_consecutive_drop_usd: string | null;
-  
-  // FX Adjustment Section
-  fx_revenue_2021: number | null;
-  fx_revenue_2022: number | null;
-  fx_revenue_2023: number | null;
-  fx_revenue_2024: number | null;
+  l1_screening_result: L1Result | null;
+
+  // FX summary
   fx_currency: string | null;
-  fx_assumed_forex_2021: number | null;
-  fx_assumed_forex_2022: number | null;
-  fx_assumed_forex_2023: number | null;
-  fx_assumed_forex_2024: number | null;
-  fx_forex_change_2021_2022: number | null;
-  fx_forex_change_2022_2023: number | null;
-  fx_forex_change_2023_2024: number | null;
-  fx_revenue_cagr_domestic_2021_2022: number | null;
-  fx_revenue_cagr_domestic_2022_2023: number | null;
-  fx_revenue_cagr_domestic_2023_2024: number | null;
   fx_revenue_drop_count: number | null;
-  fx_revenue_no_consecutive_drop_local: string | null;
+  fx_revenue_no_consecutive_drop: boolean | null;
+  fx_ebitda_above_10_l3y: boolean | null;
   fx_rationale: string | null;
-  fx_ebitda_above_10_l3y: string | null;
-  l1_screening_result: string | null;
-  
-  // AI Market Screening Remarks (cross-matched with thesis)
-  remarks: string | null;
-  
-  // Market Screening Fields
-  thesis_content: string | null;
-  
-  // Metadata
-  created_at: string;
+
+  computed_at: string | null;
   updated_at: string;
-  
-  // Relations
-  criterias?: CompanyCriteria[];
 }
 
 // ============================================
@@ -173,12 +176,23 @@ export interface CompanyCriteria {
 export type WatchlistStatus = 'Active' | 'Inactive' | 'Pending' | 'Removed';
 
 // ============================================
-// Pipeline Stage Enum
+// Pipeline Stage Enum (matches DB pipeline_stage enum)
 // ============================================
 export type DealStage = 'market_screening' | 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
 
 // ============================================
-// L1 Status Enum
+// Company status / source enums (match DB enums)
+// ============================================
+export type CompanyStatus = 'active' | 'dropped';
+export type DealOrigin = 'inbound' | 'outbound';
+
+// ============================================
+// L1 screening result enum (matches DB l1_result enum)
+// ============================================
+export type L1Result = 'pass' | 'fail' | 'inconclusive';
+
+// ============================================
+// L1 Status Enum (legacy — UI values, kept for backwards compat)
 // ============================================
 export type L1Status = 'Pass' | 'No' | 'Exception' | 'WatchList' | 'TBC' | 'Duplicate';
 
@@ -188,7 +202,7 @@ export type L1Status = 'Pass' | 'No' | 'Exception' | 'WatchList' | 'TBC' | 'Dupl
 export interface CompanyInsert {
   // Pipeline Stage
   pipeline_stage?: DealStage;
-  
+
   // Details Section
   entry_id?: number | null;
   watchlist_id?: number | null;
@@ -201,90 +215,14 @@ export interface CompanyInsert {
   comments?: string | null;
   ownership?: string | null;
   geography?: string | null;
-  
-  // Revenue Section (USD Mn)
-  revenue_2021_usd_mn?: number | null;
-  revenue_2022_usd_mn?: number | null;
-  revenue_2023_usd_mn?: number | null;
-  revenue_2024_usd_mn?: number | null;
-  
-  // EBITDA Section (USD Mn)
-  ebitda_2021_usd_mn?: number | null;
-  ebitda_2022_usd_mn?: number | null;
-  ebitda_2023_usd_mn?: number | null;
-  ebitda_2024_usd_mn?: number | null;
-  
-  // EV Section
-  ev_2024?: number | null;
-  
-  // Revenue CAGR
-  revenue_cagr_2021_2022?: number | null;
-  revenue_cagr_2022_2023?: number | null;
-  revenue_cagr_2023_2024?: number | null;
-  
-  // EBITDA Margin
-  ebitda_margin_2021?: number | null;
-  ebitda_margin_2022?: number | null;
-  ebitda_margin_2023?: number | null;
-  ebitda_margin_2024?: number | null;
-  
-  // EV/EBITDA
-  ev_ebitda_2024?: number | null;
-  
-  // Segment Details
-  segment_revenue?: number | null;
-  segment_ebitda?: number | null;
-  segment_revenue_total_ratio?: number | null;
-  
-  // L0 Screening Details
-  l0_ebitda_2024_usd_mn?: number | null;
-  l0_ev_2024_usd_mn?: number | null;
-  l0_revenue_2024_usd_mn?: number | null;
-  l0_ev_ebitda_2024?: number | null;
-  segment_specific_revenue_pct?: number | null;
-  combined_segment_revenue?: string | null;
-  revenue_from_priority_geo_flag?: string | null;
-  pct_from_domestic?: number | null;
-  l0_ev_usd_mn?: number | null;
-  
-  // L1 Analysis
-  l1_revenue_cagr_l3y?: number | null;
-  l1_revenue_drop_count?: number | null;
-  l1_ebitda_below_threshold_count?: number | null;
-  l1_revenue_cagr_n3y?: number | null;
-  l1_vision_fit?: string | null;
-  l1_priority_geo_flag?: string | null;
-  l1_ev_below_threshold?: string | null;
-  
-  // L1 Screening
-  l1_rationale?: string | null;
-  l1_revenue_no_consecutive_drop_usd?: string | null;
-  
-  // FX Adjustment Section
-  fx_revenue_2021?: number | null;
-  fx_revenue_2022?: number | null;
-  fx_revenue_2023?: number | null;
-  fx_revenue_2024?: number | null;
-  fx_currency?: string | null;
-  fx_assumed_forex_2021?: number | null;
-  fx_assumed_forex_2022?: number | null;
-  fx_assumed_forex_2023?: number | null;
-  fx_assumed_forex_2024?: number | null;
-  fx_forex_change_2021_2022?: number | null;
-  fx_forex_change_2022_2023?: number | null;
-  fx_forex_change_2023_2024?: number | null;
-  fx_revenue_cagr_domestic_2021_2022?: number | null;
-  fx_revenue_cagr_domestic_2022_2023?: number | null;
-  fx_revenue_cagr_domestic_2023_2024?: number | null;
-  fx_revenue_drop_count?: number | null;
-  fx_revenue_no_consecutive_drop_local?: string | null;
-  fx_rationale?: string | null;
-  fx_ebitda_above_10_l3y?: string | null;
-  l1_screening_result?: string | null;
-  
+
+  // Status / source
+  source?: DealOrigin | null;
+  status?: CompanyStatus | null;
+
   // AI Market Screening Remarks (cross-matched with thesis)
   remarks?: string | null;
-  
+
   // Market Screening Fields
   thesis_content?: string | null;
 }

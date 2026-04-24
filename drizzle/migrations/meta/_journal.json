@@ -187,12 +187,19 @@
     {
       "idx": 26,
       "version": "7",
+      "when": 1776902400000,
+      "tag": "20260423000000_normalize_companies_and_favorites",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
       "when": 1776988800000,
       "tag": "20260424000000_add_stuck_cleanup_job_type",
       "breakpoints": true
     },
     {
-      "idx": 27,
+      "idx": 28,
       "version": "7",
       "when": 1776988801000,
       "tag": "20260424000001_create_reset_password_tokens",
