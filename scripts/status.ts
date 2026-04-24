@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import postgres from 'postgres';
 
-const MIGRATIONS_DIR = './supabase/migrations';
+const MIGRATIONS_DIR = './drizzle/migrations';
 
 function hashFile(path: string): string {
   // drizzle computes sha256 over the file content with Unix line endings

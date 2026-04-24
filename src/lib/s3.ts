@@ -7,12 +7,28 @@ const AWS_REGION = process.env.AWS_REGION || 'ap-southeast-3';
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
 const S3_BUCKET = process.env.AWS_S3_BUCKET || 'mna-files';
+// Optional custom endpoint for server→S3 operations (upload/download/delete).
+// Set to `http://localhost:9000` (host dev) or `http://minio:9000` (docker
+// network). Omit to use real AWS S3.
+const AWS_S3_ENDPOINT = process.env.AWS_S3_ENDPOINT;
+// Optional separate endpoint used ONLY when generating presigned URLs. These
+// URLs end up in the browser, so they must be reachable from there. In docker
+// dev the server can reach `http://minio:9000` but the browser cannot — it
+// needs `http://localhost:9000`. Fall back to AWS_S3_ENDPOINT if unset (same
+// address works for both in host dev and real AWS).
+const AWS_S3_PUBLIC_ENDPOINT = process.env.AWS_S3_PUBLIC_ENDPOINT ?? AWS_S3_ENDPOINT;
+// MinIO (and most S3-alike servers) require path-style addressing —
+// `http://host/bucket/key` instead of `http://bucket.host/key`.
+const AWS_S3_FORCE_PATH_STYLE = process.env.AWS_S3_FORCE_PATH_STYLE === 'true';
 
-// Create S3 client
-function createS3Client(): S3Client {
+type ClientKind = 'internal' | 'presigner';
+
+function createS3Client(kind: ClientKind = 'internal'): S3Client {
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
     throw new Error('AWS credentials not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.');
   }
+
+  const endpoint = kind === 'presigner' ? AWS_S3_PUBLIC_ENDPOINT : AWS_S3_ENDPOINT;
 
   return new S3Client({
     region: AWS_REGION,
@@ -20,6 +36,10 @@ function createS3Client(): S3Client {
       accessKeyId: AWS_ACCESS_KEY_ID,
       secretAccessKey: AWS_SECRET_ACCESS_KEY,
     },
+    ...(endpoint && { endpoint }),
+    // If an explicit endpoint is set (MinIO/LocalStack), default to path-style
+    // unless explicitly overridden.
+    forcePathStyle: endpoint ? AWS_S3_FORCE_PATH_STYLE || true : AWS_S3_FORCE_PATH_STYLE,
   });
 }
 
@@ -75,7 +95,7 @@ export async function getSignedUrl(
   expiresIn: number = 3600,
   fileName?: string
 ): Promise<string> {
-  const s3Client = createS3Client();
+  const s3Client = createS3Client('presigner');
 
   const command = new GetObjectCommand({
     Bucket: S3_BUCKET,
@@ -98,7 +118,7 @@ export async function getUploadSignedUrl(
   contentType: string,
   expiresIn: number = 900
 ): Promise<string> {
-  const s3Client = createS3Client();
+  const s3Client = createS3Client('presigner');
 
   const command = new PutObjectCommand({
     Bucket: S3_BUCKET,

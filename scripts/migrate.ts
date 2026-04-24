@@ -1,7 +1,7 @@
 /**
  * Programmatic migrate runner — bypass drizzle-kit CLI to get reliable SSL +
  * error reporting. Reads DATABASE_URL, auto-enables TLS for non-localhost
- * hosts, applies everything in supabase/migrations/ that isn't already in
+ * hosts, applies everything in drizzle/migrations/ that isn't already in
  * drizzle.__drizzle_migrations.
  *
  * Usage: pnpm tsx scripts/migrate.ts
@@ -32,7 +32,7 @@ async function main() {
   console.log(`connecting to ${new URL(url).host} (ssl=${!isLocal})...`);
   try {
     await migrate(db, {
-      migrationsFolder: './supabase/migrations',
+      migrationsFolder: './drizzle/migrations',
       migrationsTable: '__drizzle_migrations',
       migrationsSchema: 'drizzle',
     });
