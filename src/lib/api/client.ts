@@ -8,7 +8,7 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
-const SHARED_SECRET = process.env.PASSWORD_SALT_SECRET;
+const SHARED_SECRET = process.env.ADMIN_SECRET;
 
 export async function apiRequest<T>(
   input: RequestInfo | URL,

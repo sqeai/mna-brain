@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_BrainForget1
-createdAt: 2026-04-23T00:00:00.000000
-updatedAt: 2026-04-23T00:00:00.000000
+createdAt: 2026-04-23T00:00:00
+updatedAt: 2026-04-25T02:16:46.595690
 workspaceId: wk_4yBsWJ5Tuh
 folderId: fl_Brain2Auth0
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-      "email": "dicki.sujadi@sqe.co.id"
+      "email": "admin@example.com"
     }
 bodyType: application/json
 description: |-
