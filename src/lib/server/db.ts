@@ -80,6 +80,8 @@ export function createPostgresClientFromEnv(
   } as const;
 
   const { host, port, database, user, password } = explicitDb;
+  // Port 6543 (PgBouncer / pooler transaction mode): prepared statement names must not
+  // be reused across pooled server connections — disable prepare and cap pool size.
   const isPooler = port === 6543;
   const poolCommon = {
     ...common,
