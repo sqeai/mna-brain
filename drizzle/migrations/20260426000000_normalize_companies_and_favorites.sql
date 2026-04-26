@@ -256,7 +256,7 @@ $$;
 
 -- Log any flag value that won't map cleanly (so humans can review).
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'companies', id, col, val, 'flag value outside strict yes/pass/no/fail mapping; coerced to NULL'
+SELECT '20260426000000_normalize', 'companies', id, col, val, 'flag value outside strict yes/pass/no/fail mapping; coerced to NULL'
 FROM (
   SELECT id, 'l1_vision_fit' AS col, l1_vision_fit AS val FROM companies WHERE NOT _mig_is_mapped_bool(l1_vision_fit)
   UNION ALL
@@ -343,7 +343,7 @@ ON CONFLICT (user_id, company_id) DO NOTHING;
 
 -- Log any favorite UUID that didn't match a company (helpful for audit).
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'users', u.id, 'favorite_companies', fav.value,
+SELECT '20260426000000_normalize', 'users', u.id, 'favorite_companies', fav.value,
        'favorite UUID did not match any company; dropped from user_company_favorites'
 FROM users u
 CROSS JOIN LATERAL jsonb_array_elements_text(
@@ -362,20 +362,20 @@ WHERE c.id IS NULL;
 
 -- Log coercions before they happen (defensive — ALTER USING also applies below).
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'companies', id, 'pipeline_stage', pipeline_stage,
+SELECT '20260426000000_normalize', 'companies', id, 'pipeline_stage', pipeline_stage,
        'value outside pipeline_stage enum; coerced to L0'
 FROM companies
 WHERE pipeline_stage IS NOT NULL
   AND pipeline_stage NOT IN ('market_screening','L0','L1','L2','L3','L4','L5');
 
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'companies', id, 'source', source,
+SELECT '20260426000000_normalize', 'companies', id, 'source', source,
        'value outside deal_origin enum; coerced to NULL'
 FROM companies
 WHERE source IS NOT NULL AND source NOT IN ('inbound','outbound');
 
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'companies', id, 'status', status,
+SELECT '20260426000000_normalize', 'companies', id, 'status', status,
        'value outside company_status enum; coerced to NULL'
 FROM companies
 WHERE status IS NOT NULL AND status NOT IN ('active','dropped');
@@ -417,7 +417,7 @@ ALTER TABLE companies
 -- ----------------------------------------------------------------------------
 
 INSERT INTO migration_notices (migration, table_name, row_id, column_name, original_value, reason)
-SELECT '20260423000000_normalize', 'company_analyses', id, 'status', status,
+SELECT '20260426000000_normalize', 'company_analyses', id, 'status', status,
        'value outside analysis_job_status enum; coerced to pending'
 FROM company_analyses
 WHERE status NOT IN ('pending','processing','completed','failed');
