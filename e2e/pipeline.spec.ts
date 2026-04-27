@@ -1,12 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
+import { MOCK_USER, mockAuthSession } from './helpers/auth';
 
 type Company = {
   id: string;
@@ -132,20 +125,9 @@ const mockApis = async (page: Page, companies: Company[], opts?: { favorites?: s
   );
 };
 
-const authenticate = async (page: Page) => {
-  await page.addInitScript((user) => {
-    localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-  }, MOCK_USER);
-};
-
 test.describe('Pipeline page', () => {
-  test.beforeEach(async ({ page }) => {
-    await authenticate(page);
-  });
-
   test('redirects to /login when unauthenticated', async ({ page }) => {
-    await page.context().clearCookies();
-    await page.addInitScript(() => localStorage.removeItem('mna_tracker_user'));
+    await mockAuthSession(page, null);
 
     await page.goto('/pipeline');
     await page.waitForURL('**/login');
@@ -153,6 +135,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('renders header, stage tabs and per-stage counts', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -174,6 +157,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('honors ?stage= query param and renders that stage', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -187,6 +171,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('switching tabs updates the URL', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -200,6 +185,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('search filters companies within the active stage', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -216,6 +202,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('L1 status filter narrows to matching rows', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -231,6 +218,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('clicking a company opens the detail dialog', async ({ page }) => {
+    await mockAuthSession(page);
     await mockApis(page, MOCK_COMPANIES);
     await page.route('**/api/deal-notes**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }),
@@ -252,6 +240,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('toggling favorite star posts to the favorites endpoint', async ({ page }) => {
+    await mockAuthSession(page, MOCK_USER);
     await mockApis(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -272,6 +261,7 @@ test.describe('Pipeline page', () => {
   });
 
   test('empty stage shows "No companies in this stage"', async ({ page }) => {
+    await mockAuthSession(page);
     // Only L0 data, so L4 will be empty.
     const onlyL0 = MOCK_COMPANIES.filter((c) => c.pipeline_stage === 'L0');
     await mockApis(page, onlyL0);

@@ -22,5 +22,11 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      __NEXT_PRIVATE_STANDALONE_CONFIG: '',
+      __NEXT_PRIVATE_ORIGIN: '',
+      NEXT_DEPLOYMENT_ID: '',
+      PORT: '3000',
+    },
   },
 });

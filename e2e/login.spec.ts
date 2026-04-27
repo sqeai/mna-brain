@@ -1,53 +1,56 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
+import { MOCK_USER, mockAuthSession, mockNextAuthSignIn } from './helpers/auth';
 
 test.describe('Login page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
+    // Stub the dashboard's data fetches so any post-login navigation lands
+    // cleanly without hitting the real API.
+    await page.route('**/api/companies**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [] }),
+      }),
+    );
   });
 
   test('renders login form', async ({ page }) => {
-    await expect(page.getByText('BRAIN 2.0')).toBeVisible();
+    await mockAuthSession(page, null);
+    await page.goto('/login');
+
+    await expect(page.getByRole('heading', { name: 'BRAIN 2.0' })).toBeVisible();
     await expect(page.locator('#signin-email')).toBeVisible();
     await expect(page.locator('#signin-password')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
   });
 
   test('shows error on invalid credentials', async ({ page }) => {
-    await page.route('**/api/auth/sign-in', (route) =>
-      route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Invalid email or password' }),
-      }),
-    );
+    await mockAuthSession(page, null);
+    await mockNextAuthSignIn(page, { errorCode: 'CredentialsSignin' });
+    await page.goto('/login');
 
     await page.locator('#signin-email').fill('wrong@example.com');
     await page.locator('#signin-password').fill('wrongpassword');
     await page.getByRole('button', { name: 'Sign In' }).click();
 
-    await expect(page.getByText('Invalid email or password')).toBeVisible();
-    await expect(page).toHaveURL('/login');
+    // useAuth wraps NextAuth's `error` value as the message; ensure our error
+    // alert renders with the code (the second `alert` is Next's route announcer).
+    const alert = page.getByRole('alert').filter({ hasText: /CredentialsSignin/i });
+    await expect(alert).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
   });
 
   test('successful login redirects to /dashboard', async ({ page }) => {
-    await page.route('**/api/auth/sign-in', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: MOCK_USER }),
-      }),
-    );
+    const session = await mockAuthSession(page, null);
+    await mockNextAuthSignIn(page);
+    await page.goto('/login');
 
     await page.locator('#signin-email').fill('test@example.com');
     await page.locator('#signin-password').fill('password123');
+
+    // Flip the session to authenticated right before submit so the post-signin
+    // session refresh and the dashboard's ProtectedRoute see a valid user.
+    session.setUser(MOCK_USER);
     await page.getByRole('button', { name: 'Sign In' }).click();
 
     await page.waitForURL('**/dashboard');
@@ -55,14 +58,9 @@ test.describe('Login page', () => {
   });
 
   test('disables form while submitting', async ({ page }) => {
-    await page.route('**/api/auth/sign-in', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: MOCK_USER }),
-      });
-    });
+    await mockAuthSession(page, null);
+    await mockNextAuthSignIn(page, { delayMs: 700 });
+    await page.goto('/login');
 
     await page.locator('#signin-email').fill('test@example.com');
     await page.locator('#signin-password').fill('password123');
@@ -74,9 +72,7 @@ test.describe('Login page', () => {
   });
 
   test('redirects to /dashboard if already authenticated', async ({ page }) => {
-    await page.addInitScript((user) => {
-      localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-    }, MOCK_USER);
+    await mockAuthSession(page, MOCK_USER);
 
     await page.goto('/login');
     await page.waitForURL('**/dashboard');
