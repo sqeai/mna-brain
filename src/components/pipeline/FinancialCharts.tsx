@@ -13,9 +13,11 @@ interface FinancialChartsProps {
   revenue_year1: number | null;
   revenue_year2: number | null;
   revenue_year3: number | null;
+  revenue_year4?: number | null;
   ebitda_year1: number | null;
   ebitda_year2: number | null;
   ebitda_year3: number | null;
+  ebitda_year4?: number | null;
 }
 
 const formatCurrency = (value: number | null) => {
@@ -32,20 +34,28 @@ export function FinancialCharts({
   revenue_year1,
   revenue_year2,
   revenue_year3,
+  revenue_year4,
   ebitda_year1,
   ebitda_year2,
   ebitda_year3,
+  ebitda_year4,
 }: FinancialChartsProps) {
   const revenueData = [
     { year: '2022', value: revenue_year1 || 0 },
     { year: '2023', value: revenue_year2 || 0 },
     { year: '2024', value: revenue_year3 || 0 },
+    ...(revenue_year4 !== undefined && revenue_year4 !== null
+      ? [{ year: '2025', value: revenue_year4 }]
+      : []),
   ];
 
   const ebitdaData = [
     { year: '2022', value: ebitda_year1 || 0 },
     { year: '2023', value: ebitda_year2 || 0 },
     { year: '2024', value: ebitda_year3 || 0 },
+    ...(ebitda_year4 !== undefined && ebitda_year4 !== null
+      ? [{ year: '2025', value: ebitda_year4 }]
+      : []),
   ];
 
   return (
@@ -93,7 +103,7 @@ export function FinancialCharts({
               </BarChart>
             </ChartContainer>
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t">
+          <div className={`grid gap-2 mt-3 pt-3 border-t ${revenueData.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             {revenueData.map((item) => (
               <div key={item.year} className="text-center">
                 <p className="text-xs text-muted-foreground">{item.year}</p>
@@ -147,7 +157,7 @@ export function FinancialCharts({
               </BarChart>
             </ChartContainer>
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t">
+          <div className={`grid gap-2 mt-3 pt-3 border-t ${ebitdaData.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             {ebitdaData.map((item) => (
               <div key={item.year} className="text-center">
                 <p className="text-xs text-muted-foreground">{item.year}</p>

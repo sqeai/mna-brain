@@ -57,6 +57,7 @@ import {
   getCompanyDetails,
   getScreenings,
 } from '@/lib/api/pipeline';
+import { getCompanyOverride } from '@/lib/companyOverrides';
 
 const getStageLabel = (stage: string | null): string => {
   const key = (stage || 'L0') as DealStage;
@@ -813,7 +814,7 @@ export default function CompanyDetailDialog({
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Enterprise Value (2024)</p>
-                      <p className="font-semibold text-2xl text-primary">{formatCurrency(company.ev_2024)}</p>
+                      <p className="font-semibold text-2xl text-primary">{formatCurrency(getCompanyOverride(company.id)?.ev_2024 ?? company.ev_2024)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">L1 Screening Result</p>
@@ -825,6 +826,12 @@ export default function CompanyDetailDialog({
                         <span className="text-muted-foreground text-sm">Not screened yet</span>
                       )}
                     </div>
+                    {getCompanyOverride(company.id)?.pic && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">PIC</p>
+                        <p className="font-medium">{getCompanyOverride(company.id)?.pic}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -844,8 +851,11 @@ export default function CompanyDetailDialog({
                     <BarChart
                       data={[
                         { year: '2022', revenue: company.revenue_2022_usd_mn || 0 },
-                        { year: '2023', revenue: company.revenue_2023_usd_mn || 0 },
-                        { year: '2024', revenue: company.revenue_2024_usd_mn || 0 },
+                        { year: '2023', revenue: getCompanyOverride(company.id)?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn ?? 0 },
+                        { year: '2024', revenue: getCompanyOverride(company.id)?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn ?? 0 },
+                        ...(getCompanyOverride(company.id)?.revenue_2025_usd_mn !== undefined
+                          ? [{ year: '2025', revenue: getCompanyOverride(company.id)!.revenue_2025_usd_mn! }]
+                          : []),
                       ]}
                       margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
@@ -890,8 +900,11 @@ export default function CompanyDetailDialog({
                     <BarChart
                       data={[
                         { year: '2022', ebitda: company.ebitda_2022_usd_mn || 0 },
-                        { year: '2023', ebitda: company.ebitda_2023_usd_mn || 0 },
-                        { year: '2024', ebitda: company.ebitda_2024_usd_mn || 0 },
+                        { year: '2023', ebitda: getCompanyOverride(company.id)?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn ?? 0 },
+                        { year: '2024', ebitda: getCompanyOverride(company.id)?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn ?? 0 },
+                        ...(getCompanyOverride(company.id)?.ebitda_2025_usd_mn !== undefined
+                          ? [{ year: '2025', ebitda: getCompanyOverride(company.id)!.ebitda_2025_usd_mn! }]
+                          : []),
                       ]}
                       margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >

@@ -73,6 +73,7 @@ import {
   promoteCompany,
   runCompanyL1Filters,
 } from '@/lib/api/pipeline';
+import { getCompanyOverride } from '@/lib/companyOverrides';
 
 interface PipelineCompany {
   id: string;
@@ -85,10 +86,12 @@ interface PipelineCompany {
   revenue_2022_usd_mn: number | null;
   revenue_2023_usd_mn: number | null;
   revenue_2024_usd_mn: number | null;
+  revenue_2025_usd_mn: number | null;
   ebitda_2021_usd_mn: number | null;
   ebitda_2022_usd_mn: number | null;
   ebitda_2023_usd_mn: number | null;
   ebitda_2024_usd_mn: number | null;
+  ebitda_2025_usd_mn: number | null;
   ev_2024: number | null;
   pipeline_stage: DealStage;
   l1_screening_result: string | null;
@@ -234,30 +237,35 @@ export default function Pipeline() {
         orderDir: 'desc',
       });
 
-      const formatted: PipelineCompany[] = data?.map((company: any) => ({
-        id: company.id,
-        target: company.target || '',
-        segment: company.segment || '',
-        geo: company.geography || company.geo || null,
-        website: company.website ?? null,
-        watchlist_status: company.watchlist_status,
-        revenue_2021_usd_mn: company.revenue_2021_usd_mn,
-        revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-        revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-        revenue_2024_usd_mn: company.revenue_2024_usd_mn,
-        ebitda_2021_usd_mn: company.ebitda_2021_usd_mn,
-        ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-        ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-        ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-        ev_2024: company.ev_2024,
-        pipeline_stage: (company.pipeline_stage || 'L0') as DealStage,
-        l1_screening_result: company.l1_screening_result,
-        pic: company.pic || null,
-        remarks: company.remarks || null,
-        created_at: company.created_at,
-        updated_at: company.updated_at,
-        source: company.source || null,
-      })) || [];
+      const formatted: PipelineCompany[] = data?.map((company: any) => {
+        const override = getCompanyOverride(company.id);
+        return {
+          id: company.id,
+          target: company.target || '',
+          segment: company.segment || '',
+          geo: company.geography || company.geo || null,
+          website: company.website ?? null,
+          watchlist_status: company.watchlist_status,
+          revenue_2021_usd_mn: company.revenue_2021_usd_mn,
+          revenue_2022_usd_mn: company.revenue_2022_usd_mn,
+          revenue_2023_usd_mn: override?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn,
+          revenue_2024_usd_mn: override?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn,
+          revenue_2025_usd_mn: override?.revenue_2025_usd_mn ?? null,
+          ebitda_2021_usd_mn: company.ebitda_2021_usd_mn,
+          ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
+          ebitda_2023_usd_mn: override?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn,
+          ebitda_2024_usd_mn: override?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn,
+          ebitda_2025_usd_mn: override?.ebitda_2025_usd_mn ?? null,
+          ev_2024: override?.ev_2024 ?? company.ev_2024,
+          pipeline_stage: (company.pipeline_stage || 'L0') as DealStage,
+          l1_screening_result: company.l1_screening_result,
+          pic: override?.pic ?? company.pic ?? null,
+          remarks: company.remarks || null,
+          created_at: company.created_at,
+          updated_at: company.updated_at,
+          source: company.source || null,
+        };
+      }) || [];
 
       setCompanies(formatted);
     } catch (error: any) {
@@ -840,16 +848,7 @@ export default function Pipeline() {
                                             {formatCurrency(company.revenue_2024_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
-                                            {/* Assuming revenue_2025 is not in types yet based on previous check, check fallback */}
-                                            {/* Type check said pipeline_company has rev 2021-2024.
-                                                If 2025 is missing, I should use 2024 or just placeholder '-'.
-                                                The user asked for Rev 2023, 2024, 2025 columns.
-                                                I'll use placeholder if data missing or assume column exists if not.
-                                                Types.ts showed revenue_2024_usd_mn is max year?
-                                                Wait, types.ts showed revenue_2024_usd_mn. No 2025.
-                                                I will put '-' for 2025.
-                                            */}
-                                            -
+                                            {formatCurrency(company.revenue_2025_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
                                             {formatCurrency(company.ebitda_2023_usd_mn)}
@@ -858,7 +857,7 @@ export default function Pipeline() {
                                             {formatCurrency(company.ebitda_2024_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
-                                            -
+                                            {formatCurrency(company.ebitda_2025_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
                                             {formatCurrency(company.ev_2024)}
