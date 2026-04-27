@@ -79,5 +79,15 @@ describe('UserService', () => {
       expect(favoritesRepo.add).not.toHaveBeenCalled();
       expect(result).toEqual(['a', 'c']);
     });
+
+    it('returns an empty list when no favorites remain', async () => {
+      vi.mocked(favoritesRepo.has).mockResolvedValue(true);
+      vi.mocked(favoritesRepo.listByUser).mockResolvedValue([]);
+
+      const result = await service.toggleFavorite('user-1', 'only');
+
+      expect(favoritesRepo.remove).toHaveBeenCalledWith('user-1', 'only');
+      expect(result).toEqual([]);
+    });
   });
 });
