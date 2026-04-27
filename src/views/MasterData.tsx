@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { deleteCompanyById, getCompanies } from '@/lib/api/pipeline';
+import { getCompanyOverride } from '@/lib/companyOverrides';
 import {
   Database,
   Search,
@@ -181,24 +182,27 @@ export default function MasterData() {
 
       if (data) {
         const formatted = data
-          .map((company: any) => ({
-            id: company.id,
-            name: company.target || 'Unknown',
-            sector: company.segment || '',
-            geo: company.geography || company.geo || null,
-            source: company.watchlist_status === 'Active' ? 'inbound' : 'outbound',
-            revenue_year1: company.revenue_2022_usd_mn,
-            revenue_year2: company.revenue_2023_usd_mn,
-            revenue_year3: company.revenue_2024_usd_mn,
-            ebitda_year1: company.ebitda_2022_usd_mn,
-            ebitda_year2: company.ebitda_2023_usd_mn,
-            ebitda_year3: company.ebitda_2024_usd_mn,
-            valuation: company.ev_2024,
-            pic: null,
-            created_at: company.created_at,
-            current_stage: company.pipeline_stage as DealStage | null,
-            is_active: company.pipeline_stage !== null && company.pipeline_stage !== 'Acquired',
-          }));
+          .map((company: any) => {
+            const override = getCompanyOverride(company.id);
+            return {
+              id: company.id,
+              name: company.target || 'Unknown',
+              sector: company.segment || '',
+              geo: company.geography || company.geo || null,
+              source: company.watchlist_status === 'Active' ? 'inbound' : 'outbound',
+              revenue_year1: company.revenue_2022_usd_mn,
+              revenue_year2: company.revenue_2023_usd_mn,
+              revenue_year3: company.revenue_2024_usd_mn,
+              ebitda_year1: company.ebitda_2022_usd_mn,
+              ebitda_year2: company.ebitda_2023_usd_mn,
+              ebitda_year3: company.ebitda_2024_usd_mn,
+              valuation: company.ev_2024,
+              pic: override?.pic ?? company.pic ?? null,
+              created_at: company.created_at,
+              current_stage: company.pipeline_stage as DealStage | null,
+              is_active: company.pipeline_stage !== null && company.pipeline_stage !== 'Acquired',
+            };
+          });
         setCompanies(formatted);
       }
     } catch (error) {

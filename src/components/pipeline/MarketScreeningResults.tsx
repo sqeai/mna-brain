@@ -17,6 +17,7 @@ import CompanyDetailDialog from './CompanyDetailDialog';
 import { cn } from '@/lib/utils';
 import { DealStage } from '@/lib/types';
 import { bulkUpdateCompanies, deleteCompanyById, getCompanies, getFavoriteCompanies, toggleFavoriteCompany } from '@/lib/api/pipeline';
+import { getCompanyOverride } from '@/lib/companyOverrides';
 import { useAuth } from '@/hooks/useAuth';
 
 interface MarketScreeningResult {
@@ -487,7 +488,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                           <span className="text-muted-foreground">{result.segment || 'Unknown'}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground">{getCompanyOverride(result.id)?.pic ?? '-'}</span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
                           {formatCurrency(result.revenue_2023_usd_mn)}
@@ -496,7 +497,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                           {formatCurrency(result.revenue_2024_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          -
+                          {formatCurrency(getCompanyOverride(result.id)?.revenue_2025_usd_mn ?? null)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
                           {formatCurrency(result.ebitda_2023_usd_mn)}
@@ -505,7 +506,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                           {formatCurrency(result.ebitda_2024_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          -
+                          {formatCurrency(getCompanyOverride(result.id)?.ebitda_2025_usd_mn ?? null)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs font-medium text-foreground">
                           {formatCurrency(result.ev_2024)}
