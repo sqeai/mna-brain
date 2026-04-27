@@ -112,6 +112,7 @@ export function createContainer(db: DbClient): Container {
     aiScreeningService,
     criteriaRepo,
     screeningRepo,
+    companyFinancialRepo,
   );
 
   return {

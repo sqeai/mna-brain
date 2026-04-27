@@ -2,8 +2,7 @@ import { downloadFile, getSignedUrl } from '@/lib/s3';
 import { deleteFile } from '@/lib/s3';
 import { extractTextFromFile } from '@/lib/fileExtractor';
 import { processFileContent } from '@/lib/file_processing_agent';
-import { CompanyFinancialRepository } from '@/lib/repositories';
-import type { DbClient, FileRepository, CriteriaRepository, ScreeningRepository, Tables } from '@/lib/repositories';
+import type { CompanyFinancialRepository, DbClient, FileRepository, CriteriaRepository, ScreeningRepository, Tables } from '@/lib/repositories';
 import type { CompanyAnalysisService } from './companyAnalysisService';
 import type { AIScreeningService } from './aiScreeningService';
 
@@ -15,6 +14,7 @@ export class FileService {
     private readonly aiScreeningService: AIScreeningService,
     private readonly criteriaRepo: CriteriaRepository,
     private readonly screeningRepo: ScreeningRepository,
+    private readonly companyFinancialRepo: CompanyFinancialRepository,
   ) {}
 
   async findAll(fileType?: string) {
@@ -100,8 +100,7 @@ export class FileService {
         const criteriaList = await this.criteriaRepo.findAll();
         if (criteriaList.length === 0) return;
 
-        const financialRepo = new CompanyFinancialRepository(this.db);
-        const financials = await financialRepo.findByCompany(company.id);
+        const financials = await this.companyFinancialRepo.findByCompany(company.id);
         const byYear = new Map(financials.map((r) => [r.fiscal_year, r]));
         const companyData = {
           id: company.id,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FileRepository, CriteriaRepository, ScreeningRepository, DbClient, Tables } from '@/lib/repositories';
+import type { FileRepository, CriteriaRepository, ScreeningRepository, CompanyFinancialRepository, DbClient, Tables } from '@/lib/repositories';
 import type { CompanyAnalysisService } from './companyAnalysisService';
 import type { AIScreeningService } from './aiScreeningService';
 import { FileService } from './fileService';
@@ -100,6 +100,16 @@ function makeScreeningRepoStub(): ScreeningRepository {
   } as unknown as ScreeningRepository;
 }
 
+function makeCompanyFinancialRepoStub(): CompanyFinancialRepository {
+  return {
+    findByCompany: vi.fn().mockResolvedValue([]),
+    findByCompanyAndYear: vi.fn(),
+    findByCompaniesAndYears: vi.fn(),
+    upsert: vi.fn(),
+    bulkUpsertForCompany: vi.fn(),
+  } as unknown as CompanyFinancialRepository;
+}
+
 function makeCompanyAnalysisServiceStub(): CompanyAnalysisService {
   return {
     dispatch: vi.fn(),
@@ -120,6 +130,7 @@ function makeService(overrides: {
   aiScreeningService?: AIScreeningService;
   criteriaRepo?: CriteriaRepository;
   screeningRepo?: ScreeningRepository;
+  companyFinancialRepo?: CompanyFinancialRepository;
 } = {}) {
   return new FileService(
     null as unknown as DbClient,
@@ -128,6 +139,7 @@ function makeService(overrides: {
     overrides.aiScreeningService ?? makeAIScreeningServiceStub(),
     overrides.criteriaRepo ?? makeCriteriaRepoStub(),
     overrides.screeningRepo ?? makeScreeningRepoStub(),
+    overrides.companyFinancialRepo ?? makeCompanyFinancialRepoStub(),
   );
 }
 
@@ -137,6 +149,7 @@ describe('FileService.processUpload', () => {
   let aiScreeningService: AIScreeningService;
   let criteriaRepo: CriteriaRepository;
   let screeningRepo: ScreeningRepository;
+  let companyFinancialRepo: CompanyFinancialRepository;
   let service: FileService;
 
   beforeEach(() => {
@@ -145,6 +158,7 @@ describe('FileService.processUpload', () => {
     aiScreeningService = makeAIScreeningServiceStub();
     criteriaRepo = makeCriteriaRepoStub();
     screeningRepo = makeScreeningRepoStub();
+    companyFinancialRepo = makeCompanyFinancialRepoStub();
     service = new FileService(
       null as unknown as DbClient,
       fileRepo,
@@ -152,6 +166,7 @@ describe('FileService.processUpload', () => {
       aiScreeningService,
       criteriaRepo,
       screeningRepo,
+      companyFinancialRepo,
     );
 
     vi.mocked(downloadFile).mockResolvedValue(Buffer.from('content'));
