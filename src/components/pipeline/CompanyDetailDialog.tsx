@@ -814,7 +814,7 @@ export default function CompanyDetailDialog({
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Enterprise Value (2024)</p>
-                      <p className="font-semibold text-2xl text-primary">{formatCurrency(company.ev_2024)}</p>
+                      <p className="font-semibold text-2xl text-primary">{formatCurrency(getCompanyOverride(company.id)?.ev_2024 ?? company.ev_2024)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">L1 Screening Result</p>
@@ -851,8 +851,8 @@ export default function CompanyDetailDialog({
                     <BarChart
                       data={[
                         { year: '2022', revenue: company.revenue_2022_usd_mn || 0 },
-                        { year: '2023', revenue: company.revenue_2023_usd_mn || 0 },
-                        { year: '2024', revenue: company.revenue_2024_usd_mn || 0 },
+                        { year: '2023', revenue: getCompanyOverride(company.id)?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn ?? 0 },
+                        { year: '2024', revenue: getCompanyOverride(company.id)?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn ?? 0 },
                         ...(getCompanyOverride(company.id)?.revenue_2025_usd_mn !== undefined
                           ? [{ year: '2025', revenue: getCompanyOverride(company.id)!.revenue_2025_usd_mn! }]
                           : []),
@@ -900,8 +900,8 @@ export default function CompanyDetailDialog({
                     <BarChart
                       data={[
                         { year: '2022', ebitda: company.ebitda_2022_usd_mn || 0 },
-                        { year: '2023', ebitda: company.ebitda_2023_usd_mn || 0 },
-                        { year: '2024', ebitda: company.ebitda_2024_usd_mn || 0 },
+                        { year: '2023', ebitda: getCompanyOverride(company.id)?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn ?? 0 },
+                        { year: '2024', ebitda: getCompanyOverride(company.id)?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn ?? 0 },
                         ...(getCompanyOverride(company.id)?.ebitda_2025_usd_mn !== undefined
                           ? [{ year: '2025', ebitda: getCompanyOverride(company.id)!.ebitda_2025_usd_mn! }]
                           : []),

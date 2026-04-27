@@ -86,10 +86,12 @@ interface PipelineCompany {
   revenue_2022_usd_mn: number | null;
   revenue_2023_usd_mn: number | null;
   revenue_2024_usd_mn: number | null;
+  revenue_2025_usd_mn: number | null;
   ebitda_2021_usd_mn: number | null;
   ebitda_2022_usd_mn: number | null;
   ebitda_2023_usd_mn: number | null;
   ebitda_2024_usd_mn: number | null;
+  ebitda_2025_usd_mn: number | null;
   ev_2024: number | null;
   pipeline_stage: DealStage;
   l1_screening_result: string | null;
@@ -246,13 +248,15 @@ export default function Pipeline() {
           watchlist_status: company.watchlist_status,
           revenue_2021_usd_mn: company.revenue_2021_usd_mn,
           revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-          revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-          revenue_2024_usd_mn: company.revenue_2024_usd_mn,
+          revenue_2023_usd_mn: override?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn,
+          revenue_2024_usd_mn: override?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn,
+          revenue_2025_usd_mn: override?.revenue_2025_usd_mn ?? null,
           ebitda_2021_usd_mn: company.ebitda_2021_usd_mn,
           ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-          ev_2024: company.ev_2024,
+          ebitda_2023_usd_mn: override?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn,
+          ebitda_2024_usd_mn: override?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn,
+          ebitda_2025_usd_mn: override?.ebitda_2025_usd_mn ?? null,
+          ev_2024: override?.ev_2024 ?? company.ev_2024,
           pipeline_stage: (company.pipeline_stage || 'L0') as DealStage,
           l1_screening_result: company.l1_screening_result,
           pic: override?.pic ?? company.pic ?? null,
@@ -844,7 +848,7 @@ export default function Pipeline() {
                                             {formatCurrency(company.revenue_2024_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
-                                            {formatCurrency(getCompanyOverride(company.id)?.revenue_2025_usd_mn ?? null)}
+                                            {formatCurrency(company.revenue_2025_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
                                             {formatCurrency(company.ebitda_2023_usd_mn)}
@@ -853,7 +857,7 @@ export default function Pipeline() {
                                             {formatCurrency(company.ebitda_2024_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
-                                            {formatCurrency(getCompanyOverride(company.id)?.ebitda_2025_usd_mn ?? null)}
+                                            {formatCurrency(company.ebitda_2025_usd_mn)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
                                             {formatCurrency(company.ev_2024)}

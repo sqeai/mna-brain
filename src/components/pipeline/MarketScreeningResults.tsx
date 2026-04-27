@@ -441,6 +441,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                 <TableBody>
                   {paginatedResults.map((result) => {
                     const isFav = favoriteIds.has(result.id);
+                    const override = getCompanyOverride(result.id);
                     return (
                       <TableRow
                         key={result.id}
@@ -488,28 +489,28 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                           <span className="text-muted-foreground">{result.segment || 'Unknown'}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-muted-foreground">{getCompanyOverride(result.id)?.pic ?? '-'}</span>
+                          <span className="text-muted-foreground">{override?.pic ?? '-'}</span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(result.revenue_2023_usd_mn)}
+                          {formatCurrency(override?.revenue_2023_usd_mn ?? result.revenue_2023_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(result.revenue_2024_usd_mn)}
+                          {formatCurrency(override?.revenue_2024_usd_mn ?? result.revenue_2024_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(getCompanyOverride(result.id)?.revenue_2025_usd_mn ?? null)}
+                          {formatCurrency(override?.revenue_2025_usd_mn ?? null)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(result.ebitda_2023_usd_mn)}
+                          {formatCurrency(override?.ebitda_2023_usd_mn ?? result.ebitda_2023_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(result.ebitda_2024_usd_mn)}
+                          {formatCurrency(override?.ebitda_2024_usd_mn ?? result.ebitda_2024_usd_mn)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
-                          {formatCurrency(getCompanyOverride(result.id)?.ebitda_2025_usd_mn ?? null)}
+                          {formatCurrency(override?.ebitda_2025_usd_mn ?? null)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                          {formatCurrency(result.ev_2024)}
+                          {formatCurrency(override?.ev_2024 ?? result.ev_2024)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
