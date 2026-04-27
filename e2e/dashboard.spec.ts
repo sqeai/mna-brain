@@ -138,7 +138,7 @@ test.describe('Dashboard page', () => {
     await mockCompanies(page, MOCK_COMPANIES);
     await page.goto('/dashboard');
 
-    const l2Link = page.getByRole('link').filter({ hasText: /^\d+.*L2/s }).first();
+    const l2Link = page.getByRole('link').filter({ hasText: /^\d+[\s\S]*L2/ }).first();
     const href = await l2Link.getAttribute('href');
     expect(href).toBe('/pipeline?stage=L2');
   });
