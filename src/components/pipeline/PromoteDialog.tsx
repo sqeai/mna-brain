@@ -194,82 +194,100 @@ export default function PromoteDialog({
             {mode === 'demote' ? `Demote to ${nextStage}` : `Promote to ${nextStage}`}
           </DialogTitle>
           <DialogDescription>
-            Add supporting information before {mode === 'demote' ? 'demoting' : 'promoting'} <span className="font-medium">{companyName}</span> from {currentStage} to {nextStage}.
+            {mode === 'demote' ? (
+              <>Move <span className="font-medium">{companyName}</span> back from {currentStage} to {nextStage}.</>
+            ) : (
+              <>Add supporting information before promoting <span className="font-medium">{companyName}</span> from {currentStage} to {nextStage}.</>
+            )}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="note" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="note" className="gap-1">
-              <FileText className="h-3 w-3" />
-              Note
-            </TabsTrigger>
-            <TabsTrigger value="link" className="gap-1">
-              <LinkIcon className="h-3 w-3" />
-              Link
-            </TabsTrigger>
-            <TabsTrigger value="document" className="gap-1">
-              <Upload className="h-3 w-3" />
-              Document
-            </TabsTrigger>
-          </TabsList>
+        {mode === 'demote' ? (
+          <div className="mt-2">
+            <Label htmlFor="reason">Reason (optional)</Label>
+            <Textarea
+              id="reason"
+              placeholder="Enter reason for demotion..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={4}
+              className="mt-1.5"
+            />
+          </div>
+        ) : (
+          <Tabs defaultValue="note" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="note" className="gap-1">
+                <FileText className="h-3 w-3" />
+                Note
+              </TabsTrigger>
+              <TabsTrigger value="link" className="gap-1">
+                <LinkIcon className="h-3 w-3" />
+                Link
+              </TabsTrigger>
+              <TabsTrigger value="document" className="gap-1">
+                <Upload className="h-3 w-3" />
+                Document
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="note" className="mt-4 space-y-3">
-            <div>
-              <Label htmlFor="note">Add a note (optional)</Label>
-              <Textarea
-                id="note"
-                placeholder={mode === 'demote' ? "Enter reason for demotion..." : "Enter notes about this promotion..."}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={4}
-                className="mt-1.5"
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="link" className="mt-4 space-y-3">
-            <div>
-              <Label htmlFor="linkUrl">URL</Label>
-              <Input
-                id="linkUrl"
-                placeholder="https://..."
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="linkTitle">Title (optional)</Label>
-              <Input
-                id="linkTitle"
-                placeholder="Link description..."
-                value={linkTitle}
-                onChange={(e) => setLinkTitle(e.target.value)}
-                className="mt-1.5"
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="document" className="mt-4 space-y-3">
-            <div>
-              <Label htmlFor="document">Upload Document</Label>
-              <div className="mt-1.5">
-                <Input
-                  id="document"
-                  type="file"
-                  onChange={handleFileChange}
-                  className="cursor-pointer"
+            <TabsContent value="note" className="mt-4 space-y-3">
+              <div>
+                <Label htmlFor="note">Add a note (optional)</Label>
+                <Textarea
+                  id="note"
+                  placeholder="Enter notes about this promotion..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={4}
+                  className="mt-1.5"
                 />
               </div>
-              {selectedFile && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Selected: {selectedFile.name}
-                </p>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+
+            <TabsContent value="link" className="mt-4 space-y-3">
+              <div>
+                <Label htmlFor="linkUrl">URL</Label>
+                <Input
+                  id="linkUrl"
+                  placeholder="https://..."
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="linkTitle">Title (optional)</Label>
+                <Input
+                  id="linkTitle"
+                  placeholder="Link description..."
+                  value={linkTitle}
+                  onChange={(e) => setLinkTitle(e.target.value)}
+                  className="mt-1.5"
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="document" className="mt-4 space-y-3">
+              <div>
+                <Label htmlFor="document">Upload Document</Label>
+                <div className="mt-1.5">
+                  <Input
+                    id="document"
+                    type="file"
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
+                  />
+                </div>
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Selected: {selectedFile.name}
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
 
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>

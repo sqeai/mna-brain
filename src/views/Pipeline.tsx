@@ -45,13 +45,33 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
+  ArrowLeft,
   ChevronDown,
   ChevronUp,
   Lightbulb,
   Eye,
   EyeOff,
   Star,
+  Trash2,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { SEARCH_SUGGESTION_CHIPS } from '@/lib/constants';
 import PromoteDialog from '@/components/pipeline/PromoteDialog';
 import { DealStage, L1Status } from '@/lib/types';
@@ -223,6 +243,9 @@ export default function Pipeline() {
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotingCompany, setPromotingCompany] = useState<PipelineCompany | null>(null);
   const [dialogMode, setDialogMode] = useState<'promote' | 'demote'>('promote');
+
+  // Drop deal dialog state
+  const [dropDealCompany, setDropDealCompany] = useState<PipelineCompany | null>(null);
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -892,19 +915,34 @@ export default function Pipeline() {
                                             </Badge>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => {
-                                                setDialogMode('promote');
-                                                setPromotingCompany(company);
-                                                setPromoteDialogOpen(true);
-                                              }}
-                                              className="h-7 gap-1"
-                                            >
-                                              Promote
-                                              <ChevronRight className="h-3 w-3" />
-                                            </Button>
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" size="sm" className="h-7 gap-1">
+                                                  Actions
+                                                  <ChevronDown className="h-3 w-3" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                  onClick={() => {
+                                                    setDialogMode('promote');
+                                                    setPromotingCompany(company);
+                                                    setPromoteDialogOpen(true);
+                                                  }}
+                                                >
+                                                  <ArrowRight className="mr-2 h-4 w-4" />
+                                                  Promote to L1
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                  onClick={() => setDropDealCompany(company)}
+                                                  className="text-destructive focus:text-destructive"
+                                                >
+                                                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                                  Drop deal
+                                                </DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
                                           </TableCell>
                                         </TableRow>
                                         );
@@ -1177,34 +1215,48 @@ export default function Pipeline() {
                                         {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        <div className="flex flex-col items-end gap-0.5">
-                                          {stage !== 'L5' && (
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => {
-                                                setDialogMode('promote');
-                                                setPromotingCompany(company);
-                                                setPromoteDialogOpen(true);
-                                              }}
-                                            >
-                                              Promote
-                                              <ChevronRight className="ml-1 h-4 w-4" />
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-7 gap-1">
+                                              Actions
+                                              <ChevronDown className="h-3 w-3" />
                                             </Button>
-                                          )}
-                                          {STAGES.indexOf(stage) > 0 && (
-                                            <button
-                                              onClick={() => {
-                                                setDialogMode('demote');
-                                                setPromotingCompany(company);
-                                                setPromoteDialogOpen(true);
-                                              }}
-                                              className="text-[11px] text-muted-foreground hover:text-destructive hover:underline transition-colors"
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            {stage !== 'L5' && (
+                                              <DropdownMenuItem
+                                                onClick={() => {
+                                                  setDialogMode('promote');
+                                                  setPromotingCompany(company);
+                                                  setPromoteDialogOpen(true);
+                                                }}
+                                              >
+                                                <ArrowRight className="mr-2 h-4 w-4" />
+                                                Promote to {STAGES[STAGES.indexOf(stage) + 1]}
+                                              </DropdownMenuItem>
+                                            )}
+                                            {STAGES.indexOf(stage) > 0 && (
+                                              <DropdownMenuItem
+                                                onClick={() => {
+                                                  setDialogMode('demote');
+                                                  setPromotingCompany(company);
+                                                  setPromoteDialogOpen(true);
+                                                }}
+                                              >
+                                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                                Demote to {STAGES[STAGES.indexOf(stage) - 1]}
+                                              </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                              onClick={() => setDropDealCompany(company)}
+                                              className="text-destructive focus:text-destructive"
                                             >
-                                              Demote
-                                            </button>
-                                          )}
-                                        </div>
+                                              <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                              Drop deal
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       </TableCell>
                                     </TableRow>
                                     );
@@ -1293,6 +1345,30 @@ export default function Pipeline() {
             />
           )
         }
+
+        <AlertDialog open={!!dropDealCompany} onOpenChange={(open) => !open && setDropDealCompany(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Drop deal?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to drop <span className="font-medium">{dropDealCompany?.target}</span>?
+                This will remove the deal from the pipeline.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  toast.info('Drop deal action is not yet wired to the backend');
+                  setDropDealCompany(null);
+                }}
+              >
+                Drop deal
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div >
     </DashboardLayout >
   );
