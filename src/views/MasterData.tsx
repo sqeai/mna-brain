@@ -56,6 +56,7 @@ interface CompanyWithDeal {
   id: string;
   name: string;
   sector: string;
+  geo: string | null;
   source: string;
   revenue_year1: number | null;
   revenue_year2: number | null;
@@ -184,6 +185,7 @@ export default function MasterData() {
             id: company.id,
             name: company.target || 'Unknown',
             sector: company.segment || '',
+            geo: company.geography || company.geo || null,
             source: company.watchlist_status === 'Active' ? 'inbound' : 'outbound',
             revenue_year1: company.revenue_2022_usd_mn,
             revenue_year2: company.revenue_2023_usd_mn,
@@ -431,6 +433,7 @@ export default function MasterData() {
                       <TableHead>Company</TableHead>
                       <TableHead>Sector</TableHead>
                       <TableHead>Source</TableHead>
+                      <TableHead>Geo</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>PIC</TableHead>
                       <TableHead className="text-right">Rev Y1</TableHead>
@@ -469,6 +472,11 @@ export default function MasterData() {
                             <Badge variant="secondary" className="capitalize">
                               {company.source}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {company.geo || '-'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             {displayStage ? (
