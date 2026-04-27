@@ -1,6 +1,6 @@
 import { getAgentGraph, HumanMessage } from '@/lib/agent';
 import { companiesSchema } from '@/lib/agent/tools';
-import { CompanyRepository, InvestmentThesisRepository } from '@/lib/repositories';
+import { CompanyFinancialRepository, CompanyRepository, InvestmentThesisRepository } from '@/lib/repositories';
 import type { DbClient } from '@/lib/repositories';
 import { getPostHogClient } from '@/lib/posthog-server';
 
@@ -80,6 +80,7 @@ export async function runMarketScreening(
   }
 
   const companyRepo = new CompanyRepository(deps.db);
+  const financialRepo = new CompanyFinancialRepository(deps.db);
   const thesisRepo = new InvestmentThesisRepository(deps.db);
 
   const existingNames = (await companyRepo.findTargetNames()).join(', ');
@@ -181,37 +182,39 @@ Find ${sourcesCount} companies. Return ONLY the JSON object, no other text. Use 
     };
   }
 
-  await companyRepo.insertMany(
-    filteredCompanies.map((company) => ({
-      pipeline_stage: 'market_screening',
-      target: company.target || company.company_name,
-      thesis_content: thesis,
-      segment: company.segment || company.sector,
-      segment_related_offerings: company.segment_related_offerings,
-      company_focus: company.company_focus,
-      website: company.website,
-      ownership: company.ownership,
-      geography: company.geography,
-      revenue_2021_usd_mn: company.revenue_2021_usd_mn,
-      revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-      revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-      revenue_2024_usd_mn: company.revenue_2024_usd_mn,
-      ebitda_2021_usd_mn: company.ebitda_2021_usd_mn,
-      ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-      ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-      ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-      ev_2024: company.ev_2024,
-      ev_ebitda_2024: company.ev_ebitda_2024,
-      revenue_cagr_2021_2022: company.revenue_cagr_2021_2022,
-      revenue_cagr_2022_2023: company.revenue_cagr_2022_2023,
-      revenue_cagr_2023_2024: company.revenue_cagr_2023_2024,
-      ebitda_margin_2021: company.ebitda_margin_2021,
-      ebitda_margin_2022: company.ebitda_margin_2022,
-      ebitda_margin_2023: company.ebitda_margin_2023,
-      ebitda_margin_2024: company.ebitda_margin_2024,
-      remarks: company.remarks || null,
-      source: 'outbound',
-    })),
+  const insertedCompanies = await Promise.all(
+    filteredCompanies.map((company) =>
+      companyRepo.insert({
+        pipeline_stage: 'market_screening',
+        target: company.target || company.company_name,
+        thesis_content: thesis,
+        segment: company.segment || company.sector,
+        segment_related_offerings: company.segment_related_offerings,
+        company_focus: company.company_focus,
+        website: company.website,
+        ownership: company.ownership,
+        geography: company.geography,
+        remarks: company.remarks || null,
+        source: 'outbound',
+      }),
+    ),
+  );
+
+  await Promise.all(
+    insertedCompanies.map((inserted, i) => {
+      const c = filteredCompanies[i];
+      const financialRows = [
+        { fiscal_year: 2021, revenue_usd_mn: c.revenue_2021_usd_mn ?? null, ebitda_usd_mn: c.ebitda_2021_usd_mn ?? null, ev_usd_mn: null as number | null, ebitda_margin: c.ebitda_margin_2021 ?? null, ev_ebitda: null as number | null, revenue_cagr_vs_prior: null as number | null },
+        { fiscal_year: 2022, revenue_usd_mn: c.revenue_2022_usd_mn ?? null, ebitda_usd_mn: c.ebitda_2022_usd_mn ?? null, ev_usd_mn: null as number | null, ebitda_margin: c.ebitda_margin_2022 ?? null, ev_ebitda: null as number | null, revenue_cagr_vs_prior: c.revenue_cagr_2021_2022 ?? null },
+        { fiscal_year: 2023, revenue_usd_mn: c.revenue_2023_usd_mn ?? null, ebitda_usd_mn: c.ebitda_2023_usd_mn ?? null, ev_usd_mn: null as number | null, ebitda_margin: c.ebitda_margin_2023 ?? null, ev_ebitda: null as number | null, revenue_cagr_vs_prior: c.revenue_cagr_2022_2023 ?? null },
+        { fiscal_year: 2024, revenue_usd_mn: c.revenue_2024_usd_mn ?? null, ebitda_usd_mn: c.ebitda_2024_usd_mn ?? null, ev_usd_mn: c.ev_2024 ?? null, ebitda_margin: c.ebitda_margin_2024 ?? null, ev_ebitda: c.ev_ebitda_2024 ?? null, revenue_cagr_vs_prior: c.revenue_cagr_2023_2024 ?? null },
+      ].filter((r) =>
+        r.revenue_usd_mn !== null || r.ebitda_usd_mn !== null || r.ev_usd_mn !== null ||
+        r.ebitda_margin !== null || r.ev_ebitda !== null || r.revenue_cagr_vs_prior !== null,
+      );
+      if (financialRows.length === 0) return Promise.resolve();
+      return financialRepo.bulkUpsertForCompany(inserted.id, financialRows);
+    }),
   );
 
   if (thesisId) {

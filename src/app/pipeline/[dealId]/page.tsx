@@ -59,6 +59,7 @@ import {
   getCompanyDetails,
   getScreenings,
 } from '@/lib/api/pipeline';
+import { getCompanyOverride } from '@/lib/companyOverrides';
 
 const websiteHref = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `https://${url}`;
@@ -339,8 +340,8 @@ export default function CompanyDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
-        // If still generating, poll until complete
-        if (data.status === 'generating') {
+        // If still processing, poll until complete
+        if (data.status === 'processing') {
           setAnalysisGenerating(true);
           pollAnalysis();
         }
@@ -358,7 +359,7 @@ export default function CompanyDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setAnalysis(data);
-          if (data.status !== 'generating') {
+          if (data.status !== 'processing') {
             setAnalysisGenerating(false);
             clearInterval(interval);
           }
@@ -840,8 +841,14 @@ export default function CompanyDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">EV (2024)</p>
-                    <p className="font-semibold text-primary">{formatCurrency(company.ev_2024)}</p>
+                    <p className="font-semibold text-primary">{formatCurrency(getCompanyOverride(company.id)?.ev_2024 ?? company.ev_2024)}</p>
                   </div>
+                  {getCompanyOverride(company.id)?.pic && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">PIC</p>
+                      <p className="font-medium">{getCompanyOverride(company.id)?.pic}</p>
+                    </div>
+                  )}
                 </div>
                 {/* Comments Section */}
                 {company.comments && (
@@ -857,16 +864,18 @@ export default function CompanyDetailPage() {
 
             {/* Financial Charts */}
             <FinancialCharts
-              revenue_year1={company.revenue_2022_usd_mn ? company.revenue_2022_usd_mn : null}
-              revenue_year2={company.revenue_2023_usd_mn ? company.revenue_2023_usd_mn : null}
-              revenue_year3={company.revenue_2024_usd_mn ? company.revenue_2024_usd_mn : null}
-              ebitda_year1={company.ebitda_2022_usd_mn ? company.ebitda_2022_usd_mn : null}
-              ebitda_year2={company.ebitda_2023_usd_mn ? company.ebitda_2023_usd_mn : null}
-              ebitda_year3={company.ebitda_2024_usd_mn ? company.ebitda_2024_usd_mn : null}
+              revenue_year1={company.revenue_2022_usd_mn ?? null}
+              revenue_year2={getCompanyOverride(company.id)?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn ?? null}
+              revenue_year3={getCompanyOverride(company.id)?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn ?? null}
+              revenue_year4={getCompanyOverride(company.id)?.revenue_2025_usd_mn ?? null}
+              ebitda_year1={company.ebitda_2022_usd_mn ?? null}
+              ebitda_year2={getCompanyOverride(company.id)?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn ?? null}
+              ebitda_year3={getCompanyOverride(company.id)?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn ?? null}
+              ebitda_year4={getCompanyOverride(company.id)?.ebitda_2025_usd_mn ?? null}
             />
 
             {/* AI Company Card Section */}
-            {analysisGenerating && !analysis?.business_overview ? (
+            {analysisGenerating ? (
               <AICompanyCardLoading />
             ) : analysis?.status === 'failed' ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">

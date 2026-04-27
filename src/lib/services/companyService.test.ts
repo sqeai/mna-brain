@@ -1,56 +1,244 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CompanyRepository,
   CompanyLogRepository,
   DealDocumentRepository,
   DealNoteRepository,
   DealLinkRepository,
+  CompanyFinancialRepository,
+  CompanyFxAdjustmentRepository,
+  CompanyScreeningDerivedRepository,
+  Tables,
 } from '@/lib/repositories';
 import { CompanyService } from './companyService';
 
-function makeRepoStubs() {
+vi.mock('@/lib/s3', () => ({ deleteFile: vi.fn() }));
+
+import { deleteFile } from '@/lib/s3';
+
+afterEach(() => vi.clearAllMocks());
+
+type Company = Tables<'companies'>;
+
+function makeCompany(overrides: Partial<Company> = {}): Company {
+  return {
+    id: 'company-1',
+    target: 'Acme Corp',
+    pipeline_stage: 'L0',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  } as Company;
+}
+
+function makeRepos() {
   const companyRepo = {
+    findById: vi.fn(),
+    findAll: vi.fn(),
+    count: vi.fn(),
+    findDetails: vi.fn(),
+    insert: vi.fn(),
     update: vi.fn().mockResolvedValue([]),
+    updateMany: vi.fn(),
+    delete: vi.fn(),
+    runL1Filters: vi.fn(),
     setAssignees: vi.fn().mockResolvedValue(undefined),
     findAssignees: vi.fn().mockResolvedValue([]),
   } as unknown as CompanyRepository;
-  const companyLogRepo = { insert: vi.fn().mockResolvedValue(undefined) } as unknown as CompanyLogRepository;
-  const dealDocRepo = {} as DealDocumentRepository;
+
+  const companyLogRepo = {
+    insert: vi.fn().mockResolvedValue(undefined),
+    insertMany: vi.fn(),
+  } as unknown as CompanyLogRepository;
+
+  const dealDocRepo = {
+    findFilePathsByDealId: vi.fn(),
+    delete: vi.fn(),
+  } as unknown as DealDocumentRepository;
+
   const dealNoteRepo = { insert: vi.fn().mockResolvedValue({}) } as unknown as DealNoteRepository;
   const dealLinkRepo = { insert: vi.fn().mockResolvedValue({}) } as unknown as DealLinkRepository;
-  return { companyRepo, companyLogRepo, dealDocRepo, dealNoteRepo, dealLinkRepo };
+  const companyFinancialRepo = {} as unknown as CompanyFinancialRepository;
+  const companyFxAdjustmentRepo = {} as unknown as CompanyFxAdjustmentRepository;
+  const companyScreeningDerivedRepo = {} as unknown as CompanyScreeningDerivedRepository;
+
+  return {
+    companyRepo,
+    companyLogRepo,
+    dealDocRepo,
+    dealNoteRepo,
+    dealLinkRepo,
+    companyFinancialRepo,
+    companyFxAdjustmentRepo,
+    companyScreeningDerivedRepo,
+  };
 }
 
-describe('CompanyService.dropDeal', () => {
-  let stubs: ReturnType<typeof makeRepoStubs>;
+function buildService(repos: ReturnType<typeof makeRepos>) {
+  return new CompanyService(
+    repos.companyRepo,
+    repos.companyLogRepo,
+    repos.dealDocRepo,
+    repos.dealNoteRepo,
+    repos.dealLinkRepo,
+    repos.companyFinancialRepo,
+    repos.companyFxAdjustmentRepo,
+    repos.companyScreeningDerivedRepo,
+  );
+}
+
+describe('CompanyService.create', () => {
+  it('inserts a log when logAction is provided', async () => {
+    const repos = makeRepos();
+    const company = makeCompany();
+    vi.mocked(repos.companyRepo.insert).mockResolvedValue(company);
+    const service = buildService(repos);
+
+    await service.create({ target: 'Acme' } as any, 'CREATED');
+
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: company.id, action: 'CREATED' }),
+    );
+  });
+
+  it('does not insert a log when logAction is omitted', async () => {
+    const repos = makeRepos();
+    vi.mocked(repos.companyRepo.insert).mockResolvedValue(makeCompany());
+    const service = buildService(repos);
+
+    await service.create({ target: 'Acme' } as any);
+
+    expect(repos.companyLogRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('CompanyService.delete', () => {
+  it('deletes each S3 file before removing the DB record', async () => {
+    const repos = makeRepos();
+    vi.mocked(repos.dealDocRepo.findFilePathsByDealId).mockResolvedValue(['a/file.pdf', 'b/file.pdf']);
+    const service = buildService(repos);
+
+    await service.delete('company-1');
+
+    expect(deleteFile).toHaveBeenCalledTimes(2);
+    expect(deleteFile).toHaveBeenCalledWith('a/file.pdf');
+    expect(deleteFile).toHaveBeenCalledWith('b/file.pdf');
+    expect(repos.companyRepo.delete).toHaveBeenCalledWith('company-1');
+  });
+
+  it('skips S3 deletion when there are no documents', async () => {
+    const repos = makeRepos();
+    vi.mocked(repos.dealDocRepo.findFilePathsByDealId).mockResolvedValue([]);
+    const service = buildService(repos);
+
+    await service.delete('company-1');
+
+    expect(deleteFile).not.toHaveBeenCalled();
+    expect(repos.companyRepo.delete).toHaveBeenCalledWith('company-1');
+  });
+});
+
+describe('CompanyService.promote', () => {
+  let repos: ReturnType<typeof makeRepos>;
   let service: CompanyService;
 
   beforeEach(() => {
-    stubs = makeRepoStubs();
-    service = new CompanyService(
-      stubs.companyRepo,
-      stubs.companyLogRepo,
-      stubs.dealDocRepo,
-      stubs.dealNoteRepo,
-      stubs.dealLinkRepo,
+    repos = makeRepos();
+    service = buildService(repos);
+    vi.mocked(repos.companyRepo.update).mockResolvedValue([makeCompany()]);
+  });
+
+  it('uses PROMOTED_FROM_X_TO_Y format when currentStage is provided', async () => {
+    await service.promote('company-1', 'L1', 'L2');
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'PROMOTED_FROM_L1_TO_L2' }),
     );
+  });
+
+  it('uses PROMOTED_TO_X format when currentStage is absent', async () => {
+    await service.promote('company-1', undefined, 'L1');
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'PROMOTED_TO_L1' }),
+    );
+  });
+
+  it('inserts a note when note is provided', async () => {
+    await service.promote('company-1', 'L1', 'L2', 'Some note');
+    expect(repos.dealNoteRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'Some note', deal_id: 'company-1' }),
+    );
+  });
+
+  it('does not insert a note when note is blank', async () => {
+    await service.promote('company-1', 'L1', 'L2', '  ');
+    expect(repos.dealNoteRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('inserts a link when linkUrl is provided', async () => {
+    await service.promote('company-1', 'L1', 'L2', undefined, 'https://example.com', 'Report');
+    expect(repos.dealLinkRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://example.com', title: 'Report', deal_id: 'company-1' }),
+    );
+  });
+
+  it('does not insert a link when linkUrl is blank', async () => {
+    await service.promote('company-1', 'L1', 'L2', undefined, '  ');
+    expect(repos.dealLinkRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('CompanyService.promote (assignees)', () => {
+  let repos: ReturnType<typeof makeRepos>;
+  let service: CompanyService;
+
+  beforeEach(() => {
+    repos = makeRepos();
+    service = buildService(repos);
+  });
+
+  it('replaces assignees when an array is supplied', async () => {
+    await service.promote('company-1', 'L1', 'L2', undefined, undefined, undefined, ['user-a', 'user-b']);
+
+    expect(repos.companyRepo.setAssignees).toHaveBeenCalledWith('company-1', ['user-a', 'user-b']);
+  });
+
+  it('clears assignees when an empty array is supplied', async () => {
+    await service.promote('company-2', 'L1', 'L2', undefined, undefined, undefined, []);
+
+    expect(repos.companyRepo.setAssignees).toHaveBeenCalledWith('company-2', []);
+  });
+
+  it('leaves assignees untouched when not supplied', async () => {
+    await service.promote('company-3', 'L1', 'L2');
+
+    expect(repos.companyRepo.setAssignees).not.toHaveBeenCalled();
+  });
+});
+
+describe('CompanyService.dropDeal', () => {
+  let repos: ReturnType<typeof makeRepos>;
+  let service: CompanyService;
+
+  beforeEach(() => {
+    repos = makeRepos();
+    service = buildService(repos);
   });
 
   it('marks the company as dropped and writes a stage-aware log entry', async () => {
     await service.dropDeal('company-1', 'L2');
 
-    expect(stubs.companyRepo.update).toHaveBeenCalledWith('company-1', { status: 'dropped' });
-    expect(stubs.companyLogRepo.insert).toHaveBeenCalledWith({
+    expect(repos.companyRepo.update).toHaveBeenCalledWith('company-1', { status: 'dropped' });
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith({
       company_id: 'company-1',
       action: 'DROPPED_FROM_L2',
     });
-    expect(stubs.dealNoteRepo.insert).not.toHaveBeenCalled();
+    expect(repos.dealNoteRepo.insert).not.toHaveBeenCalled();
   });
 
   it('falls back to a stageless log action when current stage is missing', async () => {
     await service.dropDeal('company-2', undefined);
 
-    expect(stubs.companyLogRepo.insert).toHaveBeenCalledWith({
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith({
       company_id: 'company-2',
       action: 'DROPPED',
     });
@@ -59,7 +247,7 @@ describe('CompanyService.dropDeal', () => {
   it('persists a deal note when a non-blank reason is provided', async () => {
     await service.dropDeal('company-3', 'L1', '  competitor acquired them  ');
 
-    expect(stubs.dealNoteRepo.insert).toHaveBeenCalledWith({
+    expect(repos.dealNoteRepo.insert).toHaveBeenCalledWith({
       deal_id: 'company-3',
       content: '  competitor acquired them  ',
       stage: 'L1',
@@ -69,13 +257,13 @@ describe('CompanyService.dropDeal', () => {
   it('skips the deal note when the reason is blank or whitespace', async () => {
     await service.dropDeal('company-4', 'L0', '   ');
 
-    expect(stubs.dealNoteRepo.insert).not.toHaveBeenCalled();
+    expect(repos.dealNoteRepo.insert).not.toHaveBeenCalled();
   });
 
   it('defaults the note stage to L0 when current stage is missing', async () => {
     await service.dropDeal('company-5', undefined, 'no fit');
 
-    expect(stubs.dealNoteRepo.insert).toHaveBeenCalledWith({
+    expect(repos.dealNoteRepo.insert).toHaveBeenCalledWith({
       deal_id: 'company-5',
       content: 'no fit',
       stage: 'L0',
@@ -84,71 +272,31 @@ describe('CompanyService.dropDeal', () => {
 });
 
 describe('CompanyService.restoreDeal', () => {
-  let stubs: ReturnType<typeof makeRepoStubs>;
+  let repos: ReturnType<typeof makeRepos>;
   let service: CompanyService;
 
   beforeEach(() => {
-    stubs = makeRepoStubs();
-    service = new CompanyService(
-      stubs.companyRepo,
-      stubs.companyLogRepo,
-      stubs.dealDocRepo,
-      stubs.dealNoteRepo,
-      stubs.dealLinkRepo,
-    );
+    repos = makeRepos();
+    service = buildService(repos);
   });
 
   it('clears the dropped status and writes a stage-aware log entry', async () => {
     await service.restoreDeal('company-1', 'L3');
 
-    expect(stubs.companyRepo.update).toHaveBeenCalledWith('company-1', { status: null });
-    expect(stubs.companyLogRepo.insert).toHaveBeenCalledWith({
+    expect(repos.companyRepo.update).toHaveBeenCalledWith('company-1', { status: null });
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith({
       company_id: 'company-1',
       action: 'RESTORED_TO_L3',
     });
-    expect(stubs.dealNoteRepo.insert).not.toHaveBeenCalled();
+    expect(repos.dealNoteRepo.insert).not.toHaveBeenCalled();
   });
 
   it('falls back to a stageless log action when current stage is missing', async () => {
     await service.restoreDeal('company-2', undefined);
 
-    expect(stubs.companyLogRepo.insert).toHaveBeenCalledWith({
+    expect(repos.companyLogRepo.insert).toHaveBeenCalledWith({
       company_id: 'company-2',
       action: 'RESTORED',
     });
-  });
-});
-
-describe('CompanyService.promote (assignees)', () => {
-  let stubs: ReturnType<typeof makeRepoStubs>;
-  let service: CompanyService;
-
-  beforeEach(() => {
-    stubs = makeRepoStubs();
-    service = new CompanyService(
-      stubs.companyRepo,
-      stubs.companyLogRepo,
-      stubs.dealDocRepo,
-      stubs.dealNoteRepo,
-      stubs.dealLinkRepo,
-    );
-  });
-
-  it('replaces assignees when an array is supplied', async () => {
-    await service.promote('company-1', 'L1', 'L2', undefined, undefined, undefined, ['user-a', 'user-b']);
-
-    expect(stubs.companyRepo.setAssignees).toHaveBeenCalledWith('company-1', ['user-a', 'user-b']);
-  });
-
-  it('clears assignees when an empty array is supplied', async () => {
-    await service.promote('company-2', 'L1', 'L2', undefined, undefined, undefined, []);
-
-    expect(stubs.companyRepo.setAssignees).toHaveBeenCalledWith('company-2', []);
-  });
-
-  it('leaves assignees untouched when not supplied', async () => {
-    await service.promote('company-3', 'L1', 'L2');
-
-    expect(stubs.companyRepo.setAssignees).not.toHaveBeenCalled();
   });
 });

@@ -1,23 +1,23 @@
-import type { UserRepository } from '@/lib/repositories';
+import type { UserCompanyFavoriteRepository } from '@/lib/repositories';
 
 export class UserService {
-  constructor(private readonly userRepo: UserRepository) {}
+  constructor(private readonly favoritesRepo: UserCompanyFavoriteRepository) {}
 
   list() {
     return this.userRepo.findAll();
   }
 
   findFavorites(userId: string) {
-    return this.userRepo.findFavoriteCompanies(userId);
+    return this.favoritesRepo.listByUser(userId);
   }
 
   async toggleFavorite(userId: string, companyId: string) {
-    const current = await this.userRepo.findFavoriteCompanies(userId);
-    const isFavorited = current.includes(companyId);
-    const updated = isFavorited
-      ? current.filter((c) => c !== companyId)
-      : [...current, companyId];
-    await this.userRepo.update(userId, { favorite_companies: updated });
-    return updated;
+    const isFavorited = await this.favoritesRepo.has(userId, companyId);
+    if (isFavorited) {
+      await this.favoritesRepo.remove(userId, companyId);
+    } else {
+      await this.favoritesRepo.add(userId, companyId);
+    }
+    return this.favoritesRepo.listByUser(userId);
   }
 }

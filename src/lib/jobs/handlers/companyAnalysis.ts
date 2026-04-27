@@ -1,6 +1,11 @@
 import { getAgentGraph, HumanMessage } from '@/lib/agent';
 import { getToolDescriptions } from '@/lib/agent/tools';
-import { CompanyAnalysisRepository, CompanyRepository } from '@/lib/repositories';
+import {
+  CompanyAnalysisRepository,
+  CompanyFinancialRepository,
+  CompanyRepository,
+  CompanyScreeningDerivedRepository,
+} from '@/lib/repositories';
 import type { DbClient, Tables } from '@/lib/repositories';
 import { z } from 'zod';
 
@@ -112,7 +117,11 @@ Respond ONLY with a JSON object. Each section value should be a markdown string 
 
 Include ONLY the sources you actually used in \`sources_used\`. Respond with the JSON object only, no additional text.`;
 
-function buildCompanyContext(company: Tables<'companies'>): string {
+function buildCompanyContext(
+  company: Tables<'companies'>,
+  financials: Tables<'company_financials'>[],
+  screening: Tables<'company_screening_derived'> | null,
+): string {
   const lines: string[] = [];
 
   lines.push(`**Company Name:** ${company.target || 'Unknown'}`);
@@ -124,37 +133,37 @@ function buildCompanyContext(company: Tables<'companies'>): string {
   if (company.website) lines.push(`**Website:** ${company.website}`);
   if (company.comments) lines.push(`**Comments:** ${company.comments}`);
 
-  const financials: string[] = [];
-  if (company.revenue_2021_usd_mn != null) financials.push(`Revenue 2021: $${company.revenue_2021_usd_mn}M`);
-  if (company.revenue_2022_usd_mn != null) financials.push(`Revenue 2022: $${company.revenue_2022_usd_mn}M`);
-  if (company.revenue_2023_usd_mn != null) financials.push(`Revenue 2023: $${company.revenue_2023_usd_mn}M`);
-  if (company.revenue_2024_usd_mn != null) financials.push(`Revenue 2024: $${company.revenue_2024_usd_mn}M`);
-  if (company.ebitda_2021_usd_mn != null) financials.push(`EBITDA 2021: $${company.ebitda_2021_usd_mn}M`);
-  if (company.ebitda_2022_usd_mn != null) financials.push(`EBITDA 2022: $${company.ebitda_2022_usd_mn}M`);
-  if (company.ebitda_2023_usd_mn != null) financials.push(`EBITDA 2023: $${company.ebitda_2023_usd_mn}M`);
-  if (company.ebitda_2024_usd_mn != null) financials.push(`EBITDA 2024: $${company.ebitda_2024_usd_mn}M`);
-  if (company.ev_2024 != null) financials.push(`EV 2024: $${company.ev_2024}M`);
+  const byYear = new Map<number, Tables<'company_financials'>>();
+  for (const row of financials) byYear.set(row.fiscal_year, row);
 
-  const margins: string[] = [];
-  if (company.ebitda_margin_2021 != null) margins.push(`Margin 2021: ${company.ebitda_margin_2021}%`);
-  if (company.ebitda_margin_2022 != null) margins.push(`Margin 2022: ${company.ebitda_margin_2022}%`);
-  if (company.ebitda_margin_2023 != null) margins.push(`Margin 2023: ${company.ebitda_margin_2023}%`);
-  if (company.ebitda_margin_2024 != null) margins.push(`Margin 2024: ${company.ebitda_margin_2024}%`);
+  const revenueParts: string[] = [];
+  const ebitdaParts: string[] = [];
+  const marginParts: string[] = [];
+  let evPart: string | null = null;
+  for (const year of [2021, 2022, 2023, 2024]) {
+    const row = byYear.get(year);
+    if (!row) continue;
+    if (row.revenue_usd_mn != null) revenueParts.push(`Revenue ${year}: $${row.revenue_usd_mn}M`);
+    if (row.ebitda_usd_mn != null) ebitdaParts.push(`EBITDA ${year}: $${row.ebitda_usd_mn}M`);
+    if (row.ebitda_margin != null) marginParts.push(`Margin ${year}: ${row.ebitda_margin}%`);
+    if (year === 2024 && row.ev_usd_mn != null) evPart = `EV 2024: $${row.ev_usd_mn}M`;
+  }
+  const financialStrings = [...revenueParts, ...ebitdaParts, ...(evPart ? [evPart] : [])];
 
-  if (financials.length > 0) {
+  if (financialStrings.length > 0) {
     lines.push(`**Financials:**`);
-    lines.push(financials.join(' | '));
+    lines.push(financialStrings.join(' | '));
   } else {
     lines.push(`**Financials:** No financial data available in database`);
   }
 
-  if (margins.length > 0) {
+  if (marginParts.length > 0) {
     lines.push(`**EBITDA Margins:**`);
-    lines.push(margins.join(' | '));
+    lines.push(marginParts.join(' | '));
   }
 
-  if (company.l1_screening_result) lines.push(`**L1 Screening Result:** ${company.l1_screening_result}`);
-  if (company.l1_rationale) lines.push(`**L1 Rationale:** ${company.l1_rationale}`);
+  if (screening?.l1_screening_result) lines.push(`**L1 Screening Result:** ${screening.l1_screening_result}`);
+  if (screening?.l1_rationale) lines.push(`**L1 Rationale:** ${screening.l1_rationale}`);
 
   return lines.join('\n');
 }
@@ -169,12 +178,18 @@ export async function runCompanyAnalysis(
 
   const analysisRepo = new CompanyAnalysisRepository(deps.db);
   const companyRepo = new CompanyRepository(deps.db);
+  const financialRepo = new CompanyFinancialRepository(deps.db);
+  const screeningRepo = new CompanyScreeningDerivedRepository(deps.db);
 
-  const company = await companyRepo.findById(companyId);
+  const [company, financials, screening] = await Promise.all([
+    companyRepo.findById(companyId),
+    financialRepo.findByCompany(companyId),
+    screeningRepo.findByCompany(companyId),
+  ]);
 
   await analysisRepo.upsertByCompanyId({
     company_id: companyId,
-    status: 'generating',
+    status: 'processing',
     error_message: null,
     job_id: deps.job.id,
   });
@@ -188,7 +203,7 @@ export async function runCompanyAnalysis(
     throw new Error('Agent not available. Please ensure ANTHROPIC_API_KEY is set.');
   }
 
-  const companyContext = buildCompanyContext(company);
+  const companyContext = buildCompanyContext(company, financials, screening);
   const toolDescriptions = getToolDescriptions();
 
   const prompt = ANALYSIS_PROMPT_TEMPLATE.replace('{toolDescriptions}', toolDescriptions)

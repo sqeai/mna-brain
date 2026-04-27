@@ -2,6 +2,7 @@ import { downloadFile, getSignedUrl } from '@/lib/s3';
 import { deleteFile } from '@/lib/s3';
 import { extractTextFromFile } from '@/lib/fileExtractor';
 import { processFileContent } from '@/lib/file_processing_agent';
+import { CompanyFinancialRepository } from '@/lib/repositories';
 import type { DbClient, FileRepository, CriteriaRepository, ScreeningRepository, Tables } from '@/lib/repositories';
 import type { CompanyAnalysisService } from './companyAnalysisService';
 import type { AIScreeningService } from './aiScreeningService';
@@ -99,6 +100,9 @@ export class FileService {
         const criteriaList = await this.criteriaRepo.findAll();
         if (criteriaList.length === 0) return;
 
+        const financialRepo = new CompanyFinancialRepository(this.db);
+        const financials = await financialRepo.findByCompany(company.id);
+        const byYear = new Map(financials.map((r) => [r.fiscal_year, r]));
         const companyData = {
           id: company.id,
           name: company.target || company.name,
@@ -107,13 +111,13 @@ export class FileService {
           company_focus: company.company_focus,
           ownership: company.ownership,
           website: company.website,
-          revenue_2022_usd_mn: company.revenue_2022_usd_mn,
-          revenue_2023_usd_mn: company.revenue_2023_usd_mn,
-          revenue_2024_usd_mn: company.revenue_2024_usd_mn,
-          ebitda_2022_usd_mn: company.ebitda_2022_usd_mn,
-          ebitda_2023_usd_mn: company.ebitda_2023_usd_mn,
-          ebitda_2024_usd_mn: company.ebitda_2024_usd_mn,
-          ev_2024: company.ev_2024,
+          revenue_2022_usd_mn: byYear.get(2022)?.revenue_usd_mn ?? null,
+          revenue_2023_usd_mn: byYear.get(2023)?.revenue_usd_mn ?? null,
+          revenue_2024_usd_mn: byYear.get(2024)?.revenue_usd_mn ?? null,
+          ebitda_2022_usd_mn: byYear.get(2022)?.ebitda_usd_mn ?? null,
+          ebitda_2023_usd_mn: byYear.get(2023)?.ebitda_usd_mn ?? null,
+          ebitda_2024_usd_mn: byYear.get(2024)?.ebitda_usd_mn ?? null,
+          ev_2024: byYear.get(2024)?.ev_usd_mn ?? null,
         };
 
         for (const criterion of criteriaList) {

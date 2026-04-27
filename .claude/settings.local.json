@@ -4,7 +4,10 @@
       "Bash(pnpm add *)",
       "Bash(pnpm test *)",
       "Bash(pnpm exec *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(pnpm vitest *)",
+      "Bash(pnpm tsc *)"
     ]
   }
 }

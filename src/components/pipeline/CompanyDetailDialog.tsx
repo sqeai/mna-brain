@@ -65,6 +65,7 @@ import {
   getScreenings,
   type UserSummary,
 } from "@/lib/api/pipeline";
+import { getCompanyOverride } from "@/lib/companyOverrides";
 
 const getStageLabel = (stage: string | null): string => {
   const key = (stage || "L0") as DealStage;

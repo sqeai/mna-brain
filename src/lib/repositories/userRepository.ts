@@ -28,15 +28,6 @@ export class UserRepository {
     return created;
   }
 
-  async findFavoriteCompanies(id: string): Promise<string[]> {
-    const [row] = await this.db
-      .select({ favorite_companies: users.favorite_companies })
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    if (!row) throw new Error(`User ${id} not found`);
-    return (row.favorite_companies as string[] | null) ?? [];
-  }
 
   async update(id: string, updates: TablesUpdate<'users'>): Promise<void> {
     await this.db.update(users).set(updates).where(eq(users.id, id));

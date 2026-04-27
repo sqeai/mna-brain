@@ -201,6 +201,13 @@
     {
       "idx": 28,
       "version": "7",
+      "when": 1777161600000,
+      "tag": "20260426000000_normalize_companies_and_favorites",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
       "when": 1777248000000,
       "tag": "20260427000000_add_user_assignments",
       "breakpoints": true

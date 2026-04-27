@@ -1,7 +1,7 @@
 /**
- * Local dev seed. Idempotent: re-running wipes prior seed rows (tagged via
- * `source = 'seed'` for companies, fixed email for the test user) and
- * reinserts them. Not for production.
+ * Local dev seed. Idempotent: re-running wipes prior seed rows (tagged by
+ * entry_id in the 9001–9999 range and the fixed test-user email) and reinserts.
+ * Not for production.
  *
  * Usage: pnpm db:seed
  */
@@ -10,15 +10,35 @@ config({ path: '.env.local' });
 config();
 
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import postgres from 'postgres';
-import { companies, users } from '../src/lib/db/schema';
+import { companies, companyFinancials, users } from '../src/lib/db/schema';
 
 const SEED_USER_EMAIL = 'test@sqe.co.id';
 const SEED_USER_PASSWORD = 'password';
-const SEED_SOURCE_TAG = 'seed';
+const SEED_ENTRY_ID_MIN = 9001;
+const SEED_ENTRY_ID_MAX = 9999;
 
-const seedCompanies = [
+type SeedCompany = {
+  entry_id: number;
+  target: string;
+  segment: string;
+  company_focus: string;
+  website: string;
+  geography: string;
+  ownership: string;
+  pipeline_stage: 'market_screening' | 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+  status: 'active' | 'dropped';
+  watchlist_status: string;
+  financials: Array<{
+    fiscal_year: number;
+    revenue_usd_mn?: number;
+    ebitda_usd_mn?: number;
+    ev_usd_mn?: number;
+  }>;
+};
+
+const seedCompanies: SeedCompany[] = [
   {
     entry_id: 9001,
     target: 'Acme Robotics',
@@ -30,11 +50,10 @@ const seedCompanies = [
     pipeline_stage: 'L0',
     status: 'active',
     watchlist_status: 'Active',
-    revenue_2023_usd_mn: 42.1,
-    revenue_2024_usd_mn: 58.7,
-    ebitda_2023_usd_mn: 6.2,
-    ebitda_2024_usd_mn: 9.4,
-    ev_2024: 320,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 42.1, ebitda_usd_mn: 6.2 },
+      { fiscal_year: 2024, revenue_usd_mn: 58.7, ebitda_usd_mn: 9.4, ev_usd_mn: 320 },
+    ],
   },
   {
     entry_id: 9002,
@@ -47,11 +66,10 @@ const seedCompanies = [
     pipeline_stage: 'L1',
     status: 'active',
     watchlist_status: 'Active',
-    revenue_2023_usd_mn: 120.0,
-    revenue_2024_usd_mn: 134.5,
-    ebitda_2023_usd_mn: 14.8,
-    ebitda_2024_usd_mn: 18.1,
-    ev_2024: 410,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 120.0, ebitda_usd_mn: 14.8 },
+      { fiscal_year: 2024, revenue_usd_mn: 134.5, ebitda_usd_mn: 18.1, ev_usd_mn: 410 },
+    ],
   },
   {
     entry_id: 9003,
@@ -64,11 +82,10 @@ const seedCompanies = [
     pipeline_stage: 'L0',
     status: 'active',
     watchlist_status: 'Monitoring',
-    revenue_2023_usd_mn: 22.3,
-    revenue_2024_usd_mn: 28.9,
-    ebitda_2023_usd_mn: 2.1,
-    ebitda_2024_usd_mn: 3.6,
-    ev_2024: 95,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 22.3, ebitda_usd_mn: 2.1 },
+      { fiscal_year: 2024, revenue_usd_mn: 28.9, ebitda_usd_mn: 3.6, ev_usd_mn: 95 },
+    ],
   },
   {
     entry_id: 9004,
@@ -81,11 +98,10 @@ const seedCompanies = [
     pipeline_stage: 'L2',
     status: 'active',
     watchlist_status: 'Active',
-    revenue_2023_usd_mn: 8.4,
-    revenue_2024_usd_mn: 17.2,
-    ebitda_2023_usd_mn: -1.2,
-    ebitda_2024_usd_mn: 0.8,
-    ev_2024: 180,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 8.4, ebitda_usd_mn: -1.2 },
+      { fiscal_year: 2024, revenue_usd_mn: 17.2, ebitda_usd_mn: 0.8, ev_usd_mn: 180 },
+    ],
   },
   {
     entry_id: 9005,
@@ -98,11 +114,10 @@ const seedCompanies = [
     pipeline_stage: 'L1',
     status: 'active',
     watchlist_status: 'Active',
-    revenue_2023_usd_mn: 61.0,
-    revenue_2024_usd_mn: 74.3,
-    ebitda_2023_usd_mn: 9.1,
-    ebitda_2024_usd_mn: 12.4,
-    ev_2024: 280,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 61.0, ebitda_usd_mn: 9.1 },
+      { fiscal_year: 2024, revenue_usd_mn: 74.3, ebitda_usd_mn: 12.4, ev_usd_mn: 280 },
+    ],
   },
   {
     entry_id: 9006,
@@ -115,11 +130,10 @@ const seedCompanies = [
     pipeline_stage: 'L0',
     status: 'dropped',
     watchlist_status: 'Dropped',
-    revenue_2023_usd_mn: 210.5,
-    revenue_2024_usd_mn: 205.1,
-    ebitda_2023_usd_mn: 22.0,
-    ebitda_2024_usd_mn: 19.4,
-    ev_2024: 540,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 210.5, ebitda_usd_mn: 22.0 },
+      { fiscal_year: 2024, revenue_usd_mn: 205.1, ebitda_usd_mn: 19.4, ev_usd_mn: 540 },
+    ],
   },
   {
     entry_id: 9007,
@@ -132,11 +146,10 @@ const seedCompanies = [
     pipeline_stage: 'L1',
     status: 'active',
     watchlist_status: 'Active',
-    revenue_2023_usd_mn: 44.7,
-    revenue_2024_usd_mn: 53.8,
-    ebitda_2023_usd_mn: 7.8,
-    ebitda_2024_usd_mn: 10.9,
-    ev_2024: 260,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 44.7, ebitda_usd_mn: 7.8 },
+      { fiscal_year: 2024, revenue_usd_mn: 53.8, ebitda_usd_mn: 10.9, ev_usd_mn: 260 },
+    ],
   },
   {
     entry_id: 9008,
@@ -149,11 +162,10 @@ const seedCompanies = [
     pipeline_stage: 'L0',
     status: 'active',
     watchlist_status: 'Monitoring',
-    revenue_2023_usd_mn: 11.2,
-    revenue_2024_usd_mn: 14.6,
-    ebitda_2023_usd_mn: 1.4,
-    ebitda_2024_usd_mn: 2.2,
-    ev_2024: 72,
+    financials: [
+      { fiscal_year: 2023, revenue_usd_mn: 11.2, ebitda_usd_mn: 1.4 },
+      { fiscal_year: 2024, revenue_usd_mn: 14.6, ebitda_usd_mn: 2.2, ev_usd_mn: 72 },
+    ],
   },
 ];
 
@@ -182,12 +194,49 @@ async function main() {
     });
     console.log(`  ✓ user ${SEED_USER_EMAIL} (password: ${SEED_USER_PASSWORD})`);
 
-    // Companies — clear prior seed rows (tagged via source='seed'), re-insert.
-    await db.delete(companies).where(eq(companies.source, SEED_SOURCE_TAG));
+    // Companies — clear prior seed rows (identified by entry_id range), re-insert.
+    // company_financials rows cascade on company delete.
     await db
-      .insert(companies)
-      .values(seedCompanies.map((c) => ({ ...c, source: SEED_SOURCE_TAG })));
-    console.log(`  ✓ ${seedCompanies.length} companies`);
+      .delete(companies)
+      .where(
+        and(
+          gte(companies.entry_id, SEED_ENTRY_ID_MIN),
+          lte(companies.entry_id, SEED_ENTRY_ID_MAX),
+        ),
+      );
+    for (const c of seedCompanies) {
+      const [inserted] = await db
+        .insert(companies)
+        .values({
+          entry_id: c.entry_id,
+          target: c.target,
+          segment: c.segment,
+          company_focus: c.company_focus,
+          website: c.website,
+          geography: c.geography,
+          ownership: c.ownership,
+          pipeline_stage: c.pipeline_stage,
+          status: c.status,
+          watchlist_status: c.watchlist_status,
+        })
+        .returning({ id: companies.id });
+      if (!inserted) continue;
+      if (c.financials.length > 0) {
+        await db.insert(companyFinancials).values(
+          c.financials.map((f) => ({
+            company_id: inserted.id,
+            fiscal_year: f.fiscal_year,
+            revenue_usd_mn: f.revenue_usd_mn ?? null,
+            ebitda_usd_mn: f.ebitda_usd_mn ?? null,
+            ev_usd_mn: f.ev_usd_mn ?? null,
+            ebitda_margin: null,
+            ev_ebitda: null,
+            revenue_cagr_vs_prior: null,
+          })),
+        );
+      }
+    }
+    console.log(`  ✓ ${seedCompanies.length} companies (+ financials)`);
 
     console.log('done.');
   } finally {

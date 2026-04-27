@@ -1,14 +1,25 @@
 import { deleteFile } from '@/lib/s3';
+import type { DealStage } from '@/lib/types';
 import type {
   CompanyRepository,
   CompanyFilters,
+  CompanyFinancialRepository,
+  CompanyFxAdjustmentRepository,
   CompanyLogRepository,
+  CompanyScreeningDerivedRepository,
   DealDocumentRepository,
   DealNoteRepository,
   DealLinkRepository,
+  Tables,
   TablesInsert,
   TablesUpdate,
 } from '@/lib/repositories';
+import {
+  toCompanyDTO,
+  splitCompanyDTO,
+  type CompanyDTO,
+  type CompanyDTOInput,
+} from '@/lib/dto/companyDTO';
 
 export class CompanyService {
   constructor(
@@ -17,6 +28,9 @@ export class CompanyService {
     private readonly dealDocRepo: DealDocumentRepository,
     private readonly dealNoteRepo: DealNoteRepository,
     private readonly dealLinkRepo: DealLinkRepository,
+    private readonly companyFinancialRepo: CompanyFinancialRepository,
+    private readonly companyFxAdjustmentRepo: CompanyFxAdjustmentRepository,
+    private readonly companyScreeningDerivedRepo: CompanyScreeningDerivedRepository,
   ) {}
 
   findById(id: string) {
@@ -33,6 +47,110 @@ export class CompanyService {
 
   findDetails(id: string) {
     return this.companyRepo.findDetails(id);
+  }
+
+  // --------- DTO (flat, backward-compatible) read path ---------
+  async findByIdDTO(id: string): Promise<CompanyDTO> {
+    const [company, financials, fx, screening] = await Promise.all([
+      this.companyRepo.findById(id),
+      this.companyFinancialRepo.findByCompany(id),
+      this.companyFxAdjustmentRepo.findByCompany(id),
+      this.companyScreeningDerivedRepo.findByCompany(id),
+    ]);
+    return toCompanyDTO(company, financials, fx, screening);
+  }
+
+  async listDTO(filters: Omit<CompanyFilters, 'id'>): Promise<CompanyDTO[]> {
+    const companies = await this.companyRepo.findAll(filters);
+    if (companies.length === 0) return [];
+    const ids = companies.map((c) => c.id);
+    const [financials, fxRows, screeningRows] = await Promise.all([
+      this.companyFinancialRepo.findByCompaniesAndYears(ids, [2021, 2022, 2023, 2024]),
+      this.companyFxAdjustmentRepo.findByCompanies(ids),
+      this.companyScreeningDerivedRepo.findByCompanies(ids),
+    ]);
+    const finByCompany = new Map<string, Tables<'company_financials'>[]>();
+    for (const f of financials) {
+      const arr = finByCompany.get(f.company_id) ?? [];
+      arr.push(f);
+      finByCompany.set(f.company_id, arr);
+    }
+    const fxByCompany = new Map<string, Tables<'company_fx_adjustments'>[]>();
+    for (const f of fxRows) {
+      const arr = fxByCompany.get(f.company_id) ?? [];
+      arr.push(f);
+      fxByCompany.set(f.company_id, arr);
+    }
+    const screeningByCompany = new Map<string, Tables<'company_screening_derived'>>();
+    for (const s of screeningRows) screeningByCompany.set(s.company_id, s);
+    return companies.map((c) =>
+      toCompanyDTO(
+        c,
+        finByCompany.get(c.id) ?? [],
+        fxByCompany.get(c.id) ?? [],
+        screeningByCompany.get(c.id) ?? null,
+      ),
+    );
+  }
+
+  // --------- DTO (flat) write path: split across tables ---------
+  /**
+   * Accepts a flat FE payload and writes to companies + child tables. Returns
+   * the composed DTO so the FE can round-trip without a refetch.
+   */
+  async createFromDTO(input: CompanyDTOInput, logAction?: string): Promise<CompanyDTO> {
+    const split = splitCompanyDTO(input);
+    const inserted = await this.companyRepo.insert(
+      split.company as TablesInsert<'companies'>,
+    );
+    await this.applyChildWrites(inserted.id, split);
+    if (logAction) {
+      await this.companyLogRepo.insert({ company_id: inserted.id, action: logAction });
+    }
+    return this.findByIdDTO(inserted.id);
+  }
+
+  async updateFromDTO(
+    id: string,
+    input: CompanyDTOInput,
+    logAction?: string,
+  ): Promise<CompanyDTO> {
+    const split = splitCompanyDTO(input);
+    if (Object.keys(split.company).length > 0) {
+      await this.companyRepo.update(id, split.company as TablesUpdate<'companies'>);
+    }
+    await this.applyChildWrites(id, split);
+    if (logAction) {
+      await this.companyLogRepo.insert({ company_id: id, action: logAction });
+    }
+    return this.findByIdDTO(id);
+  }
+
+  private async applyChildWrites(
+    companyId: string,
+    split: ReturnType<typeof splitCompanyDTO>,
+  ): Promise<void> {
+    // financials: upsert only years the caller touched
+    const financialRows = Array.from(split.financialsByYear.values()).filter(
+      (r) => Object.keys(r).length > 1, // more than just fiscal_year
+    );
+    if (financialRows.length > 0) {
+      await this.companyFinancialRepo.bulkUpsertForCompany(companyId, financialRows);
+    }
+    // fx: only if we have a currency (table requires it NOT NULL)
+    const fxRowsTouched = Array.from(split.fxByYear.values()).filter(
+      (r) => Object.keys(r).length > 2, // more than fiscal_year + currency placeholder
+    );
+    if (fxRowsTouched.length > 0 && split.fxCurrency) {
+      const withCurrency = fxRowsTouched.map((r) => ({ ...r, currency: split.fxCurrency! }));
+      await this.companyFxAdjustmentRepo.bulkUpsertForCompany(companyId, withCurrency);
+    }
+    if (split.hasScreeningFields) {
+      await this.companyScreeningDerivedRepo.upsertByCompany({
+        company_id: companyId,
+        ...split.screening,
+      });
+    }
   }
 
   async create(company: TablesInsert<'companies'>, logAction?: string) {
@@ -64,7 +182,7 @@ export class CompanyService {
   async delete(id: string) {
     const filePaths = await this.dealDocRepo.findFilePathsByDealId(id);
     if (filePaths.length > 0) {
-      await Promise.all(filePaths.map((p) => deleteFile(p)));
+      await Promise.all(filePaths.map((key) => deleteFile(key)));
     }
     await this.companyRepo.delete(id);
   }
@@ -78,7 +196,7 @@ export class CompanyService {
     linkTitle?: string,
     assigneeIds?: string[],
   ) {
-    await this.companyRepo.update(id, { pipeline_stage: nextStage });
+    await this.companyRepo.update(id, { pipeline_stage: nextStage as DealStage });
     await this.companyLogRepo.insert({
       company_id: id,
       action: currentStage
