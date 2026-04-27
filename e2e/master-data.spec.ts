@@ -1,12 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
+import { mockAuthSession } from './helpers/auth';
 
 type Company = {
   id: string;
@@ -97,20 +90,9 @@ const mockCompanies = (page: Page, companies: Company[]) =>
     return route.fallback();
   });
 
-const authenticate = async (page: Page) => {
-  await page.addInitScript((user) => {
-    localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-  }, MOCK_USER);
-};
-
 test.describe('Master Data page', () => {
-  test.beforeEach(async ({ page }) => {
-    await authenticate(page);
-  });
-
   test('redirects to /login when unauthenticated', async ({ page }) => {
-    await page.context().clearCookies();
-    await page.addInitScript(() => localStorage.removeItem('mna_tracker_user'));
+    await mockAuthSession(page, null);
 
     await page.goto('/master-data');
     await page.waitForURL('**/login');
@@ -118,6 +100,7 @@ test.describe('Master Data page', () => {
   });
 
   test('renders header, stats and companies table', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -141,6 +124,7 @@ test.describe('Master Data page', () => {
   });
 
   test('search input filters the table', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -156,6 +140,7 @@ test.describe('Master Data page', () => {
   });
 
   test('source filter narrows results (watchlist_status → source mapping)', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -173,6 +158,7 @@ test.describe('Master Data page', () => {
   });
 
   test('stage filter narrows by pipeline_stage', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -188,6 +174,7 @@ test.describe('Master Data page', () => {
   });
 
   test('suggestion chip populates the search', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -204,6 +191,7 @@ test.describe('Master Data page', () => {
   });
 
   test('paginates at 10 items per page', async ({ page }) => {
+    await mockAuthSession(page);
     const many: Company[] = Array.from({ length: 12 }, (_, i) =>
       baseCompany({
         id: `co-${i + 1}`,
@@ -232,6 +220,7 @@ test.describe('Master Data page', () => {
   });
 
   test('opens the detail dialog from a row', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -255,6 +244,7 @@ test.describe('Master Data page', () => {
   });
 
   test('delete flow confirms then removes the row', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([
@@ -280,6 +270,7 @@ test.describe('Master Data page', () => {
   });
 
   test('shows empty state when the filter matches nothing', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
 
     await Promise.all([

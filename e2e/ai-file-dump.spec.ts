@@ -1,12 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
+import { mockAuthSession } from './helpers/auth';
 
 type FileRecord = {
   id: string;
@@ -106,20 +99,9 @@ const mockFileDump = (
   });
 };
 
-const authenticate = async (page: Page) => {
-  await page.addInitScript((user) => {
-    localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-  }, MOCK_USER);
-};
-
 test.describe('AI File Dump page', () => {
-  test.beforeEach(async ({ page }) => {
-    await authenticate(page);
-  });
-
   test('redirects to /login when unauthenticated', async ({ page }) => {
-    await page.context().clearCookies();
-    await page.addInitScript(() => localStorage.removeItem('mna_tracker_user'));
+    await mockAuthSession(page, null);
 
     await page.goto('/ai-file-dump');
     await page.waitForURL('**/login');
@@ -127,6 +109,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('renders header, upload zone and three file tables', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -154,6 +137,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('shows per-table empty states when no files exist', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page, { mom: [], prospectus: [], other: [] });
 
     await Promise.all([
@@ -167,6 +151,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('loading spinner is visible until the fetches resolve', async ({ page }) => {
+    await mockAuthSession(page);
     let release!: () => void;
     const gate = new Promise<void>((r) => {
       release = r;
@@ -191,6 +176,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('selecting a file via browse input adds it to the selection list', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -210,6 +196,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('duplicate filename is flagged in the selection list', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -228,6 +215,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('clear-all removes selected files', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -247,6 +235,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('search filters the MoM table', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -264,6 +253,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('delete flow confirms then sends DELETE /api/ai-file-dump/<id>', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([
@@ -287,6 +277,7 @@ test.describe('AI File Dump page', () => {
   });
 
   test('AI CoPilot tab navigates to /ai-discovery', async ({ page }) => {
+    await mockAuthSession(page);
     await mockFileDump(page);
 
     await Promise.all([

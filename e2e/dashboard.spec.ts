@@ -1,12 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
+import { mockAuthSession } from './helpers/auth';
 
 type Company = {
   id: string;
@@ -74,20 +67,9 @@ const mockCompanies = (page: Page, companies: Company[]) =>
     });
   });
 
-const authenticate = async (page: Page) => {
-  await page.addInitScript((user) => {
-    localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-  }, MOCK_USER);
-};
-
 test.describe('Dashboard page', () => {
-  test.beforeEach(async ({ page }) => {
-    await authenticate(page);
-  });
-
   test('redirects to /login when unauthenticated', async ({ page }) => {
-    await page.context().clearCookies();
-    await page.addInitScript(() => localStorage.removeItem('mna_tracker_user'));
+    await mockAuthSession(page, null);
 
     await page.goto('/dashboard');
     await page.waitForURL('**/login');
@@ -95,6 +77,7 @@ test.describe('Dashboard page', () => {
   });
 
   test('renders header, stat cards, pipeline stages and tables', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
     await page.goto('/dashboard');
 
@@ -102,8 +85,8 @@ test.describe('Dashboard page', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
     await expect(page.getByText('Real-time overview of your M&A deal pipeline')).toBeVisible();
 
-    // Stat cards - totals derived from MOCK_COMPANIES
-    // 8 total, 4 inbound, 4 outbound, 1/2 (L5/L0) = 50% conversion
+    // Stat cards - totals derived from MOCK_COMPANIES (8 total, 4 inbound,
+    // 4 outbound, 1/2 [L5/L0] = 50% conversion).
     const totalDeals = page.locator('div').filter({ hasText: /^Total Deals$/ }).locator('..').locator('..');
     await expect(totalDeals.getByText('8', { exact: true })).toBeVisible();
 
@@ -118,10 +101,13 @@ test.describe('Dashboard page', () => {
     await expect(conversion.getByText('50%', { exact: true })).toBeVisible();
     await expect(conversion.getByText('L0 → L5')).toBeVisible();
 
-    // Pipeline stages
-    await expect(page.getByText('Pipeline Stages')).toBeVisible();
+    // Pipeline stages — scope to <main> to avoid the sidebar's nav links.
+    const main = page.locator('main');
+    await expect(main.getByText('Pipeline Stages')).toBeVisible();
     for (const stage of ['L0', 'L1', 'L2', 'L3', 'L4', 'L5']) {
-      await expect(page.getByRole('link', { name: new RegExp(`\\b${stage}\\b`) }).first()).toBeVisible();
+      await expect(
+        main.getByRole('link', { name: new RegExp(`\\b${stage}\\b`) }).first(),
+      ).toBeVisible();
     }
 
     // Company Overview table
@@ -135,15 +121,21 @@ test.describe('Dashboard page', () => {
   });
 
   test('pipeline stage link routes to /pipeline?stage=<stage>', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
     await page.goto('/dashboard');
 
-    const l2Link = page.getByRole('link').filter({ hasText: /^\d+.*L2/s }).first();
+    const l2Link = page
+      .locator('main')
+      .getByRole('link')
+      .filter({ hasText: /^\d+.*L2/s })
+      .first();
     const href = await l2Link.getAttribute('href');
     expect(href).toBe('/pipeline?stage=L2');
   });
 
   test('paginates the company overview (10 per page)', async ({ page }) => {
+    await mockAuthSession(page);
     const many: Company[] = Array.from({ length: 12 }, (_, i) =>
       baseCompany({
         id: `co-${i + 1}`,
@@ -159,8 +151,12 @@ test.describe('Dashboard page', () => {
     await expect(page.getByRole('button', { name: 'Company 1', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Company 11', exact: true })).not.toBeVisible();
 
-    const nextBtn = page.locator('button:has(svg.lucide-chevron-right)');
-    await nextBtn.click();
+    // Use evaluate-click to avoid the chatbot widget intercepting pointer
+    // coordinates over the pagination controls.
+    await page
+      .locator('button:has(svg.lucide-chevron-right)')
+      .first()
+      .evaluate((el) => (el as HTMLButtonElement).click());
 
     await expect(page.getByText(/Page\s*2\s*of\s*2/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Company 11', exact: true })).toBeVisible();
@@ -168,12 +164,15 @@ test.describe('Dashboard page', () => {
   });
 
   test('opens the company detail dialog when a row is clicked', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, MOCK_COMPANIES);
     await page.route('**/api/companies/*', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { logs: [], notes: [], links: [], documents: [] } }),
+        body: JSON.stringify({
+          data: { logs: [], notes: [], links: [], documents: [] },
+        }),
       }),
     );
     await page.goto('/dashboard');
@@ -183,10 +182,13 @@ test.describe('Dashboard page', () => {
   });
 
   test('shows empty state when no companies exist', async ({ page }) => {
+    await mockAuthSession(page);
     await mockCompanies(page, []);
 
     await Promise.all([
-      page.waitForResponse((res) => res.url().includes('/api/companies') && res.status() === 200),
+      page.waitForResponse(
+        (res) => res.url().includes('/api/companies') && res.status() === 200,
+      ),
       page.goto('/dashboard'),
     ]);
 
@@ -195,6 +197,7 @@ test.describe('Dashboard page', () => {
   });
 
   test('surfaces the loading spinner before the API resolves', async ({ page }) => {
+    await mockAuthSession(page);
     let release!: () => void;
     const gate = new Promise<void>((r) => {
       release = r;

@@ -1,20 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-
-const MOCK_USER = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
-  created_at: new Date().toISOString(),
-};
-
-const authenticate = async (page: Page) => {
-  await page.addInitScript((user) => {
-    localStorage.setItem('mna_tracker_user', JSON.stringify(user));
-    // Clear any prior chat history so the welcome state renders predictably.
-    localStorage.removeItem('mna-chat-history');
-  }, MOCK_USER);
-};
+import { mockAuthSession } from './helpers/auth';
 
 /** Stub the streaming /api/chat endpoint so sending a message doesn't hit a real LLM. */
 const mockChatEndpoint = (page: Page) =>
@@ -29,13 +14,8 @@ const mockChatEndpoint = (page: Page) =>
   });
 
 test.describe('AI Discovery page', () => {
-  test.beforeEach(async ({ page }) => {
-    await authenticate(page);
-  });
-
   test('redirects to /login when unauthenticated', async ({ page }) => {
-    await page.context().clearCookies();
-    await page.addInitScript(() => localStorage.removeItem('mna_tracker_user'));
+    await mockAuthSession(page, null);
 
     await page.goto('/ai-discovery');
     await page.waitForURL('**/login');
@@ -43,6 +23,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('renders AI CoPilot header, tab bar and chat input', async ({ page }) => {
+    await mockAuthSession(page);
     await mockChatEndpoint(page);
     await page.goto('/ai-discovery');
 
@@ -62,6 +43,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('?tab=filedump redirects to /ai-file-dump', async ({ page }) => {
+    await mockAuthSession(page);
     // Stub the ai-file-dump fetches so the target page renders without backend.
     await page.route('**/api/ai-file-dump**', (route) =>
       route.fulfill({
@@ -77,6 +59,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('suggestion chip populates the input', async ({ page }) => {
+    await mockAuthSession(page);
     await mockChatEndpoint(page);
     await page.goto('/ai-discovery');
 
@@ -90,6 +73,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('send button is disabled for empty input and enabled after typing', async ({ page }) => {
+    await mockAuthSession(page);
     await mockChatEndpoint(page);
     await page.goto('/ai-discovery');
 
@@ -102,6 +86,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('submitting a message POSTs to /api/chat', async ({ page }) => {
+    await mockAuthSession(page);
     await mockChatEndpoint(page);
     await page.goto('/ai-discovery');
 
@@ -117,6 +102,7 @@ test.describe('AI Discovery page', () => {
   });
 
   test('clicking the AI File Dump tab navigates to /ai-file-dump', async ({ page }) => {
+    await mockAuthSession(page);
     await mockChatEndpoint(page);
     await page.route('**/api/ai-file-dump**', (route) =>
       route.fulfill({
