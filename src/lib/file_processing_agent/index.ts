@@ -5,7 +5,7 @@ import { logger } from "../agent/logger";
 import { getAllCompanyReferences } from "../fuzzySearch";
 import { splitPdf } from "../pdf";
 import type { DbClient } from "@/lib/server/db";
-import { CompanyRepository } from "@/lib/repositories";
+import { CompanyFinancialRepository, CompanyRepository } from "@/lib/repositories";
 
 const generateSystemPrompt = (companies_list, userRawNotes) => `You are a specialized M&A File Processing Assistant. Your task is to analyze raw text extracted from meeting documents (like PPTX slides) and transform it into a highly structured format.
 
@@ -248,48 +248,37 @@ export async function processFileContent(
           finalMatchedCompanies.push(match);
         } else {
           if (parsed.file_type === 'prospectus') {
+            const summary = parsed?.prospectus_summary ?? {};
             const insertData = {
-              // Pipeline stage for market screening
-              pipeline_stage: 'L0',
-              // Core fields
-              target: parsed?.prospectus_summary?.target || null,
+              pipeline_stage: 'L0' as const,
+              target: summary.target || null,
               thesis_content: null,
-              // Basic info from schema
-              segment: parsed?.prospectus_summary?.segment || null,
-              segment_related_offerings: parsed?.prospectus_summary?.segment_related_offerings || null,
-              company_focus: parsed?.prospectus_summary?.company_focus || null,
-              website: parsed?.prospectus_summary?.website || null,
-              ownership: parsed?.prospectus_summary?.ownership || null,
-              geography: parsed?.prospectus_summary?.geography || null,
-              // Revenue (USD Mn)
-              revenue_2021_usd_mn: parsed?.prospectus_summary?.revenue_2021_usd_mn || null,
-              revenue_2022_usd_mn: parsed?.prospectus_summary?.revenue_2022_usd_mn || null,
-              revenue_2023_usd_mn: parsed?.prospectus_summary?.revenue_2023_usd_mn || null,
-              revenue_2024_usd_mn: parsed?.prospectus_summary?.revenue_2024_usd_mn || null,
-              // EBITDA (USD Mn)
-              ebitda_2021_usd_mn: parsed?.prospectus_summary?.ebitda_2021_usd_mn || null,
-              ebitda_2022_usd_mn: parsed?.prospectus_summary?.ebitda_2022_usd_mn || null,
-              ebitda_2023_usd_mn: parsed?.prospectus_summary?.ebitda_2023_usd_mn || null,
-              ebitda_2024_usd_mn: parsed?.prospectus_summary?.ebitda_2024_usd_mn || null,
-              // Valuation
-              ev_2024: parsed?.prospectus_summary?.ev_2024 || null,
-              ev_ebitda_2024: parsed?.prospectus_summary?.ev_ebitda_2024 || null,
-              // Growth metrics
-              revenue_cagr_2021_2022: parsed?.prospectus_summary?.revenue_cagr_2021_2022 || null,
-              revenue_cagr_2022_2023: parsed?.prospectus_summary?.revenue_cagr_2022_2023 || null,
-              revenue_cagr_2023_2024: parsed?.prospectus_summary?.revenue_cagr_2023_2024 || null,
-              // Margins
-              ebitda_margin_2021: parsed?.prospectus_summary?.ebitda_margin_2021 || null,
-              ebitda_margin_2022: parsed?.prospectus_summary?.ebitda_margin_2022 || null,
-              ebitda_margin_2023: parsed?.prospectus_summary?.ebitda_margin_2023 || null,
-              ebitda_margin_2024: parsed?.prospectus_summary?.ebitda_margin_2024 || null,
-              // AI-generated remarks cross-matched with thesis
-              remarks: parsed?.prospectus_summary?.remarks || null,
-              source: 'inbound',
-            }
+              segment: summary.segment || null,
+              segment_related_offerings: summary.segment_related_offerings || null,
+              company_focus: summary.company_focus || null,
+              website: summary.website || null,
+              ownership: summary.ownership || null,
+              geography: summary.geography || null,
+              remarks: summary.remarks || null,
+              source: 'inbound' as const,
+            };
             try {
               const companyRepo = new CompanyRepository(supabase);
               company = await companyRepo.insert(insertData);
+              // Normalized per-year financials go into company_financials.
+              const financialRepo = new CompanyFinancialRepository(supabase);
+              const financialRows = [
+                { fiscal_year: 2021, revenue_usd_mn: summary.revenue_2021_usd_mn ?? null, ebitda_usd_mn: summary.ebitda_2021_usd_mn ?? null, ev_usd_mn: null, ebitda_margin: summary.ebitda_margin_2021 ?? null, ev_ebitda: null, revenue_cagr_vs_prior: null },
+                { fiscal_year: 2022, revenue_usd_mn: summary.revenue_2022_usd_mn ?? null, ebitda_usd_mn: summary.ebitda_2022_usd_mn ?? null, ev_usd_mn: null, ebitda_margin: summary.ebitda_margin_2022 ?? null, ev_ebitda: null, revenue_cagr_vs_prior: summary.revenue_cagr_2021_2022 ?? null },
+                { fiscal_year: 2023, revenue_usd_mn: summary.revenue_2023_usd_mn ?? null, ebitda_usd_mn: summary.ebitda_2023_usd_mn ?? null, ev_usd_mn: null, ebitda_margin: summary.ebitda_margin_2023 ?? null, ev_ebitda: null, revenue_cagr_vs_prior: summary.revenue_cagr_2022_2023 ?? null },
+                { fiscal_year: 2024, revenue_usd_mn: summary.revenue_2024_usd_mn ?? null, ebitda_usd_mn: summary.ebitda_2024_usd_mn ?? null, ev_usd_mn: summary.ev_2024 ?? null, ebitda_margin: summary.ebitda_margin_2024 ?? null, ev_ebitda: summary.ev_ebitda_2024 ?? null, revenue_cagr_vs_prior: summary.revenue_cagr_2023_2024 ?? null },
+              ].filter((r) =>
+                r.revenue_usd_mn !== null || r.ebitda_usd_mn !== null || r.ev_usd_mn !== null ||
+                r.ebitda_margin !== null || r.ev_ebitda !== null || r.revenue_cagr_vs_prior !== null,
+              );
+              if (financialRows.length > 0) {
+                await financialRepo.bulkUpsertForCompany(company.id, financialRows);
+              }
             } catch {
               logger.error('Error inserting companies results:');
             }

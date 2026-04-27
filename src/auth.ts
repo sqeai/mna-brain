@@ -25,7 +25,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: user.email ?? undefined,
             name: user.name,
           };
-        } catch {
+        } catch (err) {
+          // Auth.js collapses any null/throw in authorize() into the opaque
+          // `CredentialsSignin` code. Log the real cause so prod failures
+          // (DB unreachable, TLS handshake, bad hash shape, wrong password)
+          // are distinguishable in the server logs.
+          console.error('[auth] authorize failed:', err);
           return null;
         }
       },

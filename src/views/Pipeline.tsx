@@ -146,13 +146,10 @@ const L1StatusBadge = ({ status }: { status: L1Status | null }) => {
     switch (status) {
       case 'Pass':
         return 'bg-blue-500/20 text-blue-600 border-blue-500/30 hover:bg-blue-500/30';
-      case 'Exception':
+      case 'Inconclusive':
         return 'bg-amber-500/20 text-amber-600 border-amber-500/30 hover:bg-amber-500/30';
-      case 'No':
-      case 'Duplicate':
+      case 'Fail':
         return 'bg-red-500/20 text-red-600 border-red-500/30 hover:bg-red-500/30';
-      case 'WatchList':
-      case 'TBC':
       default:
         return '';
     }
@@ -160,11 +157,8 @@ const L1StatusBadge = ({ status }: { status: L1Status | null }) => {
 
   const icons: Record<L1Status, any> = {
     Pass: CheckCircle2,
-    No: XCircle,
-    Exception: AlertCircle,
-    WatchList: Clock,
-    TBC: FileText,
-    Duplicate: AlertCircle,
+    Fail: XCircle,
+    Inconclusive: AlertCircle,
   };
 
   const Icon = icons[status];
@@ -991,10 +985,8 @@ export default function Pipeline() {
                             <SelectContent>
                               <SelectItem value="all">All Status</SelectItem>
                               <SelectItem value="Pass">Pass</SelectItem>
-                              <SelectItem value="No">No</SelectItem>
-                              <SelectItem value="Exception">Exception</SelectItem>
-                              <SelectItem value="WatchList">WatchList</SelectItem>
-                              <SelectItem value="TBC">TBC</SelectItem>
+                              <SelectItem value="Fail">Fail</SelectItem>
+                              <SelectItem value="Inconclusive">Inconclusive</SelectItem>
                             </SelectContent>
                           </Select>
                         )}

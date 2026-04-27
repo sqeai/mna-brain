@@ -8,7 +8,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "./logger";
 import { createDb } from "@/lib/server/db";
 import {
+  CompanyFinancialRepository,
   CompanyRepository,
+  CompanyScreeningDerivedRepository,
   FileRepository,
   InvenCacheRepository,
   PastAcquisitionRepository,
@@ -78,34 +80,74 @@ export const companiesSchema = [
   { name: "company_focus", type: "text" },
   { name: "website", type: "text" },
   { name: "watchlist_status", type: "text" },
-  { name: "pipeline_stage", type: "text" },
+  { name: "pipeline_stage", type: "pipeline_stage (enum: market_screening, L0, L1, L2, L3, L4, L5)" },
   { name: "comments", type: "text" },
   { name: "ownership", type: "text" },
   { name: "geography", type: "text" },
-  // Revenue (USD Mn)
-  { name: "revenue_2021_usd_mn", type: "numeric" },
-  { name: "revenue_2022_usd_mn", type: "numeric" },
-  { name: "revenue_2023_usd_mn", type: "numeric" },
-  { name: "revenue_2024_usd_mn", type: "numeric" },
-  // EBITDA (USD Mn)
-  { name: "ebitda_2021_usd_mn", type: "numeric" },
-  { name: "ebitda_2022_usd_mn", type: "numeric" },
-  { name: "ebitda_2023_usd_mn", type: "numeric" },
-  { name: "ebitda_2024_usd_mn", type: "numeric" },
-  // Valuation
-  { name: "ev_2024", type: "numeric" },
-  { name: "ev_ebitda_2024", type: "numeric" },
-  // Growth metrics
-  { name: "revenue_cagr_2021_2022", type: "numeric" },
-  { name: "revenue_cagr_2022_2023", type: "numeric" },
-  { name: "revenue_cagr_2023_2024", type: "numeric" },
-  // Margins
-  { name: "ebitda_margin_2021", type: "numeric" },
-  { name: "ebitda_margin_2022", type: "numeric" },
-  { name: "ebitda_margin_2023", type: "numeric" },
-  { name: "ebitda_margin_2024", type: "numeric" },
-  // AI Market Screening Remarks
+  { name: "source", type: "deal_origin (enum: inbound, outbound)" },
+  { name: "status", type: "company_status (enum: active, dropped)" },
   { name: "remarks", type: "text" },
+  { name: "thesis_content", type: "text" },
+  { name: "created_at", type: "timestamptz" },
+  { name: "updated_at", type: "timestamptz" },
+];
+
+/**
+ * Yearly financials live in company_financials, one row per (company_id, fiscal_year).
+ * 2024 is the latest reporting year. Join via company_financials.company_id = companies.id.
+ */
+export const companyFinancialsSchema = [
+  { name: "company_id", type: "uuid (FK companies.id)" },
+  { name: "fiscal_year", type: "integer (2021..2024 currently)" },
+  { name: "revenue_usd_mn", type: "numeric" },
+  { name: "ebitda_usd_mn", type: "numeric" },
+  { name: "ev_usd_mn", type: "numeric (only 2024 is populated)" },
+  { name: "ebitda_margin", type: "numeric" },
+  { name: "ev_ebitda", type: "numeric (only 2024 is populated)" },
+  { name: "revenue_cagr_vs_prior", type: "numeric (YoY CAGR vs prior fiscal_year; null for earliest year)" },
+];
+
+/** Per-year FX adjustments. PK is (company_id, fiscal_year). */
+export const companyFxAdjustmentsSchema = [
+  { name: "company_id", type: "uuid (FK companies.id)" },
+  { name: "fiscal_year", type: "integer" },
+  { name: "currency", type: "text (ISO-4217, e.g. KRW)" },
+  { name: "revenue_local", type: "numeric" },
+  { name: "assumed_forex", type: "numeric (USD/local rate used)" },
+  { name: "forex_change_vs_prior", type: "numeric (YoY % change in fx rate)" },
+  { name: "revenue_cagr_domestic", type: "numeric (domestic CAGR vs prior)" },
+];
+
+/** 1:1 with companies. Holds L0/L1 screening-derived values. */
+export const companyScreeningDerivedSchema = [
+  { name: "company_id", type: "uuid (PK, FK companies.id)" },
+  { name: "segment_revenue", type: "numeric" },
+  { name: "segment_ebitda", type: "numeric" },
+  { name: "segment_revenue_total_ratio", type: "numeric" },
+  { name: "l0_revenue_2024_usd_mn", type: "numeric" },
+  { name: "l0_ebitda_2024_usd_mn", type: "numeric" },
+  { name: "l0_ev_2024_usd_mn", type: "numeric" },
+  { name: "l0_ev_ebitda_2024", type: "numeric" },
+  { name: "l0_ev_usd_mn", type: "numeric" },
+  { name: "segment_specific_revenue_pct", type: "numeric" },
+  { name: "combined_segment_revenue", type: "text" },
+  { name: "revenue_from_priority_geo", type: "boolean" },
+  { name: "pct_from_domestic", type: "numeric" },
+  { name: "l1_revenue_cagr_l3y", type: "numeric" },
+  { name: "l1_revenue_cagr_n3y", type: "numeric" },
+  { name: "l1_revenue_drop_count", type: "integer" },
+  { name: "l1_ebitda_below_threshold_count", type: "integer" },
+  { name: "l1_vision_fit", type: "boolean" },
+  { name: "l1_priority_geo", type: "boolean" },
+  { name: "l1_ev_below_threshold", type: "boolean" },
+  { name: "l1_revenue_no_consecutive_drop", type: "boolean" },
+  { name: "l1_rationale", type: "text" },
+  { name: "l1_screening_result", type: "l1_result (enum: pass, fail, inconclusive)" },
+  { name: "fx_currency", type: "text" },
+  { name: "fx_revenue_drop_count", type: "integer" },
+  { name: "fx_revenue_no_consecutive_drop", type: "boolean" },
+  { name: "fx_ebitda_above_10_l3y", type: "boolean" },
+  { name: "fx_rationale", type: "text" },
 ];
 
 export const invenCacheSchema = [
@@ -220,14 +262,24 @@ export const queryCompanies = tool(
         return "No companies found matching your criteria.";
       }
 
+      // Pull matching 2024 financials in one batch.
+      const financialRepo = new CompanyFinancialRepository(createDb());
+      const fin2024 = await financialRepo.findByCompaniesAndYears(
+        companies.map((c) => c.id),
+        [2024],
+      );
+      const finByCompany = new Map<string, typeof fin2024[number]>();
+      for (const r of fin2024) finByCompany.set(r.company_id, r);
+
       // Format results as markdown table
       const header = "Target | Segment | Geography | Status | Rev 2024 ($M) | EBITDA 2024 ($M) | EV 2024 ($M)";
       const separator = "--- | --- | --- | --- | --- | --- | ---";
 
       const rows = companies.map((c) => {
-        const rev = c.revenue_2024_usd_mn ? `$${c.revenue_2024_usd_mn.toFixed(1)}` : "-";
-        const ebitda = c.ebitda_2024_usd_mn ? `$${c.ebitda_2024_usd_mn.toFixed(1)}` : "-";
-        const ev = c.ev_2024 ? `$${c.ev_2024.toFixed(1)}` : "-";
+        const f = finByCompany.get(c.id);
+        const rev = f?.revenue_usd_mn != null ? `$${f.revenue_usd_mn.toFixed(1)}` : "-";
+        const ebitda = f?.ebitda_usd_mn != null ? `$${f.ebitda_usd_mn.toFixed(1)}` : "-";
+        const ev = f?.ev_usd_mn != null ? `$${f.ev_usd_mn.toFixed(1)}` : "-";
         return `${c.target || "N/A"} | ${c.segment || "-"} | ${c.geography || "-"} | ${c.watchlist_status || "-"} | ${rev} | ${ebitda} | ${ev}`;
       });
 
@@ -282,21 +334,34 @@ export const getCompanyStats = tool(
     logger.debug(`🔧 TOOL CALLED: get_company_stats(group_by='${group_by}')`);
 
     try {
-      const companyRepo = new CompanyRepository(createDb());
+      const db = createDb();
+      const companyRepo = new CompanyRepository(db);
+      const financialRepo = new CompanyFinancialRepository(db);
       const companies = await companyRepo.findAll();
       if (!companies || companies.length === 0) {
         return "No companies in the database.";
       }
 
+      const fin2024 = await financialRepo.findByCompaniesAndYears(
+        companies.map((c) => c.id),
+        [2024],
+      );
+      const rev2024 = new Map<string, number>();
+      const ebitda2024 = new Map<string, number>();
+      for (const r of fin2024) {
+        if (r.revenue_usd_mn != null) rev2024.set(r.company_id, r.revenue_usd_mn);
+        if (r.ebitda_usd_mn != null) ebitda2024.set(r.company_id, r.ebitda_usd_mn);
+      }
+
       // Calculate overall stats
       const totalCompanies = companies.length;
-      const withRevenue = companies.filter((c) => c.revenue_2024_usd_mn);
-      const withEbitda = companies.filter((c) => c.ebitda_2024_usd_mn);
+      const withRevenue = companies.filter((c) => rev2024.has(c.id));
+      const withEbitda = companies.filter((c) => ebitda2024.has(c.id));
 
-      const totalRevenue = withRevenue.reduce((sum, c) => sum + (c.revenue_2024_usd_mn || 0), 0);
+      const totalRevenue = withRevenue.reduce((sum, c) => sum + (rev2024.get(c.id) || 0), 0);
       const avgRevenue = withRevenue.length > 0 ? totalRevenue / withRevenue.length : 0;
 
-      const totalEbitda = withEbitda.reduce((sum, c) => sum + (c.ebitda_2024_usd_mn || 0), 0);
+      const totalEbitda = withEbitda.reduce((sum, c) => sum + (ebitda2024.get(c.id) || 0), 0);
       const avgEbitda = withEbitda.length > 0 ? totalEbitda / withEbitda.length : 0;
 
       let result = `## Company Statistics
@@ -329,12 +394,10 @@ export const getCompanyStats = tool(
           .sort((a, b) => b[1].length - a[1].length)
           .slice(0, 15)
           .forEach(([segment, items]) => {
-            const avgR = items.filter((i) => i.revenue_2024_usd_mn).length > 0
-              ? items.reduce((s, i) => s + (i.revenue_2024_usd_mn || 0), 0) / items.filter((i) => i.revenue_2024_usd_mn).length
-              : 0;
-            const avgE = items.filter((i) => i.ebitda_2024_usd_mn).length > 0
-              ? items.reduce((s, i) => s + (i.ebitda_2024_usd_mn || 0), 0) / items.filter((i) => i.ebitda_2024_usd_mn).length
-              : 0;
+            const revVals = items.map((i) => rev2024.get(i.id)).filter((v): v is number => v != null);
+            const ebVals = items.map((i) => ebitda2024.get(i.id)).filter((v): v is number => v != null);
+            const avgR = revVals.length > 0 ? revVals.reduce((s, v) => s + v, 0) / revVals.length : 0;
+            const avgE = ebVals.length > 0 ? ebVals.reduce((s, v) => s + v, 0) / ebVals.length : 0;
             result += `| ${segment} | ${items.length} | ${avgR.toFixed(1)} | ${avgE.toFixed(1)} |\n`;
           });
       }
@@ -355,12 +418,10 @@ export const getCompanyStats = tool(
           .sort((a, b) => b[1].length - a[1].length)
           .slice(0, 15)
           .forEach(([geo, items]) => {
-            const avgR = items.filter((i) => i.revenue_2024_usd_mn).length > 0
-              ? items.reduce((s, i) => s + (i.revenue_2024_usd_mn || 0), 0) / items.filter((i) => i.revenue_2024_usd_mn).length
-              : 0;
-            const avgE = items.filter((i) => i.ebitda_2024_usd_mn).length > 0
-              ? items.reduce((s, i) => s + (i.ebitda_2024_usd_mn || 0), 0) / items.filter((i) => i.ebitda_2024_usd_mn).length
-              : 0;
+            const revVals = items.map((i) => rev2024.get(i.id)).filter((v): v is number => v != null);
+            const ebVals = items.map((i) => ebitda2024.get(i.id)).filter((v): v is number => v != null);
+            const avgR = revVals.length > 0 ? revVals.reduce((s, v) => s + v, 0) / revVals.length : 0;
+            const avgE = ebVals.length > 0 ? ebVals.reduce((s, v) => s + v, 0) / ebVals.length : 0;
             result += `| ${geo} | ${items.length} | ${avgR.toFixed(1)} | ${avgE.toFixed(1)} |\n`;
           });
       }
@@ -400,12 +461,30 @@ export const getCompanyDetails = tool(
     logger.debug(`🔧 TOOL CALLED: get_company_details(company_name='${company_name}')`);
 
     try {
-      const companyRepo = new CompanyRepository(createDb());
+      const db = createDb();
+      const companyRepo = new CompanyRepository(db);
+      const financialRepo = new CompanyFinancialRepository(db);
+      const screeningRepo = new CompanyScreeningDerivedRepository(db);
       const c = await companyRepo.findByNameFuzzy(company_name);
 
       if (!c) {
         return `No company found matching "${company_name}". Try a different search term or use query_companies to browse available companies.`;
       }
+
+      const [financials, screening] = await Promise.all([
+        financialRepo.findByCompany(c.id),
+        screeningRepo.findByCompany(c.id),
+      ]);
+      const byYear = new Map<number, typeof financials[number]>();
+      for (const row of financials) byYear.set(row.fiscal_year, row);
+      const fmtNum = (n: number | null | undefined, digits = 1) =>
+        n != null ? n.toFixed(digits) : "-";
+      const fmtPct = (n: number | null | undefined) =>
+        n != null ? (n * 100).toFixed(1) + "%" : "-";
+      const y21 = byYear.get(2021);
+      const y22 = byYear.get(2022);
+      const y23 = byYear.get(2023);
+      const y24 = byYear.get(2024);
 
       const result = `## Company Details: ${c.target || "Unknown"}
 
@@ -422,19 +501,20 @@ export const getCompanyDetails = tool(
 ### Revenue (USD Millions)
 | Year | 2021 | 2022 | 2023 | 2024 |
 | --- | --- | --- | --- | --- |
-| Revenue | ${c.revenue_2021_usd_mn?.toFixed(1) || "-"} | ${c.revenue_2022_usd_mn?.toFixed(1) || "-"} | ${c.revenue_2023_usd_mn?.toFixed(1) || "-"} | ${c.revenue_2024_usd_mn?.toFixed(1) || "-"} |
-| Growth | - | ${c.revenue_cagr_2021_2022 ? (c.revenue_cagr_2021_2022 * 100).toFixed(1) + "%" : "-"} | ${c.revenue_cagr_2022_2023 ? (c.revenue_cagr_2022_2023 * 100).toFixed(1) + "%" : "-"} | ${c.revenue_cagr_2023_2024 ? (c.revenue_cagr_2023_2024 * 100).toFixed(1) + "%" : "-"} |
+| Revenue | ${fmtNum(y21?.revenue_usd_mn)} | ${fmtNum(y22?.revenue_usd_mn)} | ${fmtNum(y23?.revenue_usd_mn)} | ${fmtNum(y24?.revenue_usd_mn)} |
+| Growth | - | ${fmtPct(y22?.revenue_cagr_vs_prior)} | ${fmtPct(y23?.revenue_cagr_vs_prior)} | ${fmtPct(y24?.revenue_cagr_vs_prior)} |
 
 ### EBITDA (USD Millions)
 | Year | 2021 | 2022 | 2023 | 2024 |
 | --- | --- | --- | --- | --- |
-| EBITDA | ${c.ebitda_2021_usd_mn?.toFixed(1) || "-"} | ${c.ebitda_2022_usd_mn?.toFixed(1) || "-"} | ${c.ebitda_2023_usd_mn?.toFixed(1) || "-"} | ${c.ebitda_2024_usd_mn?.toFixed(1) || "-"} |
-| Margin | ${c.ebitda_margin_2021 ? (c.ebitda_margin_2021 * 100).toFixed(1) + "%" : "-"} | ${c.ebitda_margin_2022 ? (c.ebitda_margin_2022 * 100).toFixed(1) + "%" : "-"} | ${c.ebitda_margin_2023 ? (c.ebitda_margin_2023 * 100).toFixed(1) + "%" : "-"} | ${c.ebitda_margin_2024 ? (c.ebitda_margin_2024 * 100).toFixed(1) + "%" : "-"} |
+| EBITDA | ${fmtNum(y21?.ebitda_usd_mn)} | ${fmtNum(y22?.ebitda_usd_mn)} | ${fmtNum(y23?.ebitda_usd_mn)} | ${fmtNum(y24?.ebitda_usd_mn)} |
+| Margin | ${fmtPct(y21?.ebitda_margin)} | ${fmtPct(y22?.ebitda_margin)} | ${fmtPct(y23?.ebitda_margin)} | ${fmtPct(y24?.ebitda_margin)} |
 
 ### Valuation (2024)
-- **Enterprise Value:** ${c.ev_2024 ? "$" + c.ev_2024.toFixed(1) + "M" : "N/A"}
-- **EV/EBITDA Multiple:** ${c.ev_ebitda_2024?.toFixed(1) || "N/A"}x
+- **Enterprise Value:** ${y24?.ev_usd_mn != null ? "$" + y24.ev_usd_mn.toFixed(1) + "M" : "N/A"}
+- **EV/EBITDA Multiple:** ${fmtNum(y24?.ev_ebitda)}x
 
+${screening?.l1_screening_result ? `### L1 Screening\n- **Result:** ${screening.l1_screening_result}${screening.l1_rationale ? `\n- **Rationale:** ${screening.l1_rationale}` : ""}\n` : ""}
 ${c.comments ? `### Comments\n${c.comments}` : ""}
 `;
 

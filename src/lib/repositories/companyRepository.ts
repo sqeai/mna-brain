@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm';
 import {
   companies,
+  companyFinancials,
   companyLogs,
   criterias,
   dealDocuments,
@@ -26,6 +27,7 @@ import {
 } from '@/lib/db/schema';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
+import type { DealStage } from '@/lib/types';
 
 export interface CompanyFilters {
   id?: string;
@@ -84,11 +86,11 @@ const ORDERABLE_COLUMNS: Record<string, AnyPgColumn> = {
 function buildFilterWhere(filters: CompanyFilters): SQL | undefined {
   const conditions: (SQL | undefined)[] = [];
   if (filters.id) conditions.push(eq(companies.id, filters.id));
-  if (filters.stage) conditions.push(eq(companies.pipeline_stage, filters.stage));
+  if (filters.stage) conditions.push(eq(companies.pipeline_stage, filters.stage as DealStage));
   if (filters.stageIn && filters.stageIn.length > 0) {
-    conditions.push(inArray(companies.pipeline_stage, filters.stageIn));
+    conditions.push(inArray(companies.pipeline_stage, filters.stageIn as DealStage[]));
   }
-  if (filters.excludeStage) conditions.push(ne(companies.pipeline_stage, filters.excludeStage));
+  if (filters.excludeStage) conditions.push(ne(companies.pipeline_stage, filters.excludeStage as DealStage));
   if (filters.stageNotNull) conditions.push(isNotNull(companies.pipeline_stage));
   if (filters.createdAfter) conditions.push(gte(companies.created_at, filters.createdAfter));
   if (conditions.length === 0) return undefined;
@@ -157,14 +159,22 @@ export class CompanyRepository {
     if (filters.watchlistStatus) {
       conditions.push(ilike(companies.watchlist_status, `%${filters.watchlistStatus}%`));
     }
+    // Revenue/EBITDA filters apply against fiscal_year 2024 rows in company_financials.
+    const needsFinancialsJoin =
+      filters.minRevenue !== undefined ||
+      filters.maxRevenue !== undefined ||
+      filters.minEbitda !== undefined;
+    if (needsFinancialsJoin) {
+      conditions.push(eq(companyFinancials.fiscal_year, 2024));
+    }
     if (filters.minRevenue !== undefined) {
-      conditions.push(gte(companies.revenue_2024_usd_mn, filters.minRevenue));
+      conditions.push(gte(companyFinancials.revenue_usd_mn, filters.minRevenue));
     }
     if (filters.maxRevenue !== undefined) {
-      conditions.push(lte(companies.revenue_2024_usd_mn, filters.maxRevenue));
+      conditions.push(lte(companyFinancials.revenue_usd_mn, filters.maxRevenue));
     }
     if (filters.minEbitda !== undefined) {
-      conditions.push(gte(companies.ebitda_2024_usd_mn, filters.minEbitda));
+      conditions.push(gte(companyFinancials.ebitda_usd_mn, filters.minEbitda));
     }
     if (filters.searchTerm) {
       const term = `%${filters.searchTerm}%`;
@@ -178,6 +188,15 @@ export class CompanyRepository {
     }
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const limit = Math.min(filters.limit ?? 50, 50);
+    if (needsFinancialsJoin) {
+      const rows = await this.db
+        .select({ company: companies })
+        .from(companies)
+        .innerJoin(companyFinancials, eq(companyFinancials.company_id, companies.id))
+        .where(where)
+        .limit(limit);
+      return rows.map((r) => r.company);
+    }
     return this.db.select().from(companies).where(where).limit(limit);
   }
 

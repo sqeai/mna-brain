@@ -197,6 +197,13 @@
       "when": 1776988801000,
       "tag": "20260424000001_create_reset_password_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1777161600000,
+      "tag": "20260426000000_normalize_companies_and_favorites",
+      "breakpoints": true
     }
   ]
 }

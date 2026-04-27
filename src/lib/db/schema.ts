@@ -1,8 +1,13 @@
-import { pgTable, index, pgPolicy, uuid, jsonb, text, integer, timestamp, foreignKey, unique, check, numeric, varchar, boolean, date, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, index, pgPolicy, uuid, jsonb, text, integer, timestamp, foreignKey, unique, check, numeric, varchar, boolean, date, pgEnum, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
+export const analysisJobStatus = pgEnum("analysis_job_status", ['pending', 'processing', 'completed', 'failed'])
+export const companyStatus = pgEnum("company_status", ['active', 'dropped'])
+export const dealOrigin = pgEnum("deal_origin", ['inbound', 'outbound'])
 export const jobStatus = pgEnum("job_status", ['pending', 'running', 'completed', 'failed', 'timed_out'])
 export const jobType = pgEnum("job_type", ['slide_generation', 'market_screening', 'ai_screening', 'company_analysis', 'stuck_cleanup'])
+export const l1Result = pgEnum("l1_result", ['pass', 'fail', 'inconclusive'])
+export const pipelineStage = pgEnum("pipeline_stage", ['market_screening', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'])
 export const screeningState = pgEnum("screening_state", ['pending', 'completed', 'failed'])
 
 
@@ -109,81 +114,22 @@ export const companies = pgTable("companies", {
 	comments: text(),
 	ownership: text(),
 	geography: text(),
-	revenue_2021_usd_mn: numeric({ mode: 'number' }),
-	revenue_2022_usd_mn: numeric({ mode: 'number' }),
-	revenue_2023_usd_mn: numeric({ mode: 'number' }),
-	revenue_2024_usd_mn: numeric({ mode: 'number' }),
-	ebitda_2021_usd_mn: numeric({ mode: 'number' }),
-	ebitda_2022_usd_mn: numeric({ mode: 'number' }),
-	ebitda_2023_usd_mn: numeric({ mode: 'number' }),
-	ebitda_2024_usd_mn: numeric({ mode: 'number' }),
-	ev_2024: numeric({ mode: 'number' }),
-	revenue_cagr_2021_2022: numeric({ mode: 'number' }),
-	revenue_cagr_2022_2023: numeric({ mode: 'number' }),
-	revenue_cagr_2023_2024: numeric({ mode: 'number' }),
-	ebitda_margin_2021: numeric({ mode: 'number' }),
-	ebitda_margin_2022: numeric({ mode: 'number' }),
-	ebitda_margin_2023: numeric({ mode: 'number' }),
-	ebitda_margin_2024: numeric({ mode: 'number' }),
-	ev_ebitda_2024: numeric({ mode: 'number' }),
-	segment_revenue: numeric({ mode: 'number' }),
-	segment_ebitda: numeric({ mode: 'number' }),
-	segment_revenue_total_ratio: numeric({ mode: 'number' }),
-	l0_ebitda_2024_usd_mn: numeric({ mode: 'number' }),
-	l0_ev_2024_usd_mn: numeric({ mode: 'number' }),
-	l0_revenue_2024_usd_mn: numeric({ mode: 'number' }),
-	l0_ev_ebitda_2024: numeric({ mode: 'number' }),
-	segment_specific_revenue_pct: numeric({ mode: 'number' }),
-	combined_segment_revenue: text(),
-	revenue_from_priority_geo_flag: text(),
-	pct_from_domestic: numeric({ mode: 'number' }),
-	l0_ev_usd_mn: numeric({ mode: 'number' }),
-	l1_revenue_cagr_l3y: numeric({ mode: 'number' }),
-	l1_revenue_drop_count: integer(),
-	l1_ebitda_below_threshold_count: integer(),
-	l1_revenue_cagr_n3y: numeric({ mode: 'number' }),
-	l1_vision_fit: text(),
-	l1_priority_geo_flag: text(),
-	l1_ev_below_threshold: text(),
-	l1_rationale: text(),
-	l1_revenue_no_consecutive_drop_usd: text(),
-	fx_revenue_2021: numeric({ mode: 'number' }),
-	fx_revenue_2022: numeric({ mode: 'number' }),
-	fx_revenue_2023: numeric({ mode: 'number' }),
-	fx_revenue_2024: numeric({ mode: 'number' }),
-	fx_currency: text(),
-	fx_assumed_forex_2021: numeric({ mode: 'number' }),
-	fx_assumed_forex_2022: numeric({ mode: 'number' }),
-	fx_assumed_forex_2023: numeric({ mode: 'number' }),
-	fx_assumed_forex_2024: numeric({ mode: 'number' }),
-	fx_forex_change_2021_2022: numeric({ mode: 'number' }),
-	fx_forex_change_2022_2023: numeric({ mode: 'number' }),
-	fx_forex_change_2023_2024: numeric({ mode: 'number' }),
-	fx_revenue_cagr_domestic_2021_2022: numeric({ mode: 'number' }),
-	fx_revenue_cagr_domestic_2022_2023: numeric({ mode: 'number' }),
-	fx_revenue_cagr_domestic_2023_2024: numeric({ mode: 'number' }),
-	fx_revenue_drop_count: integer(),
-	fx_revenue_no_consecutive_drop_local: text(),
-	fx_rationale: text(),
-	fx_ebitda_above_10_l3y: text(),
-	l1_screening_result: text(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
-	pipeline_stage: text().default('L0'),
+	pipeline_stage: pipelineStage().default('L0').notNull(),
 	remarks: text(),
 	thesis_content: text(),
-	source: text(),
-	status: varchar({ length: 20 }).default(sql`NULL`),
+	source: dealOrigin(),
+	status: companyStatus(),
 }, (table) => {
 	return {
 		idxCompaniesEntryId: index("idx_companies_entry_id").using("btree", table.entry_id.asc().nullsLast().op("int4_ops")),
 		idxCompaniesGeography: index("idx_companies_geography").using("btree", table.geography.asc().nullsLast().op("text_ops")),
-		idxCompaniesL1ScreeningResult: index("idx_companies_l1_screening_result").using("btree", table.l1_screening_result.asc().nullsLast().op("text_ops")),
 		idxCompaniesOwnership: index("idx_companies_ownership").using("btree", table.ownership.asc().nullsLast().op("text_ops")),
-		idxCompaniesPipelineStage: index("idx_companies_pipeline_stage").using("btree", table.pipeline_stage.asc().nullsLast().op("text_ops")),
+		idxCompaniesPipelineStage: index("idx_companies_pipeline_stage").using("btree", table.pipeline_stage.asc().nullsLast().op("enum_ops")),
 		idxCompaniesSegment: index("idx_companies_segment").using("btree", table.segment.asc().nullsLast().op("text_ops")),
-		idxCompaniesSource: index("idx_companies_source").using("btree", table.source.asc().nullsLast().op("text_ops")),
-		idxCompaniesStatus: index("idx_companies_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+		idxCompaniesSource: index("idx_companies_source").using("btree", table.source.asc().nullsLast().op("enum_ops")),
+		idxCompaniesStatus: index("idx_companies_status").using("btree", table.status.asc().nullsLast().op("enum_ops")),
 		idxCompaniesTarget: index("idx_companies_target").using("btree", table.target.asc().nullsLast().op("text_ops")),
 		idxCompaniesWatchlistId: index("idx_companies_watchlist_id").using("btree", table.watchlist_id.asc().nullsLast().op("int4_ops")),
 		idxCompaniesWatchlistStatus: index("idx_companies_watchlist_status").using("btree", table.watchlist_status.asc().nullsLast().op("text_ops")),
@@ -191,7 +137,6 @@ export const companies = pgTable("companies", {
 		allowUpdateAccessOnCompanies: pgPolicy("Allow update access on companies", { as: "permissive", for: "update", to: ["public"] }),
 		allowInsertAccessOnCompanies: pgPolicy("Allow insert access on companies", { as: "permissive", for: "insert", to: ["public"] }),
 		allowReadAccessOnCompanies: pgPolicy("Allow read access on companies", { as: "permissive", for: "select", to: ["public"] }),
-		companiesStatusCheck: check("companies_status_check", sql`(status IS NULL) OR ((status)::text = ANY ((ARRAY['active'::character varying, 'dropped'::character varying])::text[]))`),
 	}
 });
 
@@ -202,7 +147,6 @@ export const users = pgTable("users", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	email: text(),
-	favorite_companies: jsonb().$type<string[]>().default([]),
 }, (table) => {
 	return {
 		idxUsersEmail: index("idx_users_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
@@ -467,7 +411,7 @@ export const dealStageHistory = pgTable("deal_stage_history", {
 	stage: text().notNull(),
 	entered_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	exited_at: timestamp({ withTimezone: true, mode: 'string' }),
-	duration_seconds: integer(),
+	duration_seconds: integer().generatedAlwaysAs(sql`CASE WHEN exited_at IS NOT NULL THEN EXTRACT(EPOCH FROM (exited_at - entered_at))::integer END`),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => {
 	return {
@@ -561,7 +505,7 @@ export const dealDocuments = pgTable("deal_documents", {
 export const companyAnalyses = pgTable("company_analyses", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	company_id: uuid().notNull(),
-	status: text().default('pending').notNull(),
+	status: analysisJobStatus().default('pending').notNull(),
 	business_overview: text(),
 	business_model_summary: text(),
 	key_takeaways: text(),
@@ -772,3 +716,114 @@ export const files = pgTable("files", {
 		allowReadAccessOnFiles: pgPolicy("Allow read access on files", { as: "permissive", for: "select", to: ["public"] }),
 	}
 });
+
+export const companyFinancials = pgTable("company_financials", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	fiscal_year: integer().notNull(),
+	revenue_usd_mn: numeric({ mode: 'number' }),
+	ebitda_usd_mn: numeric({ mode: 'number' }),
+	ev_usd_mn: numeric({ mode: 'number' }),
+	ebitda_margin: numeric({ mode: 'number' }),
+	ev_ebitda: numeric({ mode: 'number' }),
+	revenue_cagr_vs_prior: numeric({ mode: 'number' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		idxCompanyFinancialsCompanyId: index("idx_company_financials_company_id").using("btree", table.company_id.asc().nullsLast().op("uuid_ops")),
+		companyFinancialsCompanyIdFkey: foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [companies.id],
+			name: "company_financials_company_id_fkey"
+		}).onDelete("cascade"),
+		companyFinancialsCompanyYearUniq: unique("company_financials_company_year_uniq").on(table.company_id, table.fiscal_year),
+		companyFinancialsYearChk: check("company_financials_year_chk", sql`(fiscal_year >= 1990) AND (fiscal_year <= 2100)`),
+	}
+});
+
+export const companyFxAdjustments = pgTable("company_fx_adjustments", {
+	company_id: uuid().notNull(),
+	fiscal_year: integer().notNull(),
+	currency: text().notNull(),
+	revenue_local: numeric({ mode: 'number' }),
+	assumed_forex: numeric({ mode: 'number' }),
+	forex_change_vs_prior: numeric({ mode: 'number' }),
+	revenue_cagr_domestic: numeric({ mode: 'number' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		companyFxAdjustmentsCompanyIdFkey: foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [companies.id],
+			name: "company_fx_adjustments_company_id_fkey"
+		}).onDelete("cascade"),
+		companyFxAdjustmentsPkey: primaryKey({ columns: [table.company_id, table.fiscal_year], name: "company_fx_adjustments_pkey" }),
+		companyFxAdjustmentsYearChk: check("company_fx_adjustments_year_chk", sql`(fiscal_year >= 1990) AND (fiscal_year <= 2100)`),
+	}
+});
+
+export const companyScreeningDerived = pgTable("company_screening_derived", {
+	company_id: uuid().primaryKey().notNull(),
+	segment_revenue: numeric({ mode: 'number' }),
+	segment_ebitda: numeric({ mode: 'number' }),
+	segment_revenue_total_ratio: numeric({ mode: 'number' }),
+	l0_ebitda_2024_usd_mn: numeric({ mode: 'number' }),
+	l0_ev_2024_usd_mn: numeric({ mode: 'number' }),
+	l0_revenue_2024_usd_mn: numeric({ mode: 'number' }),
+	l0_ev_ebitda_2024: numeric({ mode: 'number' }),
+	segment_specific_revenue_pct: numeric({ mode: 'number' }),
+	combined_segment_revenue: text(),
+	pct_from_domestic: numeric({ mode: 'number' }),
+	l0_ev_usd_mn: numeric({ mode: 'number' }),
+	revenue_from_priority_geo: boolean(),
+	l1_revenue_cagr_l3y: numeric({ mode: 'number' }),
+	l1_revenue_drop_count: integer(),
+	l1_ebitda_below_threshold_count: integer(),
+	l1_revenue_cagr_n3y: numeric({ mode: 'number' }),
+	l1_vision_fit: boolean(),
+	l1_priority_geo: boolean(),
+	l1_ev_below_threshold: boolean(),
+	l1_revenue_no_consecutive_drop: boolean(),
+	l1_rationale: text(),
+	l1_screening_result: l1Result(),
+	fx_currency: text(),
+	fx_revenue_drop_count: integer(),
+	fx_revenue_no_consecutive_drop: boolean(),
+	fx_ebitda_above_10_l3y: boolean(),
+	fx_rationale: text(),
+	computed_at: timestamp({ withTimezone: true, mode: 'string' }),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		idxCompanyScreeningDerivedL1Result: index("idx_company_screening_derived_l1_result").using("btree", table.l1_screening_result.asc().nullsLast().op("enum_ops")),
+		companyScreeningDerivedCompanyIdFkey: foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [companies.id],
+			name: "company_screening_derived_company_id_fkey"
+		}).onDelete("cascade"),
+	}
+});
+
+export const userCompanyFavorites = pgTable("user_company_favorites", {
+	user_id: uuid().notNull(),
+	company_id: uuid().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		idxUserCompanyFavoritesCompanyId: index("idx_user_company_favorites_company_id").using("btree", table.company_id.asc().nullsLast().op("uuid_ops")),
+		userCompanyFavoritesUserIdFkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "user_company_favorites_user_id_fkey"
+		}).onDelete("cascade"),
+		userCompanyFavoritesCompanyIdFkey: foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [companies.id],
+			name: "user_company_favorites_company_id_fkey"
+		}).onDelete("cascade"),
+		userCompanyFavoritesPkey: primaryKey({ columns: [table.user_id, table.company_id], name: "user_company_favorites_pkey" }),
+	}
+});
+

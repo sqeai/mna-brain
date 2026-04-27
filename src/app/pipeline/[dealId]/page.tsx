@@ -340,8 +340,8 @@ export default function CompanyDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
-        // If still generating, poll until complete
-        if (data.status === 'generating') {
+        // If still processing, poll until complete
+        if (data.status === 'processing') {
           setAnalysisGenerating(true);
           pollAnalysis();
         }
@@ -359,7 +359,7 @@ export default function CompanyDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setAnalysis(data);
-          if (data.status !== 'generating') {
+          if (data.status !== 'processing') {
             setAnalysisGenerating(false);
             clearInterval(interval);
           }
@@ -875,7 +875,7 @@ export default function CompanyDetailPage() {
             />
 
             {/* AI Company Card Section */}
-            {analysisGenerating && !analysis?.business_overview ? (
+            {analysisGenerating ? (
               <AICompanyCardLoading />
             ) : analysis?.status === 'failed' ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-12 flex flex-col items-center justify-center gap-4">

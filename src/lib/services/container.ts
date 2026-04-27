@@ -9,12 +9,16 @@ import {
   DealNoteRepository,
   DealLinkRepository,
   CompanyAnalysisRepository,
+  CompanyFinancialRepository,
+  CompanyFxAdjustmentRepository,
+  CompanyScreeningDerivedRepository,
   CompanySlidesRepository,
   FileRepository,
   InvestmentThesisRepository,
   JobRepository,
   ResetPasswordTokenRepository,
   UserRepository,
+  UserCompanyFavoriteRepository,
 } from '@/lib/repositories';
 import { JobDispatcher } from './jobDispatcher';
 import { CompanyService } from './companyService';
@@ -70,6 +74,10 @@ export function createContainer(db: DbClient): Container {
   const jobRepo = new JobRepository(db);
   const userRepo = new UserRepository(db);
   const resetTokenRepo = new ResetPasswordTokenRepository(db);
+  const userFavoriteRepo = new UserCompanyFavoriteRepository(db);
+  const companyFinancialRepo = new CompanyFinancialRepository(db);
+  const companyFxAdjustmentRepo = new CompanyFxAdjustmentRepository(db);
+  const companyScreeningDerivedRepo = new CompanyScreeningDerivedRepository(db);
 
   const criteriaService = new CriteriaService(criteriaRepo);
   const screeningService = new ScreeningService(screeningRepo);
@@ -78,7 +86,7 @@ export function createContainer(db: DbClient): Container {
   const dealLinkService = new DealLinkService(dealLinkRepo);
   const jobService = new JobService(jobRepo);
   const authService = new AuthService(userRepo, resetTokenRepo);
-  const userService = new UserService(userRepo);
+  const userService = new UserService(userFavoriteRepo);
   const chatService = new ChatService(thesisRepo, criteriaRepo);
 
   const companyAnalysisService = new CompanyAnalysisService(companyAnalysisRepo, jobDispatcher);
@@ -92,6 +100,9 @@ export function createContainer(db: DbClient): Container {
     dealDocRepo,
     dealNoteRepo,
     dealLinkRepo,
+    companyFinancialRepo,
+    companyFxAdjustmentRepo,
+    companyScreeningDerivedRepo,
   );
   const dealDocumentService = new DealDocumentService(dealDocRepo);
   const fileService = new FileService(
