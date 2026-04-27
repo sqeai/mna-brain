@@ -41,7 +41,7 @@ export class CompanyService {
     return this.companyRepo.findAll(filters);
   }
 
-  count(filters: Pick<CompanyFilters, 'id' | 'stage' | 'stageIn' | 'excludeStage' | 'stageNotNull' | 'createdAfter'>) {
+  count(filters: Pick<CompanyFilters, 'id' | 'stage' | 'stageIn' | 'excludeStage' | 'stageNotNull' | 'excludeDropped' | 'createdAfter'>) {
     return this.companyRepo.count(filters);
   }
 
@@ -194,6 +194,7 @@ export class CompanyService {
     note?: string,
     linkUrl?: string,
     linkTitle?: string,
+    assigneeIds?: string[],
   ) {
     await this.companyRepo.update(id, { pipeline_stage: nextStage as DealStage });
     await this.companyLogRepo.insert({
@@ -217,6 +218,40 @@ export class CompanyService {
         stage: currentStage || 'L0',
       });
     }
+    if (assigneeIds !== undefined) {
+      await this.companyRepo.setAssignees(id, assigneeIds);
+    }
+  }
+
+  getAssignees(id: string) {
+    return this.companyRepo.findAssignees(id);
+  }
+
+  setAssignees(id: string, userIds: string[]) {
+    return this.companyRepo.setAssignees(id, userIds);
+  }
+
+  async dropDeal(id: string, currentStage: string | undefined, reason?: string) {
+    await this.companyRepo.update(id, { status: 'dropped' });
+    await this.companyLogRepo.insert({
+      company_id: id,
+      action: currentStage ? `DROPPED_FROM_${currentStage}` : 'DROPPED',
+    });
+    if (reason?.trim()) {
+      await this.dealNoteRepo.insert({
+        deal_id: id,
+        content: reason,
+        stage: currentStage || 'L0',
+      });
+    }
+  }
+
+  async restoreDeal(id: string, currentStage: string | undefined) {
+    await this.companyRepo.update(id, { status: null });
+    await this.companyLogRepo.insert({
+      company_id: id,
+      action: currentStage ? `RESTORED_TO_${currentStage}` : 'RESTORED',
+    });
   }
 
   runL1Filters(id: string) {

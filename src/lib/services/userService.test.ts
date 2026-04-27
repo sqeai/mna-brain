@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UserCompanyFavoriteRepository } from '@/lib/repositories';
+import type { UserCompanyFavoriteRepository, UserRepository } from '@/lib/repositories';
 import { UserService } from './userService';
 
-function makeRepoStub(): UserCompanyFavoriteRepository {
+function makeUserRepoStub(): UserRepository {
+  return {
+    findAll: vi.fn(),
+    findByEmail: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  } as unknown as UserRepository;
+}
+
+function makeFavoritesRepoStub(): UserCompanyFavoriteRepository {
   return {
     listByUser: vi.fn(),
     add: vi.fn(),
@@ -11,57 +20,74 @@ function makeRepoStub(): UserCompanyFavoriteRepository {
   } as unknown as UserCompanyFavoriteRepository;
 }
 
-describe('UserService.toggleFavorite', () => {
-  let repo: UserCompanyFavoriteRepository;
+describe('UserService', () => {
+  let userRepo: UserRepository;
+  let favoritesRepo: UserCompanyFavoriteRepository;
   let service: UserService;
 
   beforeEach(() => {
-    repo = makeRepoStub();
-    service = new UserService(repo);
+    userRepo = makeUserRepoStub();
+    favoritesRepo = makeFavoritesRepoStub();
+    service = new UserService(userRepo, favoritesRepo);
   });
 
-  it('adds the company when it is not yet favorited', async () => {
-    vi.mocked(repo.has).mockResolvedValue(false);
-    vi.mocked(repo.listByUser).mockResolvedValue(['a', 'b', 'c']);
+  describe('list', () => {
+    it('returns all users from the user repository', async () => {
+      const users = [
+        { id: '1', name: 'Alice', email: 'a@x.com', role: 'admin' },
+        { id: '2', name: 'Bob', email: 'b@x.com', role: 'user' },
+      ];
+      vi.mocked(userRepo.findAll).mockResolvedValue(users as never);
 
-    const result = await service.toggleFavorite('user-1', 'c');
+      const result = await service.list();
 
-    expect(repo.add).toHaveBeenCalledWith('user-1', 'c');
-    expect(repo.remove).not.toHaveBeenCalled();
-    expect(result).toEqual(['a', 'b', 'c']);
+      expect(result).toEqual(users);
+      expect(userRepo.findAll).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it('removes the company when it is already favorited', async () => {
-    vi.mocked(repo.has).mockResolvedValue(true);
-    vi.mocked(repo.listByUser).mockResolvedValue(['a', 'c']);
+  describe('findFavorites', () => {
+    it("returns the user's favorite company ids", async () => {
+      vi.mocked(favoritesRepo.listByUser).mockResolvedValue(['a', 'b']);
 
-    const result = await service.toggleFavorite('user-1', 'b');
+      const result = await service.findFavorites('user-1');
 
-    expect(repo.remove).toHaveBeenCalledWith('user-1', 'b');
-    expect(repo.add).not.toHaveBeenCalled();
-    expect(result).toEqual(['a', 'c']);
+      expect(result).toEqual(['a', 'b']);
+      expect(favoritesRepo.listByUser).toHaveBeenCalledWith('user-1');
+    });
   });
 
-  it('returns an empty list when no favorites remain', async () => {
-    vi.mocked(repo.has).mockResolvedValue(true);
-    vi.mocked(repo.listByUser).mockResolvedValue([]);
+  describe('toggleFavorite', () => {
+    it('adds the company when it is not yet favorited', async () => {
+      vi.mocked(favoritesRepo.has).mockResolvedValue(false);
+      vi.mocked(favoritesRepo.listByUser).mockResolvedValue(['a', 'b', 'c']);
 
-    const result = await service.toggleFavorite('user-1', 'only');
+      const result = await service.toggleFavorite('user-1', 'c');
 
-    expect(repo.remove).toHaveBeenCalledWith('user-1', 'only');
-    expect(result).toEqual([]);
-  });
-});
+      expect(favoritesRepo.add).toHaveBeenCalledWith('user-1', 'c');
+      expect(favoritesRepo.remove).not.toHaveBeenCalled();
+      expect(result).toEqual(['a', 'b', 'c']);
+    });
 
-describe('UserService.findFavorites', () => {
-  it('delegates to the repository', async () => {
-    const repo = makeRepoStub();
-    vi.mocked(repo.listByUser).mockResolvedValue(['a', 'b']);
-    const service = new UserService(repo);
+    it('removes the company when it is already favorited', async () => {
+      vi.mocked(favoritesRepo.has).mockResolvedValue(true);
+      vi.mocked(favoritesRepo.listByUser).mockResolvedValue(['a', 'c']);
 
-    const result = await service.findFavorites('user-1');
+      const result = await service.toggleFavorite('user-1', 'b');
 
-    expect(repo.listByUser).toHaveBeenCalledWith('user-1');
-    expect(result).toEqual(['a', 'b']);
+      expect(favoritesRepo.remove).toHaveBeenCalledWith('user-1', 'b');
+      expect(favoritesRepo.add).not.toHaveBeenCalled();
+      expect(result).toEqual(['a', 'c']);
+    });
+
+    it('returns an empty list when no favorites remain', async () => {
+      vi.mocked(favoritesRepo.has).mockResolvedValue(true);
+      vi.mocked(favoritesRepo.listByUser).mockResolvedValue([]);
+
+      const result = await service.toggleFavorite('user-1', 'only');
+
+      expect(favoritesRepo.remove).toHaveBeenCalledWith('user-1', 'only');
+      expect(result).toEqual([]);
+    });
   });
 });

@@ -1,9 +1,18 @@
-import { eq, ilike } from 'drizzle-orm';
+import { asc, eq, ilike } from 'drizzle-orm';
 import { users } from '@/lib/db/schema';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
 
+export type UserListItem = Pick<Tables<'users'>, 'id' | 'name' | 'email' | 'role'>;
+
 export class UserRepository {
   constructor(private readonly db: DbClient) {}
+
+  async findAll(): Promise<UserListItem[]> {
+    return this.db
+      .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+      .from(users)
+      .orderBy(asc(users.name));
+  }
 
   async findByEmail(email: string): Promise<Tables<'users'> | null> {
     const [row] = await this.db

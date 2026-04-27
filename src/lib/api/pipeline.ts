@@ -6,6 +6,7 @@ export async function getCompanies(params: {
   stageIn?: string[];
   excludeStage?: string;
   stageNotNull?: boolean;
+  excludeDropped?: boolean;
   createdAfter?: string;
   orderBy?: string;
   orderDir?: 'asc' | 'desc';
@@ -17,6 +18,7 @@ export async function getCompanies(params: {
   if (params.stageIn?.length) search.set('stageIn', params.stageIn.join(','));
   if (params.excludeStage) search.set('excludeStage', params.excludeStage);
   if (typeof params.stageNotNull === 'boolean') search.set('stageNotNull', String(params.stageNotNull));
+  if (typeof params.excludeDropped === 'boolean') search.set('excludeDropped', String(params.excludeDropped));
   if (params.createdAfter) search.set('createdAfter', params.createdAfter);
   if (params.orderBy) search.set('orderBy', params.orderBy);
   if (params.orderDir) search.set('orderDir', params.orderDir);
@@ -82,8 +84,50 @@ export async function promoteCompany(id: string, payload: {
   note?: string;
   linkUrl?: string;
   linkTitle?: string;
+  assigneeIds?: string[];
 }) {
   return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/promote`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+}
+
+export async function getUsers() {
+  return apiRequest<UserSummary[]>('/api/users');
+}
+
+export async function getCompanyAssignees(id: string) {
+  return apiRequest<UserSummary[]>(`/api/companies/${encodeURIComponent(id)}/assignees`);
+}
+
+export async function setCompanyAssignees(id: string, userIds: string[]) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/assignees`, {
+    method: 'PUT',
+    body: JSON.stringify({ userIds }),
+  });
+}
+
+export async function dropDeal(id: string, payload: {
+  currentStage?: string | null;
+  reason?: string;
+}) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/drop`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function restoreDeal(id: string, payload: {
+  currentStage?: string | null;
+}) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/restore`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });

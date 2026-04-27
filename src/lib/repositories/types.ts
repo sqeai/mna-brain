@@ -1,5 +1,5 @@
-import type * as schema from '@/lib/db/schema';
-import type { DbClient } from '@/lib/server/db';
+import type * as schema from "@/lib/db/schema";
+import type { DbClient } from "@/lib/server/db";
 
 export type { DbClient };
 
@@ -7,11 +7,12 @@ export type { DbClient };
 // Drizzle schema exports.
 type TableMap = {
   companies: typeof schema.companies;
+  company_assignees: typeof schema.companyAssignees;
+  company_logs: typeof schema.companyLogs;
   company_analyses: typeof schema.companyAnalyses;
   company_criterias: typeof schema.companyCriterias;
   company_financials: typeof schema.companyFinancials;
   company_fx_adjustments: typeof schema.companyFxAdjustments;
-  company_logs: typeof schema.companyLogs;
   company_screening_derived: typeof schema.companyScreeningDerived;
   company_slides: typeof schema.companySlides;
   criterias: typeof schema.criterias;
@@ -31,13 +32,17 @@ type TableMap = {
   users: typeof schema.users;
 };
 
-export type Tables<T extends keyof TableMap> = TableMap[T]['$inferSelect'];
+export type Tables<T extends keyof TableMap> = TableMap[T]["$inferSelect"];
 
 // NOTE: Drizzle's $inferInsert narrows incorrectly under strictNullChecks: false
 // (keys of nullable columns disappear). We merge it with Partial<Select> so
 // every column is a valid key, while required non-null columns stay required.
 export type TablesInsert<T extends keyof TableMap> =
-  TableMap[T]['$inferInsert'] &
-  Partial<Omit<TableMap[T]['$inferSelect'], keyof TableMap[T]['$inferInsert']>>;
+  TableMap[T]["$inferInsert"] &
+    Partial<
+      Omit<TableMap[T]["$inferSelect"], keyof TableMap[T]["$inferInsert"]>
+    >;
 
-export type TablesUpdate<T extends keyof TableMap> = Partial<TableMap[T]['$inferSelect']>;
+export type TablesUpdate<T extends keyof TableMap> = Partial<
+  TableMap[T]["$inferSelect"]
+>;
