@@ -1,7 +1,10 @@
-import type { UserCompanyFavoriteRepository } from '@/lib/repositories';
+import type { UserCompanyFavoriteRepository, UserRepository } from '@/lib/repositories';
 
 export class UserService {
-  constructor(private readonly favoritesRepo: UserCompanyFavoriteRepository) {}
+  constructor(
+    private readonly userRepo: UserRepository,
+    private readonly favoritesRepo: UserCompanyFavoriteRepository,
+  ) {}
 
   list() {
     return this.userRepo.findAll();
