@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       : undefined;
     const excludeStage = params.get('excludeStage') ?? undefined;
     const stageNotNull = parseBool(params.get('stageNotNull'));
+    const excludeDropped = parseBool(params.get('excludeDropped'));
     const createdAfter = params.get('createdAfter') ?? undefined;
     const orderBy = params.get('orderBy') ?? 'updated_at';
     const orderDir = (params.get('orderDir') ?? 'desc') as 'asc' | 'desc';
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     const countOnly = parseBool(params.get('countOnly'));
 
     if (countOnly) {
-      const count = await companyService.count({ id, stage, stageIn, excludeStage, stageNotNull, createdAfter });
+      const count = await companyService.count({ id, stage, stageIn, excludeStage, stageNotNull, excludeDropped, createdAfter });
       return NextResponse.json({ data: { count } });
     }
 
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data });
     }
 
-    const data = await companyService.list({ stage, stageIn, excludeStage, stageNotNull, createdAfter, orderBy, orderDir, limit });
+    const data = await companyService.list({ stage, stageIn, excludeStage, stageNotNull, excludeDropped, createdAfter, orderBy, orderDir, limit });
     return NextResponse.json({ data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch companies';

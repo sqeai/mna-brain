@@ -6,6 +6,7 @@ export async function getCompanies(params: {
   stageIn?: string[];
   excludeStage?: string;
   stageNotNull?: boolean;
+  excludeDropped?: boolean;
   createdAfter?: string;
   orderBy?: string;
   orderDir?: 'asc' | 'desc';
@@ -17,6 +18,7 @@ export async function getCompanies(params: {
   if (params.stageIn?.length) search.set('stageIn', params.stageIn.join(','));
   if (params.excludeStage) search.set('excludeStage', params.excludeStage);
   if (typeof params.stageNotNull === 'boolean') search.set('stageNotNull', String(params.stageNotNull));
+  if (typeof params.excludeDropped === 'boolean') search.set('excludeDropped', String(params.excludeDropped));
   if (params.createdAfter) search.set('createdAfter', params.createdAfter);
   if (params.orderBy) search.set('orderBy', params.orderBy);
   if (params.orderDir) search.set('orderDir', params.orderDir);
@@ -84,6 +86,25 @@ export async function promoteCompany(id: string, payload: {
   linkTitle?: string;
 }) {
   return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/promote`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function dropDeal(id: string, payload: {
+  currentStage?: string | null;
+  reason?: string;
+}) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/drop`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function restoreDeal(id: string, payload: {
+  currentStage?: string | null;
+}) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/restore`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });

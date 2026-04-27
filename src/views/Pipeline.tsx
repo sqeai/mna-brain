@@ -54,6 +54,7 @@ import {
   EyeOff,
   Star,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -92,7 +93,11 @@ import {
   toggleFavoriteCompany,
   promoteCompany,
   runCompanyL1Filters,
+  dropDeal,
+  restoreDeal,
 } from '@/lib/api/pipeline';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface PipelineCompany {
   id: string;
@@ -117,6 +122,7 @@ interface PipelineCompany {
   created_at: string;
   updated_at: string;
   source: string | null;
+  status: string | null;
 }
 
 const STAGES: DealStage[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
@@ -225,6 +231,9 @@ export default function Pipeline() {
   // L1 status filter
   const [l1StatusFilter, setL1StatusFilter] = useState<'all' | L1Status>('all');
 
+  // Active vs Dropped view
+  const [viewMode, setViewMode] = useState<'active' | 'dropped'>('active');
+
   // Sector filter
   const [sectorFilter, setSectorFilter] = useState<string>('all');
 
@@ -246,6 +255,8 @@ export default function Pipeline() {
 
   // Drop deal dialog state
   const [dropDealCompany, setDropDealCompany] = useState<PipelineCompany | null>(null);
+  const [dropReason, setDropReason] = useState('');
+  const [isDropping, setIsDropping] = useState(false);
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -280,6 +291,7 @@ export default function Pipeline() {
         created_at: company.created_at,
         updated_at: company.updated_at,
         source: company.source || null,
+        status: company.status ?? null,
       })) || [];
 
       setCompanies(formatted);
@@ -354,10 +366,13 @@ export default function Pipeline() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, sectorFilter, l1StatusFilter, activeTab]);
+  }, [searchQuery, sectorFilter, l1StatusFilter, activeTab, viewMode]);
 
   // Get unique sectors for filter
   const uniqueSectors = [...new Set(companies.map(c => c.segment).filter(Boolean))].sort();
+
+  const isDropped = (c: PipelineCompany) => c.status === 'dropped';
+  const isActive = (c: PipelineCompany) => !isDropped(c);
 
   const filteredCompanies = companies.filter((company) => {
     const matchesStage = company.pipeline_stage === activeTab;
@@ -365,7 +380,8 @@ export default function Pipeline() {
       (company.segment || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesL1Status = l1StatusFilter === 'all' || company.l1_screening_result === l1StatusFilter;
     const matchesSector = sectorFilter === 'all' || company.segment === sectorFilter;
-    return matchesStage && matchesSearch && matchesL1Status && matchesSector;
+    const matchesView = viewMode === 'dropped' ? isDropped(company) : isActive(company);
+    return matchesStage && matchesSearch && matchesL1Status && matchesSector && matchesView;
   });
 
   // Apply sorting (favorites always first)
@@ -500,7 +516,59 @@ export default function Pipeline() {
     }
   };
 
-  const stageCount = (stage: DealStage) => companies.filter((c) => c.pipeline_stage === stage).length;
+  const stageCount = (stage: DealStage) =>
+    companies.filter((c) => c.pipeline_stage === stage && isActive(c)).length;
+  const activeStageCount = (stage: DealStage) =>
+    companies.filter((c) => c.pipeline_stage === stage && isActive(c)).length;
+  const droppedStageCount = (stage: DealStage) =>
+    companies.filter((c) => c.pipeline_stage === stage && isDropped(c)).length;
+
+  const handleRestoreDeal = async (company: PipelineCompany) => {
+    try {
+      await restoreDeal(company.id, { currentStage: company.pipeline_stage });
+      posthog.capture('deal_restored', {
+        deal_id: company.id,
+        company_name: company.target,
+        to_stage: company.pipeline_stage,
+      });
+      toast.success(`Restored ${company.target}`);
+      fetchCompanies();
+    } catch (err: any) {
+      console.error('Error restoring deal:', err);
+      toast.error(`Failed to restore deal: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const renderViewToggle = (stage: DealStage) => (
+    <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1 mb-4">
+      <button
+        type="button"
+        onClick={() => setViewMode('active')}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-all',
+          viewMode === 'active'
+            ? 'bg-background text-foreground font-medium shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Active
+        <span className="text-xs text-muted-foreground">{activeStageCount(stage)}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setViewMode('dropped')}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-all',
+          viewMode === 'dropped'
+            ? 'bg-background text-foreground font-medium shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        Dropped
+        <span className="text-xs text-muted-foreground">{droppedStageCount(stage)}</span>
+      </button>
+    </div>
+  );
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedIds);
@@ -715,6 +783,8 @@ export default function Pipeline() {
                               ))}
                             </div>
 
+                            {renderViewToggle('L0')}
+
                             {loading ? (
                               <div className="flex items-center justify-center py-12">
                                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -923,24 +993,33 @@ export default function Pipeline() {
                                                 </Button>
                                               </DropdownMenuTrigger>
                                               <DropdownMenuContent align="end">
-                                                <DropdownMenuItem
-                                                  onClick={() => {
-                                                    setDialogMode('promote');
-                                                    setPromotingCompany(company);
-                                                    setPromoteDialogOpen(true);
-                                                  }}
-                                                >
-                                                  <ArrowRight className="mr-2 h-4 w-4" />
-                                                  Promote to L1
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                  onClick={() => setDropDealCompany(company)}
-                                                  className="text-destructive focus:text-destructive"
-                                                >
-                                                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                                                  Drop deal
-                                                </DropdownMenuItem>
+                                                {viewMode === 'dropped' ? (
+                                                  <DropdownMenuItem onClick={() => handleRestoreDeal(company)}>
+                                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                                    Restore deal
+                                                  </DropdownMenuItem>
+                                                ) : (
+                                                  <>
+                                                    <DropdownMenuItem
+                                                      onClick={() => {
+                                                        setDialogMode('promote');
+                                                        setPromotingCompany(company);
+                                                        setPromoteDialogOpen(true);
+                                                      }}
+                                                    >
+                                                      <ArrowRight className="mr-2 h-4 w-4" />
+                                                      Promote to L1
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                      onClick={() => setDropDealCompany(company)}
+                                                      className="text-destructive focus:text-destructive"
+                                                    >
+                                                      <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                                      Drop deal
+                                                    </DropdownMenuItem>
+                                                  </>
+                                                )}
                                               </DropdownMenuContent>
                                             </DropdownMenu>
                                           </TableCell>
@@ -1054,6 +1133,8 @@ export default function Pipeline() {
                           </span>
                         ))}
                       </div>
+
+                      {renderViewToggle(stage)}
 
                       {/* Table for L1-L5 stages */}
                       {loading ? (
@@ -1223,38 +1304,47 @@ export default function Pipeline() {
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end">
-                                            {stage !== 'L5' && (
-                                              <DropdownMenuItem
-                                                onClick={() => {
-                                                  setDialogMode('promote');
-                                                  setPromotingCompany(company);
-                                                  setPromoteDialogOpen(true);
-                                                }}
-                                              >
-                                                <ArrowRight className="mr-2 h-4 w-4" />
-                                                Promote to {STAGES[STAGES.indexOf(stage) + 1]}
+                                            {viewMode === 'dropped' ? (
+                                              <DropdownMenuItem onClick={() => handleRestoreDeal(company)}>
+                                                <RotateCcw className="mr-2 h-4 w-4" />
+                                                Restore deal
                                               </DropdownMenuItem>
+                                            ) : (
+                                              <>
+                                                {stage !== 'L5' && (
+                                                  <DropdownMenuItem
+                                                    onClick={() => {
+                                                      setDialogMode('promote');
+                                                      setPromotingCompany(company);
+                                                      setPromoteDialogOpen(true);
+                                                    }}
+                                                  >
+                                                    <ArrowRight className="mr-2 h-4 w-4" />
+                                                    Promote to {STAGES[STAGES.indexOf(stage) + 1]}
+                                                  </DropdownMenuItem>
+                                                )}
+                                                {STAGES.indexOf(stage) > 0 && (
+                                                  <DropdownMenuItem
+                                                    onClick={() => {
+                                                      setDialogMode('demote');
+                                                      setPromotingCompany(company);
+                                                      setPromoteDialogOpen(true);
+                                                    }}
+                                                  >
+                                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                                    Demote to {STAGES[STAGES.indexOf(stage) - 1]}
+                                                  </DropdownMenuItem>
+                                                )}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                  onClick={() => setDropDealCompany(company)}
+                                                  className="text-destructive focus:text-destructive"
+                                                >
+                                                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                                  Drop deal
+                                                </DropdownMenuItem>
+                                              </>
                                             )}
-                                            {STAGES.indexOf(stage) > 0 && (
-                                              <DropdownMenuItem
-                                                onClick={() => {
-                                                  setDialogMode('demote');
-                                                  setPromotingCompany(company);
-                                                  setPromoteDialogOpen(true);
-                                                }}
-                                              >
-                                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                                Demote to {STAGES[STAGES.indexOf(stage) - 1]}
-                                              </DropdownMenuItem>
-                                            )}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                              onClick={() => setDropDealCompany(company)}
-                                              className="text-destructive focus:text-destructive"
-                                            >
-                                              <Trash2 className="mr-2 h-4 w-4 text-destructive" />
-                                              Drop deal
-                                            </DropdownMenuItem>
                                           </DropdownMenuContent>
                                         </DropdownMenu>
                                       </TableCell>
@@ -1346,7 +1436,15 @@ export default function Pipeline() {
           )
         }
 
-        <AlertDialog open={!!dropDealCompany} onOpenChange={(open) => !open && setDropDealCompany(null)}>
+        <AlertDialog
+          open={!!dropDealCompany}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDropDealCompany(null);
+              setDropReason('');
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Drop deal?</AlertDialogTitle>
@@ -1355,16 +1453,51 @@ export default function Pipeline() {
                 This will remove the deal from the pipeline.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="mt-2">
+              <Label htmlFor="drop-reason">Reason (optional)</Label>
+              <Textarea
+                id="drop-reason"
+                placeholder="Why is this deal being dropped?"
+                value={dropReason}
+                onChange={(e) => setDropReason(e.target.value)}
+                rows={3}
+                className="mt-1.5"
+                disabled={isDropping}
+              />
+            </div>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDropping}>Cancel</AlertDialogCancel>
               <AlertDialogAction
+                disabled={isDropping}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => {
-                  toast.info('Drop deal action is not yet wired to the backend');
-                  setDropDealCompany(null);
+                onClick={async (e) => {
+                  e.preventDefault();
+                  if (!dropDealCompany) return;
+                  setIsDropping(true);
+                  try {
+                    await dropDeal(dropDealCompany.id, {
+                      currentStage: dropDealCompany.pipeline_stage,
+                      reason: dropReason,
+                    });
+                    posthog.capture('deal_dropped', {
+                      deal_id: dropDealCompany.id,
+                      company_name: dropDealCompany.target,
+                      from_stage: dropDealCompany.pipeline_stage,
+                      has_reason: dropReason.trim() !== '',
+                    });
+                    toast.success(`Dropped ${dropDealCompany.target}`);
+                    setDropDealCompany(null);
+                    setDropReason('');
+                    fetchCompanies();
+                  } catch (err: any) {
+                    console.error('Error dropping deal:', err);
+                    toast.error(`Failed to drop deal: ${err.message || 'Unknown error'}`);
+                  } finally {
+                    setIsDropping(false);
+                  }
                 }}
               >
-                Drop deal
+                {isDropping ? 'Dropping...' : 'Drop deal'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

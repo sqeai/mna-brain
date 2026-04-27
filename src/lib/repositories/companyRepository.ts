@@ -8,6 +8,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   lte,
   ne,
   or,
@@ -33,6 +34,7 @@ export interface CompanyFilters {
   stageIn?: string[];
   excludeStage?: string;
   stageNotNull?: boolean;
+  excludeDropped?: boolean;
   createdAfter?: string;
   orderBy?: string;
   orderDir?: 'asc' | 'desc';
@@ -90,6 +92,9 @@ function buildFilterWhere(filters: CompanyFilters): SQL | undefined {
   }
   if (filters.excludeStage) conditions.push(ne(companies.pipeline_stage, filters.excludeStage));
   if (filters.stageNotNull) conditions.push(isNotNull(companies.pipeline_stage));
+  if (filters.excludeDropped) {
+    conditions.push(or(isNull(companies.status), ne(companies.status, 'dropped')));
+  }
   if (filters.createdAfter) conditions.push(gte(companies.created_at, filters.createdAfter));
   if (conditions.length === 0) return undefined;
   return and(...conditions);
