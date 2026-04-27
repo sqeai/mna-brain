@@ -7,6 +7,7 @@ export type { DbClient };
 // Drizzle schema exports.
 type TableMap = {
   companies: typeof schema.companies;
+  company_assignees: typeof schema.companyAssignees;
   company_logs: typeof schema.companyLogs;
   company_analyses: typeof schema.companyAnalyses;
   company_slides: typeof schema.companySlides;

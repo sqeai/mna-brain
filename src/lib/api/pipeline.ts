@@ -84,10 +84,33 @@ export async function promoteCompany(id: string, payload: {
   note?: string;
   linkUrl?: string;
   linkTitle?: string;
+  assigneeIds?: string[];
 }) {
   return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/promote`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+}
+
+export async function getUsers() {
+  return apiRequest<UserSummary[]>('/api/users');
+}
+
+export async function getCompanyAssignees(id: string) {
+  return apiRequest<UserSummary[]>(`/api/companies/${encodeURIComponent(id)}/assignees`);
+}
+
+export async function setCompanyAssignees(id: string, userIds: string[]) {
+  return apiRequest<{ success: boolean }>(`/api/companies/${encodeURIComponent(id)}/assignees`, {
+    method: 'PUT',
+    body: JSON.stringify({ userIds }),
   });
 }
 

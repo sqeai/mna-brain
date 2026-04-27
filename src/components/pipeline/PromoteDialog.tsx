@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,13 @@ import {
 } from 'lucide-react';
 import { DealStage } from '@/lib/types';
 import posthog from 'posthog-js';
-import { promoteCompany } from '@/lib/api/pipeline';
+import {
+  getCompanyAssignees,
+  getUsers,
+  promoteCompany,
+  type UserSummary,
+} from '@/lib/api/pipeline';
+import UserCombobox from './UserCombobox';
 
 interface PromoteDialogProps {
   open: boolean;
@@ -53,6 +59,32 @@ export default function PromoteDialog({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open || mode !== 'promote') return;
+    let cancelled = false;
+    setUsersLoading(true);
+    Promise.all([getUsers(), getCompanyAssignees(dealId)])
+      .then(([userList, current]) => {
+        if (cancelled) return;
+        setUsers(userList);
+        setAssigneeIds(current.map((u) => u.id));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load users/assignees:', err);
+        toast.error('Failed to load users');
+      })
+      .finally(() => {
+        if (!cancelled) setUsersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, dealId]);
 
   const handlePromote = async () => {
     setIsSubmitting(true);
@@ -68,6 +100,7 @@ export default function PromoteDialog({
         note,
         linkUrl,
         linkTitle,
+        assigneeIds: mode === 'promote' ? assigneeIds : undefined,
       });
 
       // Auto-trigger AI Company Card when promoting to L1
@@ -177,6 +210,7 @@ export default function PromoteDialog({
     setLinkUrl('');
     setLinkTitle('');
     setSelectedFile(null);
+    setAssigneeIds([]);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,7 +249,18 @@ export default function PromoteDialog({
             />
           </div>
         ) : (
-          <Tabs defaultValue="note" className="w-full">
+          <>
+            <div className="space-y-1.5">
+              <Label>Assignees</Label>
+              <UserCombobox
+                users={users}
+                selectedUserIds={assigneeIds}
+                onChange={setAssigneeIds}
+                loading={usersLoading}
+                disabled={isSubmitting}
+              />
+            </div>
+            <Tabs defaultValue="note" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="note" className="gap-1">
                 <FileText className="h-3 w-3" />
@@ -286,7 +331,8 @@ export default function PromoteDialog({
                 )}
               </div>
             </TabsContent>
-          </Tabs>
+            </Tabs>
+          </>
         )}
 
         <DialogFooter className="mt-4">

@@ -76,6 +76,7 @@ export class CompanyService {
     note?: string,
     linkUrl?: string,
     linkTitle?: string,
+    assigneeIds?: string[],
   ) {
     await this.companyRepo.update(id, { pipeline_stage: nextStage });
     await this.companyLogRepo.insert({
@@ -99,6 +100,17 @@ export class CompanyService {
         stage: currentStage || 'L0',
       });
     }
+    if (assigneeIds !== undefined) {
+      await this.companyRepo.setAssignees(id, assigneeIds);
+    }
+  }
+
+  getAssignees(id: string) {
+    return this.companyRepo.findAssignees(id);
+  }
+
+  setAssignees(id: string, userIds: string[]) {
+    return this.companyRepo.setAssignees(id, userIds);
   }
 
   async dropDeal(id: string, currentStage: string | undefined, reason?: string) {

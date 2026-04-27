@@ -1,4 +1,4 @@
-import { pgTable, index, pgPolicy, uuid, jsonb, text, integer, timestamp, foreignKey, unique, check, numeric, varchar, boolean, date, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, index, pgPolicy, uuid, jsonb, text, integer, timestamp, foreignKey, unique, check, numeric, varchar, boolean, date, pgEnum, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const jobStatus = pgEnum("job_status", ['pending', 'running', 'completed', 'failed', 'timed_out'])
@@ -203,6 +203,7 @@ export const users = pgTable("users", {
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	email: text(),
 	favorite_companies: jsonb().$type<string[]>().default([]),
+	role: text(),
 }, (table) => {
 	return {
 		idxUsersEmail: index("idx_users_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
@@ -212,6 +213,28 @@ export const users = pgTable("users", {
 		allowInsertAccessOnUsers: pgPolicy("Allow insert access on users", { as: "permissive", for: "insert", to: ["public"] }),
 		allowReadAccessOnUsers: pgPolicy("Allow read access on users", { as: "permissive", for: "select", to: ["public"] }),
 	}
+});
+
+export const companyAssignees = pgTable("company_assignees", {
+	company_id: uuid().notNull(),
+	user_id: uuid().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => {
+	return {
+		idxCompanyAssigneesCompanyId: index("idx_company_assignees_company_id").using("btree", table.company_id.asc().nullsLast().op("uuid_ops")),
+		idxCompanyAssigneesUserId: index("idx_company_assignees_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+		companyAssigneesCompanyIdFkey: foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [companies.id],
+			name: "company_assignees_company_id_fkey",
+		}).onDelete("cascade"),
+		companyAssigneesUserIdFkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "company_assignees_user_id_fkey",
+		}).onDelete("cascade"),
+		companyAssigneesPkey: primaryKey({ columns: [table.company_id, table.user_id], name: "company_assignees_pkey" }),
+	};
 });
 
 export const companyLogs = pgTable("company_logs", {

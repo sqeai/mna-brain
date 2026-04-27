@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm';
 import {
   companies,
+  companyAssignees,
   companyLogs,
   criterias,
   dealDocuments,
@@ -24,6 +25,7 @@ import {
   dealNotes,
   files,
   screenings,
+  users,
 } from '@/lib/db/schema';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { DbClient, Tables, TablesInsert, TablesUpdate } from './types';
@@ -218,6 +220,27 @@ export class CompanyRepository {
 
   async delete(id: string): Promise<void> {
     await this.db.delete(companies).where(eq(companies.id, id));
+  }
+
+  async findAssignees(companyId: string): Promise<Array<Pick<Tables<'users'>, 'id' | 'name' | 'email' | 'role'>>> {
+    return this.db
+      .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+      .from(companyAssignees)
+      .innerJoin(users, eq(users.id, companyAssignees.user_id))
+      .where(eq(companyAssignees.company_id, companyId))
+      .orderBy(asc(users.name));
+  }
+
+  async setAssignees(companyId: string, userIds: string[]): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(companyAssignees).where(eq(companyAssignees.company_id, companyId));
+      if (userIds.length > 0) {
+        const unique = Array.from(new Set(userIds));
+        await tx.insert(companyAssignees).values(
+          unique.map((user_id) => ({ company_id: companyId, user_id })),
+        );
+      }
+    });
   }
 
   async runL1Filters(id: string): Promise<unknown> {

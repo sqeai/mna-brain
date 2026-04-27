@@ -9,7 +9,11 @@ import type {
 import { CompanyService } from './companyService';
 
 function makeRepoStubs() {
-  const companyRepo = { update: vi.fn().mockResolvedValue([]) } as unknown as CompanyRepository;
+  const companyRepo = {
+    update: vi.fn().mockResolvedValue([]),
+    setAssignees: vi.fn().mockResolvedValue(undefined),
+    findAssignees: vi.fn().mockResolvedValue([]),
+  } as unknown as CompanyRepository;
   const companyLogRepo = { insert: vi.fn().mockResolvedValue(undefined) } as unknown as CompanyLogRepository;
   const dealDocRepo = {} as DealDocumentRepository;
   const dealNoteRepo = { insert: vi.fn().mockResolvedValue({}) } as unknown as DealNoteRepository;
@@ -112,5 +116,39 @@ describe('CompanyService.restoreDeal', () => {
       company_id: 'company-2',
       action: 'RESTORED',
     });
+  });
+});
+
+describe('CompanyService.promote (assignees)', () => {
+  let stubs: ReturnType<typeof makeRepoStubs>;
+  let service: CompanyService;
+
+  beforeEach(() => {
+    stubs = makeRepoStubs();
+    service = new CompanyService(
+      stubs.companyRepo,
+      stubs.companyLogRepo,
+      stubs.dealDocRepo,
+      stubs.dealNoteRepo,
+      stubs.dealLinkRepo,
+    );
+  });
+
+  it('replaces assignees when an array is supplied', async () => {
+    await service.promote('company-1', 'L1', 'L2', undefined, undefined, undefined, ['user-a', 'user-b']);
+
+    expect(stubs.companyRepo.setAssignees).toHaveBeenCalledWith('company-1', ['user-a', 'user-b']);
+  });
+
+  it('clears assignees when an empty array is supplied', async () => {
+    await service.promote('company-2', 'L1', 'L2', undefined, undefined, undefined, []);
+
+    expect(stubs.companyRepo.setAssignees).toHaveBeenCalledWith('company-2', []);
+  });
+
+  it('leaves assignees untouched when not supplied', async () => {
+    await service.promote('company-3', 'L1', 'L2');
+
+    expect(stubs.companyRepo.setAssignees).not.toHaveBeenCalled();
   });
 });
