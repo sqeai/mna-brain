@@ -50,7 +50,6 @@ import {
   Presentation,
   Pencil,
   Check,
-  X,
 } from "lucide-react";
 import { CompanyAnalysisSection } from "@/components/pipeline/CompanyAnalysisSection";
 import { AICompanyCardLoading } from "@/components/pipeline/AICompanyCardLoading";
@@ -969,32 +968,7 @@ export default function CompanyDetailDialog({
                       <Building2 className="h-4 w-4" />
                       Company Information
                     </CardTitle>
-                    {isEditing ? (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={cancelEditing}
-                          disabled={isSaving}
-                          aria-label="Cancel editing"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={saveEditing}
-                          disabled={isSaving}
-                          className="gap-1"
-                        >
-                          {isSaving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Check className="h-4 w-4" />
-                          )}
-                          Save
-                        </Button>
-                      </div>
-                    ) : (
+                    {!isEditing && (
                       <Button
                         variant="ghost"
                         size="sm"
