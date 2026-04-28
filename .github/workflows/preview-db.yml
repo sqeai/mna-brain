@@ -77,6 +77,14 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Pass git context so Vercel attaches this deploy to the PR branch and
+          # repoints the branch's preview alias (`*-git-<branch>-<team>.vercel.app`)
+          # to the new deployment instead of treating it as a one-off.
+          VERCEL_GIT_PROVIDER: github
+          VERCEL_GIT_REPO_OWNER: ${{ github.repository_owner }}
+          VERCEL_GIT_REPO_SLUG: ${{ github.event.repository.name }}
+          VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
+          VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: vercel deploy --yes --token="$VERCEL_TOKEN"
 
   teardown:
