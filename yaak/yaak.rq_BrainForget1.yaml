@@ -2,13 +2,13 @@ type: http_request
 model: http_request
 id: rq_BrainForget1
 createdAt: 2026-04-23T00:00:00
-updatedAt: 2026-04-25T02:16:46.595690
+updatedAt: 2026-04-28T07:53:59.844037
 workspaceId: wk_4yBsWJ5Tuh
 folderId: fl_Brain2Auth0
 authentication: {}
 authenticationType: null
 body:
-  text: |-
+  text: |
     {
       "email": "admin@example.com"
     }
@@ -34,5 +34,5 @@ headers:
 method: POST
 name: Forget password
 sortPriority: 2.0
-url: http://localhost:3000/api/auth/forget-password
+url: http://${[ API_URL ]}/api/auth/forget-password
 urlParameters: []

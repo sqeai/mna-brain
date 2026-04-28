@@ -1,0 +1,108 @@
+name: Preview DB & Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+
+concurrency:
+  group: preview-db-${{ github.event.number }}
+  cancel-in-progress: true
+
+env:
+  NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
+
+jobs:
+  setup:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          # Use the source branch HEAD (not the GH-synthesized merge commit) so
+          # Vercel records the deployment against the correct git branch and
+          # picks up the branch-scoped DATABASE_URL.
+          ref: ${{ github.head_ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Neon branch from main
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          parent_branch: main
+          branch_name: ${{ env.NEON_BRANCH_NAME }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (direct connection)
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: pnpm db:migrate
+
+      - name: Seed database
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: pnpm db:seed
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Set DATABASE_URL on Vercel preview (branch-scoped)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+          POOLED_URL: ${{ steps.neon.outputs.db_url_pooled }}
+        run: |
+          # Idempotent: drop any prior branch-scoped value before re-adding.
+          vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
+          printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel (build runs on Vercel)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Pass git context so Vercel attaches this deploy to the PR branch and
+          # repoints the branch's preview alias (`*-git-<branch>-<team>.vercel.app`)
+          # to the new deployment instead of treating it as a one-off.
+          VERCEL_GIT_PROVIDER: github
+          VERCEL_GIT_REPO_OWNER: ${{ github.repository_owner }}
+          VERCEL_GIT_REPO_SLUG: ${{ github.event.repository.name }}
+          VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
+          VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: vercel deploy --yes --token="$VERCEL_TOKEN"
+
+  teardown:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: ${{ env.NEON_BRANCH_NAME }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Remove Vercel preview env var
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+        run: vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true

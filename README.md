@@ -5,7 +5,7 @@
 Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
 ```bash
-npm i supabase --save-dev
+pnpm i supabase --save-dev
 ```
 
 When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.

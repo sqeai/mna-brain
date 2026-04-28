@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_BrainSignup1
-createdAt: 2026-04-23T00:00:00.000000
-updatedAt: 2026-04-23T00:00:00.000000
+createdAt: 2026-04-23T00:00:00
+updatedAt: 2026-04-28T07:44:51.639672
 workspaceId: wk_4yBsWJ5Tuh
 folderId: fl_Brain2Auth0
 authentication: {}
@@ -35,5 +35,5 @@ headers:
 method: POST
 name: Sign up
 sortPriority: 1.0
-url: http://localhost:3000/api/auth/signup
+url: http://${[ API_URL ]}/api/auth/signup
 urlParameters: []

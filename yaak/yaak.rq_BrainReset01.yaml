@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_BrainReset01
 createdAt: 2026-04-23T00:00:00
-updatedAt: 2026-04-25T02:16:56.606856
+updatedAt: 2026-04-28T07:46:42.446392
 workspaceId: wk_4yBsWJ5Tuh
 folderId: fl_Brain2Auth0
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-    ",
+      "key": "",
       "password": "password"
     }
 bodyType: application/json
