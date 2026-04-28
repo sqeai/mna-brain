@@ -132,6 +132,8 @@ interface PipelineCompany {
   updated_at: string;
   source: string | null;
   status: string | null;
+  ownership: string | null;
+  geography: string | null;
   financials_raw?: import('@/lib/repositories').Tables<'company_financials'>[];
 }
 
@@ -347,6 +349,8 @@ export default function Pipeline() {
             created_at: company.created_at,
             updated_at: company.updated_at,
             source: company.source || null,
+            ownership: company.ownership ?? null,
+            geography: company.geography ?? null,
             financials_raw: company.financials_raw,
           };
         }) || [];

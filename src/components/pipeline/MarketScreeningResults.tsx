@@ -582,6 +582,8 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                   created_at: selectedResult.created_at,
                   updated_at: selectedResult.created_at,
                   source: selectedResult.source,
+                  ownership: selectedResult.ownership,
+                  geography: selectedResult.geography,
                 }}
                 open={detailDialogOpen}
                 onOpenChange={setDetailDialogOpen}
