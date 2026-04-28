@@ -23,9 +23,6 @@ pnpm-debug.log*
 .env*.local
 *.local
 
-# Vercel
-.vercel
-
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
