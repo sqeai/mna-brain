@@ -866,6 +866,10 @@ export default function CompanyDetailPage() {
             {/* Financial Charts */}
             <FinancialCharts
               financials={mergeFinancialsWithOverrides(company.id, company.financials_raw ?? [])}
+              rawFinancials={company.financials_raw ?? []}
+              companyId={company.id}
+              hasOverrides={Boolean(getCompanyOverride(company.id))}
+              onUpdate={fetchCompany}
             />
 
             {/* AI Company Card Section */}
