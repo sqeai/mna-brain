@@ -68,30 +68,17 @@ jobs:
           BRANCH: ${{ github.head_ref }}
           POOLED_URL: ${{ steps.neon.outputs.db_url_pooled }}
         run: |
+          printf "$POOLED_URL"
           # Idempotent: drop any prior branch-scoped value before re-adding.
           vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
           printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
 
       - name: Deploy to Vercel (build runs on Vercel)
-        id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          url=$(vercel deploy --yes --token="$VERCEL_TOKEN")
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-
-      - name: Comment preview URL on PR
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: preview-deployment
-          message: |
-            **Preview deployment ready**
-
-            - App: ${{ steps.deploy.outputs.url }}
-            - Neon branch: `${{ env.NEON_BRANCH_NAME }}`
-            - DB: scoped to git branch `${{ github.head_ref }}`
+        run: vercel deploy --yes --token="$VERCEL_TOKEN"
 
   teardown:
     if: github.event.action == 'closed'
@@ -112,13 +99,3 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           BRANCH: ${{ github.head_ref }}
         run: vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
-
-      - name: Update PR comment
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: preview-deployment
-          message: |
-            **Preview teardown complete**
-
-            - Neon branch `${{ env.NEON_BRANCH_NAME }}` deleted
-            - Vercel preview env var removed for `${{ github.head_ref }}`
