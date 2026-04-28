@@ -42,10 +42,10 @@ jobs:
 
       - name: Create Neon branch from main
         id: neon
-        uses: neondatabase/create-branch-action@v5
+        uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
-          parent: main
+          parent_branch: main
           branch_name: ${{ env.NEON_BRANCH_NAME }}
           api_key: ${{ secrets.NEON_API_KEY }}
 
