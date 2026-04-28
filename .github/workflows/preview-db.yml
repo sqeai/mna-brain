@@ -1,0 +1,133 @@
+name: Preview DB & Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+
+concurrency:
+  group: preview-db-${{ github.event.number }}
+  cancel-in-progress: true
+
+env:
+  NEON_BRANCH_NAME: preview/pr-${{ github.event.number }}
+
+jobs:
+  setup:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Neon branch from main
+        id: neon
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          parent: main
+          branch_name: ${{ env.NEON_BRANCH_NAME }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (direct connection)
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: pnpm db:migrate
+
+      - name: Seed database
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: pnpm db:seed
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Set DATABASE_URL on Vercel preview (branch-scoped)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+          POOLED_URL: ${{ steps.neon.outputs.db_url_pooled }}
+        run: |
+          # Idempotent: drop any prior branch-scoped value before re-adding.
+          vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
+          printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
+
+      - name: Pull Vercel project settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=preview --git-branch="${{ github.head_ref }}" --token="$VERCEL_TOKEN"
+
+      - name: Build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-deployment
+          message: |
+            **Preview deployment ready**
+
+            - App: ${{ steps.deploy.outputs.url }}
+            - Neon branch: `${{ env.NEON_BRANCH_NAME }}`
+            - DB: scoped to git branch `${{ github.head_ref }}`
+
+  teardown:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon branch
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: ${{ env.NEON_BRANCH_NAME }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Remove Vercel preview env var
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+        run: vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
+
+      - name: Update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-deployment
+          message: |
+            **Preview teardown complete**
+
+            - Neon branch `${{ env.NEON_BRANCH_NAME }}` deleted
+            - Vercel preview env var removed for `${{ github.head_ref }}`

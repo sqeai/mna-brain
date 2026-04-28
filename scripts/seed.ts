@@ -10,14 +10,23 @@ config({ path: '.env.local' });
 config();
 
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import postgres from 'postgres';
-import { companies, companyFinancials, users } from '../src/lib/db/schema';
+import {
+  companies,
+  companyFinancials,
+  userCompanyFavorites,
+  users,
+} from '../src/lib/db/schema';
+import { hashPassword } from '../src/lib/services/password';
 
 const SEED_USER_EMAIL = 'test@sqe.co.id';
 const SEED_USER_PASSWORD = 'password';
+const SEED_USER_ROLE = 'admin';
 const SEED_ENTRY_ID_MIN = 9001;
 const SEED_ENTRY_ID_MAX = 9999;
+// entry_ids that the seed user starts with as favorites (subset of seedCompanies).
+const SEED_FAVORITE_ENTRY_IDS = [9001, 9002, 9004];
 
 type SeedCompany = {
   entry_id: number;
@@ -185,17 +194,23 @@ async function main() {
   console.log(`seeding ${new URL(url).host}...`);
 
   try {
-    // Users — remove any prior seed user, then insert fresh.
+    // Users — remove any prior seed user (cascades favorites/assignees), then insert fresh.
     await db.delete(users).where(eq(users.email, SEED_USER_EMAIL));
-    await db.insert(users).values({
-      name: 'Test User',
-      email: SEED_USER_EMAIL,
-      password: SEED_USER_PASSWORD,
-    });
-    console.log(`  ✓ user ${SEED_USER_EMAIL} (password: ${SEED_USER_PASSWORD})`);
+    const passwordHash = await hashPassword(SEED_USER_PASSWORD);
+    const [seedUser] = await db
+      .insert(users)
+      .values({
+        name: 'Test User',
+        email: SEED_USER_EMAIL,
+        password: passwordHash,
+        role: SEED_USER_ROLE,
+      })
+      .returning({ id: users.id });
+    if (!seedUser) throw new Error('failed to insert seed user');
+    console.log(`  ✓ user ${SEED_USER_EMAIL} (password: ${SEED_USER_PASSWORD}, role: ${SEED_USER_ROLE})`);
 
     // Companies — clear prior seed rows (identified by entry_id range), re-insert.
-    // company_financials rows cascade on company delete.
+    // company_financials and user_company_favorites rows cascade on company delete.
     await db
       .delete(companies)
       .where(
@@ -204,6 +219,7 @@ async function main() {
           lte(companies.entry_id, SEED_ENTRY_ID_MAX),
         ),
       );
+    const insertedCompanies: Array<{ entry_id: number; id: string }> = [];
     for (const c of seedCompanies) {
       const [inserted] = await db
         .insert(companies)
@@ -221,6 +237,7 @@ async function main() {
         })
         .returning({ id: companies.id });
       if (!inserted) continue;
+      insertedCompanies.push({ entry_id: c.entry_id, id: inserted.id });
       if (c.financials.length > 0) {
         await db.insert(companyFinancials).values(
           c.financials.map((f) => ({
@@ -237,6 +254,29 @@ async function main() {
       }
     }
     console.log(`  ✓ ${seedCompanies.length} companies (+ financials)`);
+
+    // Favorites — link the seed user to a subset of the seeded companies via the
+    // user_company_favorites join table (replaces the removed users.favorite_companies jsonb).
+    const favoriteCompanyIds = insertedCompanies
+      .filter((c) => SEED_FAVORITE_ENTRY_IDS.includes(c.entry_id))
+      .map((c) => c.id);
+    if (favoriteCompanyIds.length > 0) {
+      await db
+        .delete(userCompanyFavorites)
+        .where(
+          and(
+            eq(userCompanyFavorites.user_id, seedUser.id),
+            inArray(userCompanyFavorites.company_id, favoriteCompanyIds),
+          ),
+        );
+      await db.insert(userCompanyFavorites).values(
+        favoriteCompanyIds.map((company_id) => ({
+          user_id: seedUser.id,
+          company_id,
+        })),
+      );
+      console.log(`  ✓ ${favoriteCompanyIds.length} user_company_favorites for seed user`);
+    }
 
     console.log('done.');
   } finally {
