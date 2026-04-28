@@ -65,7 +65,7 @@ import {
   getScreenings,
   type UserSummary,
 } from "@/lib/api/pipeline";
-import { getCompanyOverride } from "@/lib/companyOverrides";
+import { mergeFinancialsWithOverrides } from "@/lib/companyOverrides";
 
 const getStageLabel = (stage: string | null): string => {
   const key = (stage || "L0") as DealStage;
@@ -85,6 +85,8 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
+import { FinancialCharts } from "@/components/pipeline/FinancialCharts";
+import type { Tables } from "@/lib/repositories";
 
 export interface CompanyData {
   id: string;
@@ -107,6 +109,7 @@ export interface CompanyData {
   created_at: string;
   updated_at: string;
   source: string | null;
+  financials_raw?: Tables<'company_financials'>[];
 }
 
 /** Minimal company_logs row used to build stage history */
@@ -969,135 +972,9 @@ export default function CompanyDetailDialog({
                 </CardContent>
               </Card>
 
-              {/* Revenue Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Revenue (USD Millions)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={[
-                          {
-                            year: "2022",
-                            revenue: company.revenue_2022_usd_mn || 0,
-                          },
-                          {
-                            year: "2023",
-                            revenue: company.revenue_2023_usd_mn || 0,
-                          },
-                          {
-                            year: "2024",
-                            revenue: company.revenue_2024_usd_mn || 0,
-                          },
-                        ]}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          className="stroke-muted"
-                        />
-                        <XAxis dataKey="year" className="text-sm" />
-                        <YAxis
-                          tickFormatter={(value) => `$${value.toFixed(0)}M`}
-                          className="text-sm"
-                        />
-                        <ReferenceLine
-                          y={0}
-                          stroke="hsl(var(--border))"
-                          strokeWidth={1}
-                        />
-                        <Tooltip
-                          formatter={(value: number) => [
-                            `$${value.toFixed(1)}M`,
-                            "Revenue",
-                          ]}
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Bar
-                          dataKey="revenue"
-                          fill="hsl(var(--primary))"
-                          radius={[4, 4, 0, 0]}
-                          name="Revenue"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* EBITDA Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    EBITDA (USD Millions)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={[
-                          {
-                            year: "2022",
-                            ebitda: company.ebitda_2022_usd_mn || 0,
-                          },
-                          {
-                            year: "2023",
-                            ebitda: company.ebitda_2023_usd_mn || 0,
-                          },
-                          {
-                            year: "2024",
-                            ebitda: company.ebitda_2024_usd_mn || 0,
-                          },
-                        ]}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          className="stroke-muted"
-                        />
-                        <XAxis dataKey="year" className="text-sm" />
-                        <YAxis
-                          tickFormatter={(value) => `$${value.toFixed(0)}M`}
-                          className="text-sm"
-                        />
-                        <ReferenceLine
-                          y={0}
-                          stroke="hsl(var(--border))"
-                          strokeWidth={1}
-                        />
-                        <Tooltip
-                          formatter={(value: number) => [
-                            `$${value.toFixed(1)}M`,
-                            "EBITDA",
-                          ]}
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Bar
-                          dataKey="ebitda"
-                          fill="hsl(142, 76%, 36%)"
-                          radius={[4, 4, 0, 0]}
-                          name="EBITDA"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
+              <FinancialCharts
+                financials={mergeFinancialsWithOverrides(company.id, company.financials_raw ?? [])}
+              />
 
               {/* AI Company Card Summary in Overview */}
               <div ref={aiCardSectionRef}>

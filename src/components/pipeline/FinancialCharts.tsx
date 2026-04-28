@@ -8,21 +8,14 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
+import type { Tables } from '@/lib/repositories';
 
 interface FinancialChartsProps {
-  revenue_year1: number | null;
-  revenue_year2: number | null;
-  revenue_year3: number | null;
-  revenue_year4?: number | null;
-  ebitda_year1: number | null;
-  ebitda_year2: number | null;
-  ebitda_year3: number | null;
-  ebitda_year4?: number | null;
+  financials: Pick<Tables<'company_financials'>, 'fiscal_year' | 'revenue_usd_mn' | 'ebitda_usd_mn'>[];
 }
 
 const formatCurrency = (value: number | null) => {
   if (value === null || value === undefined) return '-';
-  // Values are stored in millions
   if (Math.abs(value) >= 1000) {
     const billions = value / 1000;
     return `$${billions.toFixed(2)}B`;
@@ -30,33 +23,26 @@ const formatCurrency = (value: number | null) => {
   return `$${value.toFixed(2)}M`;
 };
 
-export function FinancialCharts({
-  revenue_year1,
-  revenue_year2,
-  revenue_year3,
-  revenue_year4,
-  ebitda_year1,
-  ebitda_year2,
-  ebitda_year3,
-  ebitda_year4,
-}: FinancialChartsProps) {
-  const revenueData = [
-    { year: '2022', value: revenue_year1 || 0 },
-    { year: '2023', value: revenue_year2 || 0 },
-    { year: '2024', value: revenue_year3 || 0 },
-    ...(revenue_year4 !== undefined && revenue_year4 !== null
-      ? [{ year: '2025', value: revenue_year4 }]
-      : []),
-  ];
+export function FinancialCharts({ financials }: FinancialChartsProps) {
+  const sorted = [...financials].sort((a, b) => a.fiscal_year - b.fiscal_year);
 
-  const ebitdaData = [
-    { year: '2022', value: ebitda_year1 || 0 },
-    { year: '2023', value: ebitda_year2 || 0 },
-    { year: '2024', value: ebitda_year3 || 0 },
-    ...(ebitda_year4 !== undefined && ebitda_year4 !== null
-      ? [{ year: '2025', value: ebitda_year4 }]
-      : []),
-  ];
+  const revenueData = sorted.map((row) => ({
+    year: String(row.fiscal_year),
+    value: row.revenue_usd_mn ?? 0,
+  }));
+
+  const ebitdaData = sorted.map((row) => ({
+    year: String(row.fiscal_year),
+    value: row.ebitda_usd_mn ?? 0,
+  }));
+
+  const colClass = (n: number) => {
+    if (n <= 1) return 'grid-cols-1';
+    if (n === 2) return 'grid-cols-2';
+    if (n === 3) return 'grid-cols-3';
+    if (n === 4) return 'grid-cols-4';
+    return 'grid-cols-4';
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -65,7 +51,7 @@ export function FinancialCharts({
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
-            Revenue (3Y)
+            Revenue
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -103,14 +89,16 @@ export function FinancialCharts({
               </BarChart>
             </ChartContainer>
           </div>
-          <div className={`grid gap-2 mt-3 pt-3 border-t ${revenueData.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            {revenueData.map((item) => (
-              <div key={item.year} className="text-center">
-                <p className="text-xs text-muted-foreground">{item.year}</p>
-                <p className="font-semibold text-sm">{formatCurrency(item.value)}</p>
-              </div>
-            ))}
-          </div>
+          {revenueData.length > 0 && (
+            <div className={`grid gap-2 mt-3 pt-3 border-t ${colClass(revenueData.length)}`}>
+              {revenueData.map((item) => (
+                <div key={item.year} className="text-center">
+                  <p className="text-xs text-muted-foreground">{item.year}</p>
+                  <p className="font-semibold text-sm">{formatCurrency(item.value)}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -119,7 +107,7 @@ export function FinancialCharts({
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-success" />
-            EBITDA (3Y)
+            EBITDA
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -157,14 +145,16 @@ export function FinancialCharts({
               </BarChart>
             </ChartContainer>
           </div>
-          <div className={`grid gap-2 mt-3 pt-3 border-t ${ebitdaData.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            {ebitdaData.map((item) => (
-              <div key={item.year} className="text-center">
-                <p className="text-xs text-muted-foreground">{item.year}</p>
-                <p className="font-semibold text-sm">{formatCurrency(item.value)}</p>
-              </div>
-            ))}
-          </div>
+          {ebitdaData.length > 0 && (
+            <div className={`grid gap-2 mt-3 pt-3 border-t ${colClass(ebitdaData.length)}`}>
+              {ebitdaData.map((item) => (
+                <div key={item.year} className="text-center">
+                  <p className="text-xs text-muted-foreground">{item.year}</p>
+                  <p className="font-semibold text-sm">{formatCurrency(item.value)}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

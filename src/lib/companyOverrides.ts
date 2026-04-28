@@ -85,3 +85,41 @@ export function getCompanyOverride(id: string | null | undefined): CompanyOverri
   if (!id) return undefined;
   return COMPANY_OVERRIDES[id];
 }
+
+/**
+ * Merge per-year override values (revenue/ebitda for 2023/2024/2025) into the
+ * normalized `company_financials` rows. If a year has no DB row, a synthetic
+ * row is created from the override. Used by the FinancialCharts call sites so
+ * companies with only override data still render bars.
+ */
+export function mergeFinancialsWithOverrides<
+  T extends { fiscal_year: number; revenue_usd_mn: number | null; ebitda_usd_mn: number | null },
+>(companyId: string, base: T[]): Array<{ fiscal_year: number; revenue_usd_mn: number | null; ebitda_usd_mn: number | null }> {
+  const override = getCompanyOverride(companyId);
+  const byYear = new Map<number, { fiscal_year: number; revenue_usd_mn: number | null; ebitda_usd_mn: number | null }>();
+  for (const row of base) {
+    byYear.set(row.fiscal_year, {
+      fiscal_year: row.fiscal_year,
+      revenue_usd_mn: row.revenue_usd_mn,
+      ebitda_usd_mn: row.ebitda_usd_mn,
+    });
+  }
+  if (!override) return Array.from(byYear.values()).sort((a, b) => a.fiscal_year - b.fiscal_year);
+
+  const overrideMap: Array<[number, keyof CompanyOverride, keyof CompanyOverride]> = [
+    [2023, 'revenue_2023_usd_mn', 'ebitda_2023_usd_mn'],
+    [2024, 'revenue_2024_usd_mn', 'ebitda_2024_usd_mn'],
+    [2025, 'revenue_2025_usd_mn', 'ebitda_2025_usd_mn'],
+  ];
+  for (const [year, revKey, ebtKey] of overrideMap) {
+    const existing = byYear.get(year) ?? { fiscal_year: year, revenue_usd_mn: null, ebitda_usd_mn: null };
+    const rev = override[revKey];
+    const ebt = override[ebtKey];
+    if (typeof rev === 'number') existing.revenue_usd_mn = rev;
+    if (typeof ebt === 'number') existing.ebitda_usd_mn = ebt;
+    if (typeof rev === 'number' || typeof ebt === 'number' || byYear.has(year)) {
+      byYear.set(year, existing);
+    }
+  }
+  return Array.from(byYear.values()).sort((a, b) => a.fiscal_year - b.fiscal_year);
+}

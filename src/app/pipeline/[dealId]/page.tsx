@@ -59,7 +59,7 @@ import {
   getCompanyDetails,
   getScreenings,
 } from '@/lib/api/pipeline';
-import { getCompanyOverride } from '@/lib/companyOverrides';
+import { getCompanyOverride, mergeFinancialsWithOverrides } from '@/lib/companyOverrides';
 
 const websiteHref = (url: string) =>
   /^https?:\/\//i.test(url) ? url : `https://${url}`;
@@ -108,6 +108,7 @@ interface CompanyData {
   created_at: string | null;
   updated_at: string | null;
   source: string | null;
+  financials_raw?: import('@/lib/repositories').Tables<'company_financials'>[];
 }
 
 /** Minimal company_logs row used to build stage history */
@@ -864,14 +865,7 @@ export default function CompanyDetailPage() {
 
             {/* Financial Charts */}
             <FinancialCharts
-              revenue_year1={company.revenue_2022_usd_mn ?? null}
-              revenue_year2={getCompanyOverride(company.id)?.revenue_2023_usd_mn ?? company.revenue_2023_usd_mn ?? null}
-              revenue_year3={getCompanyOverride(company.id)?.revenue_2024_usd_mn ?? company.revenue_2024_usd_mn ?? null}
-              revenue_year4={getCompanyOverride(company.id)?.revenue_2025_usd_mn ?? null}
-              ebitda_year1={company.ebitda_2022_usd_mn ?? null}
-              ebitda_year2={getCompanyOverride(company.id)?.ebitda_2023_usd_mn ?? company.ebitda_2023_usd_mn ?? null}
-              ebitda_year3={getCompanyOverride(company.id)?.ebitda_2024_usd_mn ?? company.ebitda_2024_usd_mn ?? null}
-              ebitda_year4={getCompanyOverride(company.id)?.ebitda_2025_usd_mn ?? null}
+              financials={mergeFinancialsWithOverrides(company.id, company.financials_raw ?? [])}
             />
 
             {/* AI Company Card Section */}

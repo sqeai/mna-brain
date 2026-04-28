@@ -30,6 +30,20 @@ export class CompanyFinancialRepository {
     return row ?? null;
   }
 
+  async findLatestByCompanies(companyIds: string[]): Promise<Tables<'company_financials'>[]> {
+    if (companyIds.length === 0) return [];
+    const all = await this.db
+      .select()
+      .from(companyFinancials)
+      .where(inArray(companyFinancials.company_id, companyIds))
+      .orderBy(companyFinancials.company_id, companyFinancials.fiscal_year);
+    const latestByCompany = new Map<string, Tables<'company_financials'>>();
+    for (const row of all) {
+      latestByCompany.set(row.company_id, row);
+    }
+    return Array.from(latestByCompany.values());
+  }
+
   async findByCompaniesAndYears(
     companyIds: string[],
     years: number[],
