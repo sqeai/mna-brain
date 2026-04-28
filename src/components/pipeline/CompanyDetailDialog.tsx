@@ -62,6 +62,7 @@ import {
   addCompanyNote,
   deleteDealLink,
   deleteDealNote,
+  getCompanies,
   getCompanyAssignees,
   getCompanyDetails,
   getScreenings,
@@ -296,12 +297,16 @@ const formatDuration = (seconds: number | null) => {
 };
 
 export default function CompanyDetailDialog({
-  company,
+  company: companyProp,
   open,
   onOpenChange,
   onUpdate,
 }: CompanyDetailDialogProps) {
   const router = useRouter();
+  const [company, setCompany] = useState<CompanyData>(companyProp);
+  useEffect(() => {
+    setCompany(companyProp);
+  }, [companyProp]);
   const [stageHistory, setStageHistory] = useState<StageHistory[]>([]);
   const [notes, setNotes] = useState<DealNote[]>([]);
   const [links, setLinks] = useState<DealLink[]>([]);
@@ -384,8 +389,14 @@ export default function CompanyDetailDialog({
         }),
         setCompanyAssignees(company.id, editForm.assigneeIds),
       ]);
-      const refreshed = await getCompanyAssignees(company.id);
-      setAssignees(refreshed);
+      const [refreshedAssignees, refreshedCompany] = await Promise.all([
+        getCompanyAssignees(company.id),
+        getCompanies({ id: company.id }),
+      ]);
+      setAssignees(refreshedAssignees);
+      if (refreshedCompany) {
+        setCompany((prev) => ({ ...prev, ...refreshedCompany }));
+      }
       toast.success('Company updated');
       setIsEditing(false);
       setEditForm(null);
@@ -997,7 +1008,7 @@ export default function CompanyDetailDialog({
                           className="mt-1"
                         />
                       ) : (
-                        <p className="font-semibold text-lg">
+                        <p className="font-semibold text-lg break-words">
                           {company.target || "Unknown"}
                         </p>
                       )}
@@ -1019,10 +1030,10 @@ export default function CompanyDetailDialog({
                           href={websiteHref(company.website)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:underline text-sm inline-flex items-center gap-1"
+                          className="text-primary hover:underline text-sm inline-flex items-start gap-1 break-all"
                         >
-                          {company.website}
-                          <ExternalLink className="h-3 w-3" />
+                          <span className="break-all">{company.website}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0 mt-1" />
                         </a>
                       ) : (
                         <span className="text-muted-foreground text-sm">
@@ -1042,7 +1053,7 @@ export default function CompanyDetailDialog({
                           className="mt-1"
                         />
                       ) : (
-                        <p className="font-medium">{company.segment || "-"}</p>
+                        <p className="font-medium break-words">{company.segment || "-"}</p>
                       )}
                     </div>
                     <div>
@@ -1057,7 +1068,7 @@ export default function CompanyDetailDialog({
                           className="mt-1"
                         />
                       ) : (
-                        <p className="font-medium">{company.geography || "-"}</p>
+                        <p className="font-medium break-words">{company.geography || "-"}</p>
                       )}
                     </div>
                     {/* Row 2 */}
@@ -1087,7 +1098,7 @@ export default function CompanyDetailDialog({
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="font-medium">{company.ownership || "-"}</p>
+                        <p className="font-medium break-words">{company.ownership || "-"}</p>
                       )}
                     </div>
                     <div>
@@ -1113,7 +1124,7 @@ export default function CompanyDetailDialog({
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="font-medium capitalize">
+                        <p className="font-medium capitalize break-words">
                           {company.source || "-"}
                         </p>
                       )}
@@ -1165,7 +1176,7 @@ export default function CompanyDetailDialog({
                           className="mt-1"
                         />
                       ) : (
-                        <p className="font-medium">
+                        <p className="font-medium break-words">
                           {formatCurrency(company.ev_2024)}
                         </p>
                       )}
