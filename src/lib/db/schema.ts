@@ -335,7 +335,6 @@ export const users = pgTable(
     created_at: timestamp({ withTimezone: true, mode: "string" }).defaultNow(),
     updated_at: timestamp({ withTimezone: true, mode: "string" }).defaultNow(),
     email: text(),
-    favorite_companies: jsonb().$type<string[]>().default([]),
     role: text(),
   },
   (table) => {
