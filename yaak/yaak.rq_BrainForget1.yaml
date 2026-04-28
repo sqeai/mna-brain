@@ -2,13 +2,13 @@ type: http_request
 model: http_request
 id: rq_BrainForget1
 createdAt: 2026-04-23T00:00:00
-updatedAt: 2026-04-28T07:47:09.164625
+updatedAt: 2026-04-28T07:53:59.844037
 workspaceId: wk_4yBsWJ5Tuh
 folderId: fl_Brain2Auth0
 authentication: {}
 authenticationType: null
 body:
-  text: |-
+  text: |
     {
       "email": "admin@example.com"
     }
