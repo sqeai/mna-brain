@@ -48,6 +48,12 @@ export interface CompanyDTO {
   created_at: string | null;
   updated_at: string | null;
 
+  // ---- Raw normalized rows from company_financials, ordered by fiscal_year ASC ----
+  // Use this for any surface that needs arbitrary-year data. The wide
+  // `revenue_YYYY_usd_mn` keys below are kept for backward-compat but are
+  // capped to TRACKED_YEARS.
+  financials_raw: Tables<'company_financials'>[];
+
   // ---- Flattened from company_financials (one column per tracked year) ----
   revenue_2021_usd_mn: number | null;
   revenue_2022_usd_mn: number | null;
@@ -147,6 +153,7 @@ export function toCompanyDTO(
     (fxByYear.get(year)?.[key] as number | null) ?? null;
 
   return {
+    financials_raw: financials,
     id: company.id,
     pipeline_stage: company.pipeline_stage,
     entry_id: company.entry_id,

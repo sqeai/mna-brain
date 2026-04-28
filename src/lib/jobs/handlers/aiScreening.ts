@@ -1,6 +1,11 @@
 import { getAgentGraph, HumanMessage } from '@/lib/agent';
 import { getToolDescriptions } from '@/lib/agent/tools';
-import { CompanyRepository, ScreeningRepository } from '@/lib/repositories';
+import {
+  CompanyFinancialRepository,
+  CompanyRepository,
+  CompanyScreeningDerivedRepository,
+  ScreeningRepository,
+} from '@/lib/repositories';
 import type { DbClient, Tables } from '@/lib/repositories';
 import { z } from 'zod';
 import { getPostHogClient } from '@/lib/posthog-server';
@@ -29,6 +34,8 @@ export interface AIScreeningJobResult extends ScreeningResult {
   screeningId: string;
 }
 
+// Wire payload sent by callers. Financial/screening fields are ignored by the
+// handler (which now self-fetches from DB); kept for backward-compat only.
 export interface CompanyData {
   id: string;
   name: string;
@@ -102,10 +109,14 @@ Respond ONLY with a JSON object containing:
 
 Respond with the JSON object only, no additional text.`;
 
-function buildCompanyContext(company: CompanyData): string {
+function buildCompanyContext(
+  company: Tables<'companies'> & { name?: string },
+  financials: Tables<'company_financials'>[],
+  screening: Tables<'company_screening_derived'> | null,
+): string {
   const lines: string[] = [];
 
-  lines.push(`**Company Name:** ${company.name || 'Unknown'}`);
+  lines.push(`**Company Name:** ${company.target || company.name || 'Unknown'}`);
 
   if (company.segment) lines.push(`**Segment:** ${company.segment}`);
   if (company.segment_related_offerings)
@@ -114,43 +125,44 @@ function buildCompanyContext(company: CompanyData): string {
   if (company.company_focus) lines.push(`**Focus:** ${company.company_focus}`);
   if (company.ownership) lines.push(`**Ownership:** ${company.ownership}`);
   if (company.website) lines.push(`**Website:** ${company.website}`);
-  if (company.combined_segment_revenue)
-    lines.push(`**Combined Segment Revenue:** ${company.combined_segment_revenue}`);
-  if (company.revenue_from_priority_geo_flag)
-    lines.push(`**Revenue from Priority Geo:** ${company.revenue_from_priority_geo_flag}`);
-  if (company.pct_from_domestic != null)
-    lines.push(`**% from Domestic:** ${company.pct_from_domestic}%`);
+  if (screening?.combined_segment_revenue)
+    lines.push(`**Combined Segment Revenue:** ${screening.combined_segment_revenue}`);
+  if (screening?.revenue_from_priority_geo != null)
+    lines.push(`**Revenue from Priority Geo:** ${screening.revenue_from_priority_geo ? 'Yes' : 'No'}`);
+  if (screening?.pct_from_domestic != null)
+    lines.push(`**% from Domestic:** ${screening.pct_from_domestic}%`);
 
-  const financials: string[] = [];
-  if (company.revenue_2022_usd_mn != null) financials.push(`Revenue 2022: $${company.revenue_2022_usd_mn}M`);
-  if (company.revenue_2023_usd_mn != null) financials.push(`Revenue 2023: $${company.revenue_2023_usd_mn}M`);
-  if (company.revenue_2024_usd_mn != null) financials.push(`Revenue 2024: $${company.revenue_2024_usd_mn}M`);
-  if (company.ebitda_2022_usd_mn != null) financials.push(`EBITDA 2022: $${company.ebitda_2022_usd_mn}M`);
-  if (company.ebitda_2023_usd_mn != null) financials.push(`EBITDA 2023: $${company.ebitda_2023_usd_mn}M`);
-  if (company.ebitda_2024_usd_mn != null) financials.push(`EBITDA 2024: $${company.ebitda_2024_usd_mn}M`);
-  if (company.ebitda_margin_2022_pct != null) financials.push(`EBITDA Margin 2022: ${company.ebitda_margin_2022_pct}%`);
-  if (company.ebitda_margin_2023_pct != null) financials.push(`EBITDA Margin 2023: ${company.ebitda_margin_2023_pct}%`);
-  if (company.ebitda_margin_2024_pct != null) financials.push(`EBITDA Margin 2024: ${company.ebitda_margin_2024_pct}%`);
-  if (company.ev_2024 != null) financials.push(`EV 2024: $${company.ev_2024}M`);
-  if (company.ev_ebitda_2024 != null) financials.push(`EV/EBITDA 2024: ${company.ev_ebitda_2024}x`);
-  if (company.revenue_cagr_3y_pct != null) financials.push(`Revenue CAGR 3Y: ${company.revenue_cagr_3y_pct}%`);
-  if (company.l0_ev_usd_mn != null) financials.push(`L0 EV: $${company.l0_ev_usd_mn}M`);
+  const byYear = new Map<number, Tables<'company_financials'>>();
+  for (const row of financials) byYear.set(row.fiscal_year, row);
 
-  if (financials.length > 0) {
+  const financialParts: string[] = [];
+  for (const year of [2021, 2022, 2023, 2024]) {
+    const row = byYear.get(year);
+    if (!row) continue;
+    if (row.revenue_usd_mn != null) financialParts.push(`Revenue ${year}: $${row.revenue_usd_mn}M`);
+    if (row.ebitda_usd_mn != null) financialParts.push(`EBITDA ${year}: $${row.ebitda_usd_mn}M`);
+    if (row.ebitda_margin != null) financialParts.push(`EBITDA Margin ${year}: ${row.ebitda_margin}%`);
+  }
+  const row2024 = byYear.get(2024);
+  if (row2024?.ev_usd_mn != null) financialParts.push(`EV 2024: $${row2024.ev_usd_mn}M`);
+  if (row2024?.ev_ebitda != null) financialParts.push(`EV/EBITDA 2024: ${row2024.ev_ebitda}x`);
+  if (screening?.l0_ev_usd_mn != null) financialParts.push(`L0 EV: $${screening.l0_ev_usd_mn}M`);
+
+  if (financialParts.length > 0) {
     lines.push(`**Financials:**`);
-    lines.push(financials.join(' | '));
+    lines.push(financialParts.join(' | '));
   } else {
     lines.push(`**Financials:** No financial data available`);
   }
 
   const metrics: string[] = [];
-  if (company.l1_revenue_cagr_l3y != null) metrics.push(`Revenue CAGR L3Y: ${company.l1_revenue_cagr_l3y}%`);
-  if (company.l1_revenue_cagr_n3y != null) metrics.push(`Revenue CAGR N3Y: ${company.l1_revenue_cagr_n3y}%`);
-  if (company.l1_vision_fit) metrics.push(`Vision Fit: ${company.l1_vision_fit}`);
-  if (company.l1_priority_geo_flag) metrics.push(`Priority Geo Flag: ${company.l1_priority_geo_flag}`);
-  if (company.l1_ev_below_threshold) metrics.push(`EV Below Threshold: ${company.l1_ev_below_threshold}`);
-  if (company.l1_rationale) metrics.push(`L1 Rationale: ${company.l1_rationale}`);
-  if (company.l1_screening_result) metrics.push(`L1 Screening Result: ${company.l1_screening_result}`);
+  if (screening?.l1_revenue_cagr_l3y != null) metrics.push(`Revenue CAGR L3Y: ${screening.l1_revenue_cagr_l3y}%`);
+  if (screening?.l1_revenue_cagr_n3y != null) metrics.push(`Revenue CAGR N3Y: ${screening.l1_revenue_cagr_n3y}%`);
+  if (screening?.l1_vision_fit != null) metrics.push(`Vision Fit: ${screening.l1_vision_fit ? 'Yes' : 'No'}`);
+  if (screening?.l1_priority_geo != null) metrics.push(`Priority Geo: ${screening.l1_priority_geo ? 'Yes' : 'No'}`);
+  if (screening?.l1_ev_below_threshold != null) metrics.push(`EV Below Threshold: ${screening.l1_ev_below_threshold ? 'Yes' : 'No'}`);
+  if (screening?.l1_rationale) metrics.push(`L1 Rationale: ${screening.l1_rationale}`);
+  if (screening?.l1_screening_result) metrics.push(`L1 Screening Result: ${screening.l1_screening_result}`);
 
   if (metrics.length > 0) {
     lines.push(`**Screening Metrics:**`);
@@ -193,24 +205,21 @@ export async function runAIScreening(
   }
 
   const companyRepo = new CompanyRepository(deps.db);
+  const financialRepo = new CompanyFinancialRepository(deps.db);
+  const screeningDerivedRepo = new CompanyScreeningDerivedRepository(deps.db);
   const screeningRepo = new ScreeningRepository(deps.db);
 
-  let enrichedCompany: CompanyData = { ...company };
-  try {
-    const dbCompany = await companyRepo.findById(companyId);
-    enrichedCompany = {
-      ...company,
-      ...Object.fromEntries(
-        Object.entries(dbCompany as Record<string, unknown>).filter(([, v]) => v != null),
-      ),
-    } as CompanyData;
-  } catch (dbFetchError) {
-    console.warn(
-      `[AI-Screening] Could not fetch from DB: ${(dbFetchError as Error).message}. Using payload data.`,
-    );
-  }
+  const [dbCompany, financials, screeningDerived] = await Promise.all([
+    companyRepo.findById(companyId),
+    financialRepo.findByCompany(companyId),
+    screeningDerivedRepo.findByCompany(companyId),
+  ]);
 
-  const companyContext = buildCompanyContext(enrichedCompany);
+  const companyContext = buildCompanyContext(
+    { ...dbCompany, name: company.name },
+    financials,
+    screeningDerived,
+  );
   const toolDescriptions = getToolDescriptions();
 
   const evaluationPrompt = SCREENING_PROMPT_TEMPLATE.replace(
@@ -273,7 +282,7 @@ export async function runAIScreening(
     event: 'ai_screening_completed',
     properties: {
       company_id: companyId,
-      company_name: company.name,
+      company_name: dbCompany.target || company.name,
       criteria_id: criteriaId,
       result: screeningResult.result,
     },
