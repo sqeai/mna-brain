@@ -72,35 +72,50 @@ jobs:
           vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
           printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
 
-      - name: Deploy to Vercel if no successful deployment exists
+      - name: Redeploy latest Vercel deployment for commit
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          BRANCH: ${{ github.head_ref }}
-          OWNER: ${{ github.repository_owner }}
-          SLUG: ${{ github.event.repository.name }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Skip if a successful (READY) deployment already exists for this commit;
-          # otherwise build with --meta so Vercel attaches the deploy to the PR
-          # branch and repoints the `*-git-<branch>-<team>.vercel.app` alias.
+          # Skip if 2+ successful deployments already exist for this commit
+          # (auto-deploy + a prior workflow-run redeploy = 2).
           READY_COUNT=$(curl -fsS \
-            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&meta-githubCommitSha=$SHA&state=READY&limit=1" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&meta-githubCommitSha=$SHA&state=READY&limit=10" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             | jq '.deployments | length')
 
           if [ "$READY_COUNT" -ge 2 ]; then
-            echo "Successful deployment already exists for $SHA; skipping build."
+            echo "Found $READY_COUNT successful deployments for $SHA; skipping redeploy."
             exit 0
           fi
 
-          vercel deploy --yes --token="$VERCEL_TOKEN" \
-            --meta githubDeployment=1 \
-            --meta githubCommitRef="$BRANCH" \
-            --meta githubCommitSha="$SHA" \
-            --meta githubOrg="$OWNER" \
-            --meta githubRepo="$SLUG"
+          # Redeploy the latest Vercel deployment for this commit so it picks
+          # up the branch-scoped DATABASE_URL set above. Retry every 10s for up
+          # to 2 minutes — Vercel's auto-deploy may not be registered yet, or
+          # may still be building (redeploy fails until it reaches a terminal
+          # state).
+          for i in $(seq 1 12); do
+            LATEST_URL=$(curl -fsS \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&meta-githubCommitSha=$SHA&limit=1" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              | jq -r '.deployments[0].url // empty')
+
+            if [ -n "$LATEST_URL" ]; then
+              echo "Attempt $i: redeploying https://$LATEST_URL"
+              if vercel redeploy "https://$LATEST_URL" --token="$VERCEL_TOKEN"; then
+                exit 0
+              fi
+            else
+              echo "Attempt $i: no deployment found for $SHA yet"
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::Failed to redeploy for $SHA after 2 minutes"
+          exit 1
 
   teardown:
     if: github.event.action == 'closed'
