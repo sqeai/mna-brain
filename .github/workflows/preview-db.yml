@@ -72,20 +72,35 @@ jobs:
           vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
           printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
 
-      - name: Deploy to Vercel (build runs on Vercel)
+      - name: Deploy to Vercel if no successful deployment exists
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          # Pass git context so Vercel attaches this deploy to the PR branch and
-          # repoints the branch's preview alias (`*-git-<branch>-<team>.vercel.app`)
-          # to the new deployment instead of treating it as a one-off.
-          VERCEL_GIT_PROVIDER: github
-          VERCEL_GIT_REPO_OWNER: ${{ github.repository_owner }}
-          VERCEL_GIT_REPO_SLUG: ${{ github.event.repository.name }}
-          VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
-          VERCEL_GIT_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: vercel deploy --yes --token="$VERCEL_TOKEN"
+          BRANCH: ${{ github.head_ref }}
+          OWNER: ${{ github.repository_owner }}
+          SLUG: ${{ github.event.repository.name }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Skip if a successful (READY) deployment already exists for this commit;
+          # otherwise build with --meta so Vercel attaches the deploy to the PR
+          # branch and repoints the `*-git-<branch>-<team>.vercel.app` alias.
+          READY_COUNT=$(curl -fsS \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&meta-githubCommitSha=$SHA&state=READY&limit=1" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            | jq '.deployments | length')
+
+          if [ "$READY_COUNT" -ge 2 ]; then
+            echo "Successful deployment already exists for $SHA; skipping build."
+            exit 0
+          fi
+
+          vercel deploy --yes --token="$VERCEL_TOKEN" \
+            --meta githubDeployment=1 \
+            --meta githubCommitRef="$BRANCH" \
+            --meta githubCommitSha="$SHA" \
+            --meta githubOrg="$OWNER" \
+            --meta githubRepo="$SLUG"
 
   teardown:
     if: github.event.action == 'closed'
