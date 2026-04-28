@@ -90,7 +90,7 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             | jq '.deployments | length')
 
-          if [ "$READY_COUNT" -ge 1 ]; then
+          if [ "$READY_COUNT" -ge 2 ]; then
             echo "Successful deployment already exists for $SHA; skipping build."
             exit 0
           fi
