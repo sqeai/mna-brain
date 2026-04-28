@@ -13,7 +13,6 @@ function makeUser(overrides: Partial<User> = {}): User {
     name: 'Test User',
     email: 'test@example.com',
     password: '',
-    favorite_companies: [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
