@@ -68,7 +68,6 @@ jobs:
           BRANCH: ${{ github.head_ref }}
           POOLED_URL: ${{ steps.neon.outputs.db_url_pooled }}
         run: |
-          printf "$POOLED_URL"
           # Idempotent: drop any prior branch-scoped value before re-adding.
           vercel env rm DATABASE_URL preview "$BRANCH" --yes --token="$VERCEL_TOKEN" || true
           printf "%s" "$POOLED_URL" | vercel env add DATABASE_URL preview "$BRANCH" --token="$VERCEL_TOKEN"
