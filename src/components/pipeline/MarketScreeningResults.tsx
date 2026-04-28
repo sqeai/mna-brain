@@ -63,6 +63,7 @@ interface MarketScreeningResult {
   ebitda_margin_2023: number | null;
   ebitda_margin_2024: number | null;
   source: string | null;
+  financials_raw?: import('@/lib/repositories').Tables<'company_financials'>[];
 }
 
 interface MarketScreeningResultsProps {
@@ -582,6 +583,7 @@ export default function MarketScreeningResults({ refreshTrigger, onAddedToPipeli
                   created_at: selectedResult.created_at,
                   updated_at: selectedResult.created_at,
                   source: selectedResult.source,
+                  financials_raw: selectedResult.financials_raw,
                 }}
                 open={detailDialogOpen}
                 onOpenChange={setDetailDialogOpen}

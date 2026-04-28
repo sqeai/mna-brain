@@ -156,6 +156,7 @@ export default function MasterData() {
         created_at: data.created_at,
         updated_at: data.updated_at,
         source: data.source ?? null,
+        financials_raw: data.financials_raw,
       });
     } catch {
       toast({ title: 'Error', description: 'Could not load company', variant: 'destructive' });
@@ -621,7 +622,10 @@ export default function MasterData() {
             company={selectedCompany}
             open={!!selectedCompany}
             onOpenChange={(open) => !open && setSelectedCompany(null)}
-            onUpdate={fetchCompanies}
+            onUpdate={() => {
+              fetchCompanies();
+              if (selectedCompany) openCompanyDialog(selectedCompany.id);
+            }}
           />
         )}
       </div>
